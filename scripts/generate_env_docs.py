@@ -1,5 +1,6 @@
 """Automatically create markdown documents for every registered environment."""
 
+import argparse
 import hashlib
 import inspect
 import json
@@ -102,7 +103,7 @@ def create_random_action_gif(
     env_filename = sanitize_env_id(env_id)
     outfile = OUTPUT_DIR / "assets" / "random_action_gifs" / f"{env_filename}.gif"
     fps = env.metadata.get("render_fps", default_fps)
-    iio.mimsave(outfile, imgs, fps=fps)
+    iio.mimsave(outfile, imgs, fps=fps, loop=0)
 
 
 def create_initial_state_gif(
@@ -120,7 +121,7 @@ def create_initial_state_gif(
     env_filename = sanitize_env_id(env_id)
     outfile = OUTPUT_DIR / "assets" / "initial_state_gifs" / f"{env_filename}.gif"
     fps = env.metadata.get("render_fps", default_fps)
-    iio.mimsave(outfile, imgs, fps=fps)
+    iio.mimsave(outfile, imgs, fps=fps, loop=0)
 
 
 def generate_markdown(env_id: str, env: gymnasium.Env) -> str:
@@ -147,8 +148,18 @@ def generate_markdown(env_id: str, env: gymnasium.Env) -> str:
 
 
 def _main() -> None:
+    parser = argparse.ArgumentParser(description="Generate environment documentation")
+    parser.add_argument(
+        "--force", action="store_true", help="Force regeneration of all environments"
+    )
+    args = parser.parse_args()
+
     print("Regenerating environment docs...")
-    print("NOTE: the first time you commit locally, this may take some time.")
+    if args.force:
+        print("Force flag detected - regenerating all environments")
+    else:
+        print("NOTE: the first time you commit locally, this may take some time.")
+
     OUTPUT_DIR.mkdir(exist_ok=True)
     (OUTPUT_DIR / "assets" / "random_action_gifs").mkdir(parents=True, exist_ok=True)
     (OUTPUT_DIR / "assets" / "initial_state_gifs").mkdir(parents=True, exist_ok=True)
@@ -162,7 +173,7 @@ def _main() -> None:
         total_envs += 1
         env = prbench.make(env_id, render_mode="rgb_array")
 
-        if is_env_changed(env_id, env):
+        if args.force or is_env_changed(env_id, env):
             print(f"  Regenerating {env_id}...")
             create_random_action_gif(env_id, env)
             create_initial_state_gif(env_id, env)
