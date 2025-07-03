@@ -40,12 +40,12 @@ The benchmark includes a diverse collection of environments. Each environment wi
 2. Tested on MacOS Catalina and Ubuntu 22.04 (but we aim to support most platforms)
 
 ### :wrench: Installation
-1. Recommended: create and source a virtualenv (perhaps with [uv](https://github.com/astral-sh/uv)).
+1. Recommended: create and source a virtualenv (perhaps with [uv](https://github.com/astral-sh/uv))
 2. `pip install -e ".[develop]"`
 3. `pre-commit install`
 
 ### :microscope: Check Installation
-Run `./run_ci_checks.sh`.` It should complete with all green successes.
+Run `./run_ci_checks.sh`. It should complete with all green successes.
 
 ### :new: Adding New Environments
 Detailed instructions to be added soon. For now, please see the examples in `src/prbench/env`. Also consider:
