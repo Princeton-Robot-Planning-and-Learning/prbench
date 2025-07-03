@@ -113,7 +113,6 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         obs, reward, terminated, truncated, done = self._geom2d_env.step(
             *args, **kwargs
         )
-        # TODO overwrite termination and rewards...
         assert isinstance(self.observation_space, ObjectCentricBoxSpace)
         vec_obs = self.observation_space.vectorize(obs)
         return vec_obs, reward, terminated, truncated, done
