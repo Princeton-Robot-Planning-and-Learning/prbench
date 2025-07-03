@@ -4,3 +4,5 @@
 
 A robotics benchmark for physical reasoning.
 
+### Contributing
+TODO: need to note `pre-commit install`
