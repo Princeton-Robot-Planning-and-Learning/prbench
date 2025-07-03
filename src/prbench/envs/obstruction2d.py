@@ -1,4 +1,4 @@
-"""Obstruction 2D env (more description coming soon)."""
+"""Obstruction 2D env."""
 
 import gymnasium
 import numpy as np
@@ -15,8 +15,22 @@ from relational_structs import ObjectCentricStateSpace
 from relational_structs.spaces import ObjectCentricBoxSpace
 
 
+def create_env_description(num_obstructions: int = 2) -> str:
+    """Create a human-readable environment description."""
+    # pylint: disable=line-too-long
+    if num_obstructions > 0:
+        obstruction_sentence = f"\nThe target surface may be initially obstructed by one or more of the {num_obstructions} obstacle blocks.\n"
+    else:
+        obstruction_sentence = ""
+
+    return f"""A 2D environment where the goal is to place a target block onto a target surface. The block must be completely contained within the surface boundaries.
+{obstruction_sentence}    
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
+"""
+
+
 class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
-    """Obstruction 2D env (more description coming soon)."""
+    """Obstruction 2D env."""
 
     def __init__(
         self,
@@ -24,7 +38,7 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         spec: Obstruction2DEnvSpec = Obstruction2DEnvSpec(),
         **kwargs,
     ) -> None:
-        super().__init__(**kwargs)
+        super().__init__()
         # At the moment, all the real logic for this environment is defined
         # externally. We create that environment and then add some additional
         # code to vectorize observations, making it easier for RL approaches.
@@ -52,6 +66,11 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.action_space = self._geom2d_env.action_space
         assert isinstance(self.observation_space, Box)
         assert isinstance(self.action_space, Box)
+        self.metadata = {
+            "description": create_env_description(num_obstructions),
+            "render_modes": self._geom2d_env.metadata["render_modes"],
+            "render_fps": 10,
+        }
 
     def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
         super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
