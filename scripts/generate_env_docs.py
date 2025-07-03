@@ -133,8 +133,6 @@ def generate_markdown(env_id: str, env: gymnasium.Env) -> str:
     md += f"### Description\n{description}\n"
     md += "### Initial State Distribution\n"
     md += f"![initial state GIF](assets/initial_state_gifs/{env_filename}.gif)\n\n"
-    md += "### Evidence of Solvability\n"
-    md += "Coming soon.\n\n"
     md += "### Observation Space\n"
     md += env.metadata["observation_space_description"] + "\n\n"
     md += "### Action Space\n"
