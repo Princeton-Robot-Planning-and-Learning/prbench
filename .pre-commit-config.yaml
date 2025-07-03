@@ -6,3 +6,4 @@ repos:
         entry: python scripts/generate_env_docs.py
         language: system
         types: [python]
+        pass_filenames: false
