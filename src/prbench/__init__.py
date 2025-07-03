@@ -7,10 +7,15 @@ from gymnasium.envs.registration import register
 def register_all_environments() -> None:
     """Add all benchmark environments to the gymnasium registry."""
     # NOTE: ids must start with "prbench/" to be properly registered.
-    register(
-        id="prbench/Obstruction2D-v0",
-        entry_point="prbench.envs.obstruction2d:Obstruction2DEnv",
-    )
+
+    # Obstructions2D environment with different numbers of obstructions
+    num_obstructions = [0, 1, 2, 3, 4]
+    for num_obstruction in num_obstructions:
+        register(
+            id=f"prbench/Obstruction2D-o{num_obstruction}-v0",
+            entry_point="prbench.envs.obstruction2d:Obstruction2DEnv",
+            kwargs={"num_obstructions": num_obstruction},
+        )
 
 
 def make(*args, **kwargs) -> gymnasium.Env:
