@@ -180,7 +180,7 @@ def _main() -> None:
 
     print("Finished generating environment docs.")
 
-    # Add and commit the results.
+    # Add the results.
     subprocess.run(["git", "add", OUTPUT_DIR], check=True)
 
 
