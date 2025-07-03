@@ -1,8 +1,10 @@
 """Obstruction 2D env."""
 
-import gymnasium
 import inspect
+
+import gymnasium
 import numpy as np
+from geom2drobotenvs.concepts import is_on
 from geom2drobotenvs.envs.obstruction_2d_env import (
     Geom2DRobotEnvTypeFeatures,
 )
@@ -10,7 +12,6 @@ from geom2drobotenvs.envs.obstruction_2d_env import Obstruction2DEnv as G2DOE
 from geom2drobotenvs.envs.obstruction_2d_env import (
     Obstruction2DEnvSpec,
 )
-from geom2drobotenvs.concepts import is_on
 from geom2drobotenvs.utils import CRVRobotActionSpace
 from numpy.typing import NDArray
 from relational_structs import ObjectCentricStateSpace
@@ -21,7 +22,7 @@ def create_env_description(num_obstructions: int = 2) -> str:
     """Create a human-readable environment description."""
     # pylint: disable=line-too-long
     if num_obstructions > 0:
-        obstruction_sentence = f"\nThe target surface may be initially obstructed by one or more of the {num_obstructions} obstacle blocks.\n"
+        obstruction_sentence = f"\nThe target surface may be initially obstructed. In this environment, there are always {num_obstructions} obstacle blocks.\n"
     else:
         obstruction_sentence = ""
 
@@ -37,6 +38,13 @@ def create_reward_description() -> str:
     return f"""A penalty of -1.0 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is given below:
 ```python
 {inspect.getsource(is_on)}```
+"""
+
+
+def create_references() -> str:
+    """Create a human-readable reference section."""
+    # pylint: disable=line-too-long
+    return """Similar environments have been used many times, especially in the task and motion planning literature. We took inspiration especially from the "1D Continuous TAMP" environment in [PDDLStream](https://github.com/caelan/pddlstream).
 """
 
 
@@ -78,14 +86,16 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         assert isinstance(self.observation_space, ObjectCentricBoxSpace)
         assert isinstance(self.action_space, CRVRobotActionSpace)
         # Add descriptions to metadata for doc generation.
-        obs_md = "TODO" # self.observation_space.create_markdown_description()
-        act_md = "TODO" # self.action_space.create_markdown_description()
+        obs_md = self.observation_space.create_markdown_description()
+        act_md = self.action_space.create_markdown_description()
         reward_md = create_reward_description()
+        references_md = create_references()
         self.metadata = {
             "description": create_env_description(num_obstructions),
             "observation_space_description": obs_md,
             "action_space_description": act_md,
             "reward_description": reward_md,
+            "references": references_md,
             "render_modes": self._geom2d_env.metadata["render_modes"],
             "render_fps": 10,
         }

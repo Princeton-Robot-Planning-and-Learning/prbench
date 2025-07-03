@@ -13,10 +13,50 @@ The robot has a movable circular base and a retractable arm with a rectangular v
 Coming soon.
 
 ### Observation Space
-TODO
+The entries of an array in this Box space correspond to the following object features:
+| **Index** | **Object** | **Feature** |
+| --- | --- | --- |
+| 0 | robot | x |
+| 1 | robot | y |
+| 2 | robot | theta |
+| 3 | robot | base_radius |
+| 4 | robot | arm_joint |
+| 5 | robot | arm_length |
+| 6 | robot | vacuum |
+| 7 | robot | gripper_height |
+| 8 | robot | gripper_width |
+| 9 | target_surface | x |
+| 10 | target_surface | y |
+| 11 | target_surface | theta |
+| 12 | target_surface | static |
+| 13 | target_surface | color_r |
+| 14 | target_surface | color_g |
+| 15 | target_surface | color_b |
+| 16 | target_surface | z_order |
+| 17 | target_surface | width |
+| 18 | target_surface | height |
+| 19 | target_block | x |
+| 20 | target_block | y |
+| 21 | target_block | theta |
+| 22 | target_block | static |
+| 23 | target_block | color_r |
+| 24 | target_block | color_g |
+| 25 | target_block | color_b |
+| 26 | target_block | z_order |
+| 27 | target_block | width |
+| 28 | target_block | height |
+
 
 ### Action Space
-TODO
+The entries of an array in this Box space correspond to the following action features:
+| **Index** | **Feature** | **Description** | **Min** | **Max** |
+| --- | --- | --- | --- | --- |
+| 0 | dx | Change in robot x position (positive is right) | -0.050 | 0.050 |
+| 1 | dy | Change in robot y position (positive is up) | -0.050 | 0.050 |
+| 2 | dtheta | Change in robot angle in radians (positive is ccw) | -0.196 | 0.196 |
+| 3 | darm | Change in robot arm length (positive is out) | -0.100 | 0.100 |
+| 4 | vac | Directly sets the vacuum (0.0 is off, 1.0 is on) | 0.000 | 1.000 |
+
 
 ### Rewards
 A penalty of -1.0 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is given below:
@@ -47,3 +87,5 @@ def is_on(
 ```
 
 
+### References
+Similar environments have been used many times, especially in the task and motion planning literature. We took inspiration especially from the "1D Continuous TAMP" environment in [PDDLStream](https://github.com/caelan/pddlstream).

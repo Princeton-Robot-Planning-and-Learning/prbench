@@ -78,7 +78,10 @@ def generate_markdown(env_id: str, env: gymnasium.Env) -> str:
     md += env.metadata["action_space_description"] + "\n\n"
     md += "### Rewards\n"
     md += env.metadata["reward_description"] + "\n\n"
-    return md
+    if "references" in env.metadata:
+        md += "### References\n"
+        md += env.metadata["references"] + "\n\n"
+    return md.rstrip() + "\n"
 
 
 def _main() -> None:
