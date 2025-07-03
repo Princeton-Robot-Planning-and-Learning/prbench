@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "prbench"
 version = "0.1.0"
-description = "A basic starter for Python packages."
+description = "A robotics benchmark for physical reasoning."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
