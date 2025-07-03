@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 dependencies = [
    "matplotlib",
    "numpy",
-   "geom2drobotenvs@git+https://github.com/tomsilver/geom2d-robot-envs"
+   "geom2drobotenvs@git+https://github.com/tomsilver/geom2d-robot-envs",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +23,7 @@ develop = [
     "pylint>=2.14.5",
     "pytest-pylint>=0.18.0",
     "pytest>=7.2.2",
+    "pre-commit",
 ]
 
 [tool.setuptools.packages.find]

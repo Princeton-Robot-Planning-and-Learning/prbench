@@ -1,7 +1,10 @@
-"""Obstruction 2D env (more description coming soon)."""
+"""Obstruction 2D env."""
+
+import inspect
 
 import gymnasium
 import numpy as np
+from geom2drobotenvs.concepts import is_on
 from geom2drobotenvs.envs.obstruction_2d_env import (
     Geom2DRobotEnvTypeFeatures,
 )
@@ -9,14 +12,44 @@ from geom2drobotenvs.envs.obstruction_2d_env import Obstruction2DEnv as G2DOE
 from geom2drobotenvs.envs.obstruction_2d_env import (
     Obstruction2DEnvSpec,
 )
-from gymnasium.spaces import Box
+from geom2drobotenvs.utils import CRVRobotActionSpace
 from numpy.typing import NDArray
 from relational_structs import ObjectCentricStateSpace
 from relational_structs.spaces import ObjectCentricBoxSpace
 
 
+def create_env_description(num_obstructions: int = 2) -> str:
+    """Create a human-readable environment description."""
+    # pylint: disable=line-too-long
+    if num_obstructions > 0:
+        obstruction_sentence = f"\nThe target surface may be initially obstructed. In this environment, there are always {num_obstructions} obstacle blocks.\n"
+    else:
+        obstruction_sentence = ""
+
+    return f"""A 2D environment where the goal is to place a target block onto a target surface. The block must be completely contained within the surface boundaries.
+{obstruction_sentence}    
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
+"""
+
+
+def create_reward_description() -> str:
+    """Create a human-readable description of environment rewards."""
+    # pylint: disable=line-too-long
+    return f"""A penalty of -1.0 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is given below:
+```python
+{inspect.getsource(is_on)}```
+"""
+
+
+def create_references() -> str:
+    """Create a human-readable reference section."""
+    # pylint: disable=line-too-long
+    return """Similar environments have been used many times, especially in the task and motion planning literature. We took inspiration especially from the "1D Continuous TAMP" environment in [PDDLStream](https://github.com/caelan/pddlstream).
+"""
+
+
 class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
-    """Obstruction 2D env (more description coming soon)."""
+    """Obstruction 2D env."""
 
     def __init__(
         self,
@@ -24,7 +57,7 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         spec: Obstruction2DEnvSpec = Obstruction2DEnvSpec(),
         **kwargs,
     ) -> None:
-        super().__init__(**kwargs)
+        super().__init__()
         # At the moment, all the real logic for this environment is defined
         # externally. We create that environment and then add some additional
         # code to vectorize observations, making it easier for RL approaches.
@@ -50,8 +83,22 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             self._constant_objects, Geom2DRobotEnvTypeFeatures
         )
         self.action_space = self._geom2d_env.action_space
-        assert isinstance(self.observation_space, Box)
-        assert isinstance(self.action_space, Box)
+        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
+        assert isinstance(self.action_space, CRVRobotActionSpace)
+        # Add descriptions to metadata for doc generation.
+        obs_md = self.observation_space.create_markdown_description()
+        act_md = self.action_space.create_markdown_description()
+        reward_md = create_reward_description()
+        references_md = create_references()
+        self.metadata = {
+            "description": create_env_description(num_obstructions),
+            "observation_space_description": obs_md,
+            "action_space_description": act_md,
+            "reward_description": reward_md,
+            "references": references_md,
+            "render_modes": self._geom2d_env.metadata["render_modes"],
+            "render_fps": 10,
+        }
 
     def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
         super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
