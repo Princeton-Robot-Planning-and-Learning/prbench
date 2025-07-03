@@ -82,6 +82,8 @@ def generate_markdown(env_id: str, env: gymnasium.Env) -> str:
 
 
 def _main() -> None:
+    # TODO add precommit hook
+    # TODO make sure that unchanged envs are skipped
     print("Regenerating environment docs...")
     OUTPUT_DIR.mkdir(exist_ok=True)
     prbench.register_all_environments()
