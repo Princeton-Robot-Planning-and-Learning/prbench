@@ -148,6 +148,7 @@ def generate_markdown(env_id: str, env: gymnasium.Env) -> str:
 def _main() -> None:
     # TODO add precommit hook
     print("Regenerating environment docs...")
+    print("NOTE: the first time you commit locally, this may take some time.")
     OUTPUT_DIR.mkdir(exist_ok=True)
     (OUTPUT_DIR / "assets" / "random_action_gifs").mkdir(parents=True, exist_ok=True)
     (OUTPUT_DIR / "assets" / "initial_state_gifs").mkdir(parents=True, exist_ok=True)
