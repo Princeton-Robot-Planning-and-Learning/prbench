@@ -11,6 +11,7 @@ requires-python = ">=3.10"
 dependencies = [
    "matplotlib",
    "numpy",
+   "geom2drobotenvs@git+https://github.com/tomsilver/geom2d-robot-envs"
 ]
 
 [project.optional-dependencies]
