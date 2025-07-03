@@ -101,7 +101,7 @@ The entries of an array in this Box space correspond to the following action fea
 
 
 ### Rewards
-A penalty of -1.0 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is given below:
+A penalty of -1 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is given below:
 ```python
 def is_on(
     state: ObjectCentricState,

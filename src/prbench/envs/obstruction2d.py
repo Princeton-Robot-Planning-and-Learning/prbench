@@ -35,7 +35,7 @@ The robot has a movable circular base and a retractable arm with a rectangular v
 def create_reward_description() -> str:
     """Create a human-readable description of environment rewards."""
     # pylint: disable=line-too-long
-    return f"""A penalty of -1.0 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is given below:
+    return f"""A penalty of -1 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is given below:
 ```python
 {inspect.getsource(is_on)}```
 """
