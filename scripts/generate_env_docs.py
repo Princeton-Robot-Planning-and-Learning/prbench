@@ -1,5 +1,9 @@
 """Automatically create markdown documents for every registered environment."""
 
+import hashlib
+import inspect
+import json
+import os
 from pathlib import Path
 
 import gymnasium
@@ -8,6 +12,63 @@ import imageio.v2 as iio
 import prbench
 
 OUTPUT_DIR = Path(__file__).parent.parent / "docs" / "envs"
+CACHE_DIR = Path(__file__).parent.parent / ".cache" / "env_docs"
+
+
+def get_env_source_hash(env_id: str, env: gymnasium.Env) -> str:
+    """Get a hash of the environment's source code and metadata."""
+    env_class = env.__class__
+    source_code = inspect.getsource(env_class)
+    module_path = inspect.getfile(env_class)
+    # Read the entire module file to catch changes in imports, helper functions, etc.
+    with open(module_path, "r", encoding="utf-8") as f:
+        module_source = f.read()
+    # Include metadata in the hash.
+    metadata_str = json.dumps(env.metadata, sort_keys=True)
+    # Create hash from source code, module source, and metadata.
+    hash_input = f"{env_id}\n{source_code}\n{module_source}\n{metadata_str}"
+    return hashlib.sha256(hash_input.encode()).hexdigest()
+
+
+def get_cache_file(env_id: str) -> Path:
+    """Get the cache file path for a specific environment."""
+    env_filename = sanitize_env_id(env_id)
+    return CACHE_DIR / f"{env_filename}.json"
+
+
+def is_env_changed(env_id: str, env: gymnasium.Env) -> bool:
+    """Check if the environment has changed since last generation."""
+    cache_file = get_cache_file(env_id)
+
+    if not cache_file.exists():
+        return True
+
+    try:
+        with open(cache_file, "r", encoding="utf-8") as f:
+            cache_data = json.load(f)
+
+        current_hash = get_env_source_hash(env_id, env)
+        return cache_data.get("source_hash") != current_hash
+    except (json.JSONDecodeError, KeyError):
+        return True
+
+
+def update_cache(env_id: str, env: gymnasium.Env) -> None:
+    """Update the cache for a specific environment."""
+    cache_file = get_cache_file(env_id)
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Get the module file path for timestamp.
+    module_path = inspect.getfile(env.__class__)
+
+    cache_data = {
+        "source_hash": get_env_source_hash(env_id, env),
+        "env_id": env_id,
+        "timestamp": os.path.getmtime(module_path),
+    }
+
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump(cache_data, f, indent=2)
 
 
 def sanitize_env_id(env_id: str) -> str:
@@ -86,20 +147,35 @@ def generate_markdown(env_id: str, env: gymnasium.Env) -> str:
 
 def _main() -> None:
     # TODO add precommit hook
-    # TODO make sure that unchanged envs are skipped
     print("Regenerating environment docs...")
     OUTPUT_DIR.mkdir(exist_ok=True)
+    (OUTPUT_DIR / "assets" / "random_action_gifs").mkdir(parents=True, exist_ok=True)
+    (OUTPUT_DIR / "assets" / "initial_state_gifs").mkdir(parents=True, exist_ok=True)
+
     prbench.register_all_environments()
+
+    total_envs = 0
+    regenerated_envs = 0
+
     for env_id in prbench.get_all_env_ids():
+        total_envs += 1
         env = prbench.make(env_id, render_mode="rgb_array")
-        create_random_action_gif(env_id, env)
-        create_initial_state_gif(env_id, env)
-        md = generate_markdown(env_id, env)
-        assert env_id.startswith("prbench/")
-        env_filename = sanitize_env_id(env_id)
-        filename = OUTPUT_DIR / f"{env_filename}.md"
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write(md)
+
+        if is_env_changed(env_id, env):
+            print(f"  Regenerating {env_id}...")
+            create_random_action_gif(env_id, env)
+            create_initial_state_gif(env_id, env)
+            md = generate_markdown(env_id, env)
+            assert env_id.startswith("prbench/")
+            env_filename = sanitize_env_id(env_id)
+            filename = OUTPUT_DIR / f"{env_filename}.md"
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(md)
+            update_cache(env_id, env)
+            regenerated_envs += 1
+        else:
+            print(f"  Skipping {env_id} (no changes detected)")
+
     print("Finished generating environment docs.")
 
 
