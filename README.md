@@ -12,7 +12,7 @@ To even call this "pre-alpha" would be generous. Unless you have had a direct co
 
 ## :zap: Usage Example
 
-```
+```python
 import prbench
 prbench.register_all_environments()
 env = prbench.make("prbench/Obstruction2D-o3-v0")  # 3 obstructions
