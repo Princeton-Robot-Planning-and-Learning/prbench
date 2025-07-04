@@ -1,8 +1,8 @@
 """Obstruction 2D env."""
 
 import inspect
-
 from typing import Any
+
 import gymnasium
 import numpy as np
 from geom2drobotenvs.concepts import is_on
@@ -121,8 +121,11 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def render(self):
         return self._geom2d_env.render()
 
-    def get_action_from_gui_input(self, gui_input: dict[str, Any]) -> NDArray[np.float32]:
-        """Get the mapping from human inputs to actions, derived from action space."""
+    def get_action_from_gui_input(
+        self, gui_input: dict[str, Any]
+    ) -> NDArray[np.float32]:
+        """Get the mapping from human inputs to actions, derived from action
+        space."""
         # Unpack the input.
         keys_pressed = gui_input["keys"]
         right_x, right_y = gui_input["right_stick"]

@@ -52,5 +52,7 @@ exclude = ["venv/*", ".venv/*"]
 [[tool.mypy.overrides]]
 module = [
     "matplotlib.*",
+    "pygame.*",
+    "dill.*",
 ]
 ignore_missing_imports = true
