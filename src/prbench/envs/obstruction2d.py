@@ -149,10 +149,10 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # is used right now.
         action[2] = _rescale(left_x, low[2], high[2])
 
-        # The up/down mouse keys are used to adjust the robot arm.
-        if "up" in keys_pressed:
+        # The w/s mouse keys are used to adjust the robot arm.
+        if "w" in keys_pressed:
             action[3] = low[3]
-        if "down" in keys_pressed:
+        if "s" in keys_pressed:
             action[3] = high[3]
 
         # The space bar is used to turn on the vacuum.
