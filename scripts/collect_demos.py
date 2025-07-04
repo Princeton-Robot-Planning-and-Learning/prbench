@@ -2,6 +2,7 @@
 
 import argparse
 import math
+import sys
 import time
 from pathlib import Path
 
@@ -13,7 +14,7 @@ try:
 except ImportError:
     print("Error: pygame is required for demo collection.")
     print("Install it with: pip install pygame")
-    exit(1)
+    sys.exit(1)
 
 import prbench
 
@@ -128,7 +129,7 @@ class DemoCollector:
 
         # The user may be pressing multiple keys at once, and pygame only gets
         # up/down events, rather than accessing all keys currently pressed.
-        self.keys_pressed = set()
+        self.keys_pressed: set[str] = set()
 
         # Initialize pygame.
         pygame.init()
@@ -156,6 +157,7 @@ class DemoCollector:
         self.reset_env()
 
     def reset_env(self) -> None:
+        """Reset the environment and start collecting a new demo."""
         obs, _ = self.env.reset(seed=self.seed)
         self.seed += 1
         self.observations = [obs]
@@ -166,6 +168,7 @@ class DemoCollector:
         self.keys_pressed.clear()
 
     def save_demo(self) -> None:
+        """Save the current demo to disk."""
         if not self.observations or not self.actions:
             print("Warning: No demo data to save!")
             return
@@ -210,7 +213,7 @@ class DemoCollector:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
-            elif event.type == pygame.KEYDOWN:
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     self.reset_env()
                 elif event.key == pygame.K_g:
@@ -222,7 +225,7 @@ class DemoCollector:
                     if key_name not in {"r", "g", "q"}:
                         self.keys_pressed.add(key_name)
                         some_action_input = True
-            elif event.type == pygame.KEYUP:
+            if event.type == pygame.KEYUP:
                 if not self.terminated and not self.truncated:
                     key_name = pygame.key.name(event.key)
                     if key_name in self.keys_pressed:
@@ -240,9 +243,11 @@ class DemoCollector:
         return True
 
     def render(self) -> None:
-        img = self.env.render()
+        """Render the image in the GUI."""
         # For now, assume a certain image format.
-        assert len(img.shape) == 3 and img.shape[2] in (3, 4) and img.dtype == np.uint8
+        img: np.ndarray = self.env.render()  # type: ignore
+        assert len(img.shape) == 3 and img.shape[2] in (3, 4)  # type: ignore
+        assert img.dtype == np.uint8  # type: ignore
         img_surface = pygame.surfarray.make_surface(img[:, :, :3].swapaxes(0, 1))
 
         # Scale image to fit the center area (excluding side panels).
@@ -314,6 +319,7 @@ class DemoCollector:
         pygame.display.flip()
 
     def step_env(self) -> None:
+        """Step the environment one time."""
         # Get analog stick values.
         left_x, left_y = self.left_stick.x, self.left_stick.y
         right_x, right_y = self.right_stick.x, self.right_stick.y
@@ -325,11 +331,12 @@ class DemoCollector:
             "right_stick": (right_x, right_y),
         }
 
+        assert hasattr(self.unwrapped_env, "get_action_from_gui_input")
         action = self.unwrapped_env.get_action_from_gui_input(input_data)
         obs, reward, terminated, truncated, _ = self.env.step(action)
         self.observations.append(obs)
         self.actions.append(action)
-        self.rewards.append(reward)
+        self.rewards.append(float(reward))
         self.terminated = terminated
         self.truncated = truncated
 

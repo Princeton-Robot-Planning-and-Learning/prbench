@@ -132,6 +132,7 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         left_x, _ = gui_input["left_stick"]
 
         # Initialize the action.
+        assert isinstance(self.action_space, CRVRobotActionSpace)
         low = self.action_space.low
         high = self.action_space.high
         action = np.zeros(self.action_space.shape, self.action_space.dtype)
