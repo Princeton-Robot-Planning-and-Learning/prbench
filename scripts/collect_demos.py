@@ -175,12 +175,15 @@ class DemoCollector:
             print("Warning: No demo data to save!")
             return
         timestamp = int(time.time())
-        demo_subdir = self.demo_dir / sanitize_env_id(self.env_id) / str(self.seed)
+        # The seed used for this demo is self.seed - 1 since we increment after reset
+        demo_seed = self.seed - 1
+        demo_subdir = self.demo_dir / sanitize_env_id(self.env_id) / str(demo_seed)
         demo_subdir.mkdir(parents=True, exist_ok=True)
         demo_path = demo_subdir / f"{timestamp}.p"
         demo_data = {
             "env_id": self.env_id,
             "timestamp": timestamp,
+            "seed": demo_seed,
             "observations": self.observations,
             "actions": self.actions,
             "rewards": self.rewards,
