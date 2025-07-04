@@ -28,7 +28,7 @@ img = env.render()
 
 ### :ballot_box_with_check: Requirements
 1. Python 3.10+
-2. Tested on MacOS Catalina and Ubuntu 22.04 (but we aim to support most platforms)
+2. Tested on MacOS Monterey and Ubuntu 22.04 (but we aim to support most platforms)
 
 ### :wrench: Installation
 1. Recommended: create and source a virtualenv (perhaps with [uv](https://github.com/astral-sh/uv))
