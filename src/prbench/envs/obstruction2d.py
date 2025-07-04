@@ -17,6 +17,8 @@ from numpy.typing import NDArray
 from relational_structs import ObjectCentricStateSpace
 from relational_structs.spaces import ObjectCentricBoxSpace
 
+from .base import HumanInputEnv
+
 
 def create_env_description(num_obstructions: int = 2) -> str:
     """Create a human-readable environment description."""
@@ -48,7 +50,7 @@ def create_references() -> str:
 """
 
 
-class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
+class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]], HumanInputEnv):
     """Obstruction 2D env."""
 
     def __init__(
@@ -119,3 +121,25 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def render(self):
         return self._geom2d_env.render()
+
+    def get_human_input_mapping(self):
+        """Get the mapping from human inputs to actions, derived from action space."""
+        low = self.action_space.low
+        high = self.action_space.high
+        # Indices: 0=dx, 1=dy, 2=dtheta, 3=darm, 4=vac
+        return {
+            'key_mappings': {
+                'a': (0, float(low[0])),   # dx min (left)
+                'd': (0, float(high[0])),  # dx max (right)
+                'w': (1, float(high[1])),  # dy max (up)
+                's': (1, float(low[1])),   # dy min (down)
+                'q': (2, float(low[2])),   # dtheta min (ccw)
+                'e': (2, float(high[2])),  # dtheta max (cw)
+                'z': (3, float(low[3])),   # darm min (retract)
+                'x': (3, float(high[3])),  # darm max (extend)
+                'space': (4, float(high[4])), # vac max (on)
+                # Optionally, 'c': (4, float(low[4])) # vac min (off)
+            },
+            'description': "WASD: Move robot base, QE: Rotate robot, ZX: Extend/retract arm, Space: Toggle vacuum",
+            'action_bounds': [(float(l), float(h)) for l, h in zip(low, high)],
+        }
