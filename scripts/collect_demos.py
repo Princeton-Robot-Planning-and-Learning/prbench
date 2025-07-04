@@ -16,6 +16,8 @@ except ImportError:
     print("Install it with: pip install pygame")
     sys.exit(1)
 
+from generate_env_docs import sanitize_env_id
+
 import prbench
 
 
@@ -173,11 +175,15 @@ class DemoCollector:
             print("Warning: No demo data to save!")
             return
         timestamp = int(time.time())
-        demo_filename = f"{self.env_id.replace('/', '_')}_{timestamp}.p"
-        demo_path = self.demo_dir / demo_filename
+        # The seed used for this demo is self.seed - 1 since we increment after reset
+        demo_seed = self.seed - 1
+        demo_subdir = self.demo_dir / sanitize_env_id(self.env_id) / str(demo_seed)
+        demo_subdir.mkdir(parents=True, exist_ok=True)
+        demo_path = demo_subdir / f"{timestamp}.p"
         demo_data = {
             "env_id": self.env_id,
             "timestamp": timestamp,
+            "seed": demo_seed,
             "observations": self.observations,
             "actions": self.actions,
             "rewards": self.rewards,
@@ -193,6 +199,24 @@ class DemoCollector:
 
         Returns False if should quit.
         """
+        if self.terminated or self.truncated:
+            while True:
+                response = (
+                    input(
+                        "Episode terminated! Do you want to save before reset? (y/n) "
+                    )
+                    .strip()
+                    .lower()
+                )
+                if response not in ("y", "n"):
+                    continue
+                if response == "y":
+                    self.save_demo()
+                self.reset_env()
+                break
+
+        assert not (self.terminated or self.truncated)
+
         # Check if something happened.
         some_action_input = False
 
@@ -220,21 +244,16 @@ class DemoCollector:
                     self.save_demo()
                 elif event.key == pygame.K_q:
                     return False
-                elif not self.terminated and not self.truncated:
+                else:
                     key_name = pygame.key.name(event.key)
                     if key_name not in {"r", "g", "q"}:
                         self.keys_pressed.add(key_name)
                         some_action_input = True
             if event.type == pygame.KEYUP:
-                if not self.terminated and not self.truncated:
-                    key_name = pygame.key.name(event.key)
-                    if key_name in self.keys_pressed:
-                        self.keys_pressed.discard(key_name)
-                        some_action_input = True
-
-        if self.terminated or self.truncated:
-            print("Environment terminated! Save and/or reset.")
-            return True
+                key_name = pygame.key.name(event.key)
+                if key_name in self.keys_pressed:
+                    self.keys_pressed.discard(key_name)
+                    some_action_input = True
 
         # Execute the actions.
         if some_action_input:
