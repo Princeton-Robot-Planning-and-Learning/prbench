@@ -11,9 +11,6 @@ The robot has a movable circular base and a retractable arm with a rectangular v
 ### Initial State Distribution
 ![initial state GIF](assets/initial_state_gifs/Obstruction2D-o3.gif)
 
-### Evidence of Solvability
-Coming soon.
-
 ### Observation Space
 The entries of an array in this Box space correspond to the following object features:
 | **Index** | **Object** | **Feature** |
@@ -98,7 +95,7 @@ def is_on(
     top: Object,
     bottom: Object,
     static_object_cache: dict[Object, MultiBody2D],
-    tol: float = 1e-1,
+    tol: float = 0.025,
 ) -> bool:
     """Checks top object is completely on the bottom one.
 

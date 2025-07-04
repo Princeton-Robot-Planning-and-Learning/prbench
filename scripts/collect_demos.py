@@ -16,6 +16,8 @@ except ImportError:
     print("Install it with: pip install pygame")
     sys.exit(1)
 
+from generate_env_docs import sanitize_env_id
+
 import prbench
 
 
@@ -173,8 +175,9 @@ class DemoCollector:
             print("Warning: No demo data to save!")
             return
         timestamp = int(time.time())
-        demo_filename = f"{self.env_id.replace('/', '_')}_{timestamp}.p"
-        demo_path = self.demo_dir / demo_filename
+        demo_subdir = self.demo_dir / sanitize_env_id(self.env_id) / str(self.seed)
+        demo_subdir.mkdir(parents=True, exist_ok=True)
+        demo_path = demo_subdir / f"{timestamp}.p"
         demo_data = {
             "env_id": self.env_id,
             "timestamp": timestamp,
