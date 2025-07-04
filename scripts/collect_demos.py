@@ -246,15 +246,7 @@ class DemoCollector:
         right_label = self.font.render("Right Stick", True, (255, 255, 255))
         self.screen.blit(left_label, (self.left_stick.center_x - 40, self.left_stick.center_y - 60))
         self.screen.blit(right_label, (self.right_stick.center_x - 40, self.right_stick.center_y - 60))
-        
-        # Draw stick values
-        left_x, left_y = self.left_stick.x, self.left_stick.y
-        right_x, right_y = self.right_stick.x, self.right_stick.y
-        left_values = self.font.render(f"L: ({left_x:.2f}, {left_y:.2f})", True, (200, 200, 200))
-        right_values = self.font.render(f"R: ({right_x:.2f}, {right_y:.2f})", True, (200, 200, 200))
-        self.screen.blit(left_values, (10, 40))
-        self.screen.blit(right_values, (10, 65))
-        
+                
         # Draw status text.
         status_text = f"{self.env_id} - Demo Length: {len(self.actions)}"
         text_surface = self.font.render(status_text, True, (255, 255, 255))
@@ -267,7 +259,6 @@ class DemoCollector:
             "Press 'r' to start/reset demo",
             "Press 'g' to save demo", 
             "Press 'q' to quit",
-            "Click and drag on analog sticks to control"
         ]
         for i, instruction in enumerate(instructions):
             text_surface = self.font.render(instruction, True, (200, 200, 200))
