@@ -1,6 +1,7 @@
 """Obstruction 2D env."""
 
 import inspect
+from typing import Any
 
 import gymnasium
 import numpy as np
@@ -119,3 +120,43 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def render(self):
         return self._geom2d_env.render()
+
+    def get_action_from_gui_input(
+        self, gui_input: dict[str, Any]
+    ) -> NDArray[np.float32]:
+        """Get the mapping from human inputs to actions, derived from action
+        space."""
+        # Unpack the input.
+        keys_pressed = gui_input["keys"]
+        right_x, right_y = gui_input["right_stick"]
+        left_x, _ = gui_input["left_stick"]
+
+        # Initialize the action.
+        assert isinstance(self.action_space, CRVRobotActionSpace)
+        low = self.action_space.low
+        high = self.action_space.high
+        action = np.zeros(self.action_space.shape, self.action_space.dtype)
+
+        def _rescale(x: float, lb: float, ub: float) -> float:
+            """Rescale from [-1, 1] to [lb, ub]."""
+            return lb + (x + 1) * (ub - lb) / 2
+
+        # The right stick controls the x, y movement of the base.
+        action[0] = _rescale(right_x, low[0], high[0])
+        action[1] = _rescale(right_y, low[1], high[1])
+
+        # The left stick controls the rotation of the base. Only the x axis
+        # is used right now.
+        action[2] = _rescale(left_x, low[2], high[2])
+
+        # The up/down mouse keys are used to adjust the robot arm.
+        if "up" in keys_pressed:
+            action[3] = low[3]
+        if "down" in keys_pressed:
+            action[3] = high[3]
+
+        # The space bar is used to turn on the vacuum.
+        if "space" in keys_pressed:
+            action[4] = 1.0
+
+        return action
