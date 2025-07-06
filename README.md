@@ -6,7 +6,7 @@ A **p**hysical **r**easoning **bench**mark for robotics.
 
 There's growing excitement around large language models and their ability to "reason"—but reasoning isn't just about tokens and text. **Robots must reason too**: over long horizons, under uncertainty, and with sparse feedback. And unlike purely symbolic systems, **robotic reasoning is physical**. It’s grounded in low-level, continuous state and action spaces. It requires understanding kinematics, geometry, dynamics, contact, force, tool use, and more.
 
-This benchmark is designed for this kind of physical reasoning with robots. We invite researchers to try their best task and motion planning, reinforcement learning, imitation learning, and foundation models approaches. We further hope that PRBench will bridge perspectives and foster shared progress toward physically intelligent robots.
+This benchmark is designed for this kind of physical reasoning with robots. We invite researchers to try their best task and motion planning, reinforcement learning, imitation learning, and foundation models approaches. We hope that PRBench will bridge perspectives and foster shared progress toward physically intelligent robots.
 
 ## :clock1: Status
 
