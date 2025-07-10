@@ -393,6 +393,6 @@ def create_env_description(num_obstructions: int = 2) -> str:
         obstruction_sentence = ""
 
     return f"""A 2D environment where the goal is to "pick up" (suction) a target block.
-{obstruction_sentence}    
+{obstruction_sentence}
 The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
 """

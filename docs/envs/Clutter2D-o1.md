@@ -5,7 +5,7 @@
 A 2D environment where the goal is to "pick up" (suction) a target block.
 
 The target block may be initially obstructed. In this environment, there are always 1 obstacle blocks.
-    
+
 The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
 
 ### Initial State Distribution
