@@ -25,11 +25,11 @@ def test_object_centric_motion2d_env():
     env.close()
 
 
-# def test_clutter2d_observation_space():
-#     """Tests that observations are vectors with fixed dimensionality."""
-#     prbench.register_all_environments()
-#     env = prbench.make("prbench/Clutter2D-o10-v0")
-#     assert isinstance(env.observation_space, Box)
-#     for _ in range(5):
-#         obs, _ = env.reset()
-#         assert env.observation_space.contains(obs)
+def test_motion2d_observation_space():
+    """Tests that observations are vectors with fixed dimensionality."""
+    prbench.register_all_environments()
+    env = prbench.make("prbench/Motion2D-p5-v0")
+    assert isinstance(env.observation_space, Box)
+    for _ in range(5):
+        obs, _ = env.reset()
+        assert env.observation_space.contains(obs)

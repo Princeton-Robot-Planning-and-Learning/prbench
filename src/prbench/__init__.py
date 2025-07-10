@@ -26,6 +26,15 @@ def register_all_environments() -> None:
             kwargs={"num_obstructions": num_obstruction},
         )
 
+    # Motion2D environment with different numbers of passages.
+    num_passages = [1, 2, 3, 4, 5]
+    for num_passage in num_passages:
+        register(
+            id=f"prbench/Motion2D-p{num_passage}-v0",
+            entry_point="prbench.envs.motion2d:Motion2DEnv",
+            kwargs={"num_passages": num_passage},
+        )
+
 
 def make(*args, **kwargs) -> gymnasium.Env:
     """Create a registered environment from its name."""
