@@ -79,6 +79,23 @@ class Clutter2DEnvSpec(Geom2DRobotEnvSpec):
         ),
     )
 
+    # Target block hyperparameters.
+    target_block_rgb: tuple[float, float, float] = PURPLE
+    target_block_init_bounds: tuple[SE2Pose, SE2Pose] = (
+        SE2Pose(
+            world_min_x + robot_base_radius,
+            world_min_y + robot_base_radius,
+            -np.pi,
+        ),
+        SE2Pose(
+            world_max_x - robot_base_radius,
+            world_max_y - robot_base_radius,
+            np.pi,
+        ),
+    )
+    target_block_shape: tuple[float, float] = (2 * robot_gripper_height, 2 * robot_gripper_height)
+
+
     # For rendering.
     render_dpi: int = 150
 
@@ -105,25 +122,27 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
         }
 
     def _sample_initial_state(self) -> ObjectCentricState:
-        constant_initial_state_dict = self._create_constant_initial_state_dict()
-        temp_init_state = create_state_from_dict(
-            constant_initial_state_dict, Geom2DRobotEnvTypeFeatures
-        )
-        static_objects = set(temp_init_state)
-        assert not state_has_collision(
-            temp_init_state,
-            static_objects,
-            static_objects,
-            {},
-        )
-        # TODO
+        initial_state_dict = self._create_constant_initial_state_dict()
+        static_objects = set(initial_state_dict)
         robot_pose = sample_se2_pose(
             self._spec.robot_init_pose_bounds, self.np_random
         )
-        state = self._create_initial_state(
-            constant_initial_state_dict,
-            robot_pose,
-        )
+        state = self._create_initial_state(initial_state_dict, robot_pose)
+        robot = state.get_objects(CRVRobotType)[0]
+        assert not state_has_collision(state, {robot}, static_objects, {})
+        # Sample target pose and check for collisions with robot and static objects.
+        while True:
+            target_pose = sample_se2_pose(
+                self._spec.target_block_init_bounds, self.np_random
+            )
+            state = self._create_initial_state(
+                initial_state_dict,
+                robot_pose,
+                target_pose=target_pose,
+            )
+            target_block = state.get_objects(TargetBlockType)[0]
+            if not state_has_collision(state, {target_block}, {robot} | static_objects, {}):
+                break
         return state
 
 
@@ -149,7 +168,8 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
         return init_state_dict
     
     def _create_initial_state(self, constant_initial_state_dict: dict[Object, dict[str, float]],
-        robot_pose: SE2Pose) -> ObjectCentricState:
+        robot_pose: SE2Pose,
+        target_pose: SE2Pose | None = None) -> ObjectCentricState:
         
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
@@ -168,6 +188,22 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
             "gripper_height": self._spec.robot_gripper_height,
             "gripper_width": self._spec.robot_gripper_width,
         }
+
+        # Create the target block.
+        if target_pose is not None:
+            target_block = TargetBlockType("target_block")
+            init_state_dict[target_block] = {
+                "x": target_pose.x,
+                "y": target_pose.y,
+                "theta": target_pose.theta,
+                "width": self._spec.target_block_shape[0],
+                "height":self._spec.target_block_shape[1],
+                "static": False,
+                "color_r": self._spec.target_block_rgb[0],
+                "color_g": self._spec.target_block_rgb[1],
+                "color_b": self._spec.target_block_rgb[2],
+                "z_order": ZOrder.ALL.value,
+            }
 
         # Finalize state.
         return create_state_from_dict(init_state_dict, Geom2DRobotEnvTypeFeatures)
