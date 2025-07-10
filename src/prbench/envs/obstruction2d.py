@@ -19,36 +19,6 @@ from relational_structs import ObjectCentricStateSpace
 from relational_structs.spaces import ObjectCentricBoxSpace
 
 
-def create_env_description(num_obstructions: int = 2) -> str:
-    """Create a human-readable environment description."""
-    # pylint: disable=line-too-long
-    if num_obstructions > 0:
-        obstruction_sentence = f"\nThe target surface may be initially obstructed. In this environment, there are always {num_obstructions} obstacle blocks.\n"
-    else:
-        obstruction_sentence = ""
-
-    return f"""A 2D environment where the goal is to place a target block onto a target surface. The block must be completely contained within the surface boundaries.
-{obstruction_sentence}    
-The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
-"""
-
-
-def create_reward_description() -> str:
-    """Create a human-readable description of environment rewards."""
-    # pylint: disable=line-too-long
-    return f"""A penalty of -1.0 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is given below:
-```python
-{inspect.getsource(is_on)}```
-"""
-
-
-def create_references() -> str:
-    """Create a human-readable reference section."""
-    # pylint: disable=line-too-long
-    return """Similar environments have been used many times, especially in the task and motion planning literature. We took inspiration especially from the "1D Continuous TAMP" environment in [PDDLStream](https://github.com/caelan/pddlstream).
-"""
-
-
 class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     """Obstruction 2D env."""
 
@@ -160,3 +130,33 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             action[4] = 1.0
 
         return action
+
+
+def create_env_description(num_obstructions: int = 2) -> str:
+    """Create a human-readable environment description."""
+    # pylint: disable=line-too-long
+    if num_obstructions > 0:
+        obstruction_sentence = f"\nThe target surface may be initially obstructed. In this environment, there are always {num_obstructions} obstacle blocks.\n"
+    else:
+        obstruction_sentence = ""
+
+    return f"""A 2D environment where the goal is to place a target block onto a target surface. The block must be completely contained within the surface boundaries.
+{obstruction_sentence}    
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
+"""
+
+
+def create_reward_description() -> str:
+    """Create a human-readable description of environment rewards."""
+    # pylint: disable=line-too-long
+    return f"""A penalty of -1.0 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is given below:
+```python
+{inspect.getsource(is_on)}```
+"""
+
+
+def create_references() -> str:
+    """Create a human-readable reference section."""
+    # pylint: disable=line-too-long
+    return """Similar environments have been used many times, especially in the task and motion planning literature. We took inspiration especially from the "1D Continuous TAMP" environment in [PDDLStream](https://github.com/caelan/pddlstream).
+"""
