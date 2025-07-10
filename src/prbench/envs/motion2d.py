@@ -173,8 +173,7 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
                 break
         else:
             raise RuntimeError("Failed to sample target pose.")
-        # Sample obstacles one by one. Assume that the scene is never so dense
-        # that we need to resample earlier choices.
+        # Create obstacles in vertical narrow passages.
         obstacles: list[tuple[SE2Pose, tuple[float, float]]] = []
         for _ in range(self._num_obstacles):
             for _ in range(self._spec.max_init_sampling_attempts):
