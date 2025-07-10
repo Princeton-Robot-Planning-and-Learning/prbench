@@ -65,31 +65,33 @@ class Motion2DEnvSpec(Geom2DRobotEnvSpec):
     robot_arm_length: float = 2 * robot_base_radius
     robot_gripper_height: float = 0.07
     robot_gripper_width: float = 0.01
+    # The robot starts on the left side of the screen.
     robot_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
         SE2Pose(
-            world_min_x + 4 * robot_base_radius,
-            world_min_y + 4 * robot_base_radius,
+            world_min_x + 2 * robot_base_radius,
+            world_min_y + 3 * robot_base_radius,
             -np.pi,
         ),
         SE2Pose(
-            world_max_x - 4 * robot_base_radius,
-            world_max_y - 4 * robot_base_radius,
+            world_min_x + 3 * robot_base_radius,
+            world_max_y - 3 * robot_base_radius,
             np.pi,
         ),
     )
 
     # Target region hyperparameters.
     target_region_rgb: tuple[float, float, float] = PURPLE
+    # The target region starts on the right side of the screen.
     target_region_init_bounds: tuple[SE2Pose, SE2Pose] = (
         SE2Pose(
-            world_min_x + robot_base_radius,
-            world_min_y + robot_base_radius,
-            -np.pi,
+            world_max_x - 3 * robot_base_radius,
+            world_min_y + 3 * robot_base_radius,
+            0,
         ),
         SE2Pose(
-            world_max_x - robot_base_radius,
-            world_max_y - robot_base_radius,
-            np.pi,
+            world_max_x - 2 * robot_base_radius,
+            world_max_y - 3 * robot_base_radius,
+            0,
         ),
     )
     target_region_shape: tuple[float, float] = (
@@ -99,30 +101,17 @@ class Motion2DEnvSpec(Geom2DRobotEnvSpec):
 
     # Obstacle hyperparameters.
     obstacle_rgb: tuple[float, float, float] = BLACK
-
-    obstacle_height_bounds: tuple[float, float] = (
-        robot_base_radius,
-        5 * robot_base_radius,
+    obstacle_width: float = robot_base_radius / 10
+    obstacle_min_x: float = robot_init_pose_bounds[1].x + 2 * robot_base_radius
+    obstacle_max_x: float = target_region_init_bounds[0].x - (2 * robot_base_radius + obstacle_width)
+    obstacle_passage_height_bounds: tuple[float, float] = (
+        2.05 * robot_base_radius,
+        2.5 * robot_base_radius,
     )
-    obstacle_width_bounds: tuple[float, float] = (
-        robot_base_radius,
-        5 * robot_base_radius,
+    obstacle_passage_y_bounds: tuple[float, float] = (
+        world_min_y + 2 * robot_base_radius,
+        world_max_y - 2 * robot_base_radius
     )
-    obstacle_pose_init_bounds: tuple[SE2Pose, SE2Pose] = (
-        SE2Pose(
-            world_min_x + robot_base_radius,
-            world_min_y + robot_base_radius,
-            -np.pi,
-        ),
-        SE2Pose(
-            world_max_x - robot_base_radius,
-            world_max_y - robot_base_radius,
-            np.pi,
-        ),
-    )
-
-    # For initial state sampling.
-    max_init_sampling_attempts: int = 10_000
 
     # For rendering.
     render_dpi: int = 150
@@ -137,12 +126,12 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
 
     def __init__(
         self,
-        num_obstacles: int = 2,
+        num_passages: int = 2,
         spec: Motion2DEnvSpec = Motion2DEnvSpec(),
         **kwargs,
     ) -> None:
         super().__init__(spec, **kwargs)
-        self._num_obstacles = num_obstacles
+        self._num_passages = num_passages
         self._spec: Motion2DEnvSpec = spec  # for type checking
         self.metadata = {
             "render_modes": ["rgb_array"],
@@ -150,64 +139,41 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         }
 
     def _sample_initial_state(self) -> ObjectCentricState:
-        initial_state_dict = self._create_constant_initial_state_dict()
-        static_objects = set(initial_state_dict)
+        # Sample initial robot pose.
         robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
-        state = self._create_initial_state(initial_state_dict, robot_pose)
-        robot = state.get_objects(CRVRobotType)[0]
-        assert not state_has_collision(state, {robot}, static_objects, {})
-        # Sample target region and check for collisions with robot and static objects.
-        for _ in range(self._spec.max_init_sampling_attempts):
-            target_region_pose = sample_se2_pose(
-                self._spec.target_region_init_bounds, self.np_random
-            )
-            state = self._create_initial_state(
-                initial_state_dict,
-                robot_pose,
-                target_region_pose=target_region_pose,
-            )
-            target_region = state.get_objects(TargetRegionType)[0]
-            if not state_has_collision(
-                state, {target_region}, {robot} | static_objects, {}
-            ):
-                break
-        else:
-            raise RuntimeError("Failed to sample target pose.")
-        # Create obstacles in vertical narrow passages.
+        # Sample initial target region pose.
+        target_region_pose = sample_se2_pose(
+            self._spec.target_region_init_bounds, self.np_random
+        )
+        # Sample obstacles to form vertical narrow passages.
         obstacles: list[tuple[SE2Pose, tuple[float, float]]] = []
-        for _ in range(self._num_obstacles):
-            for _ in range(self._spec.max_init_sampling_attempts):
-                obstacle_pose = sample_se2_pose(self._spec.obstacle_pose_init_bounds, self.np_random)
-                # Sample shape.
-                obstacle_shape = (
-                    self.np_random.uniform(*self._spec.obstacle_width_bounds),
-                    self.np_random.uniform(*self._spec.obstacle_height_bounds),
-                )
-                possible_obstacles = obstacles + [
-                    (obstacle_pose, obstacle_shape)
-                ]
-                state = self._create_initial_state(
-                    initial_state_dict,
-                    robot_pose,
-                    target_region_pose=target_region_pose,
-                    obstacles=possible_obstacles,
-                )
-                obj_name_to_obj = {o.name: o for o in state}
-                new_obstacle = obj_name_to_obj[f"obstacle{len(obstacles)}"]
-                assert new_obstacle.name.startswith("obstacle")
-                if not state_has_collision(state, {new_obstacle}, set(state), {}):
-                    break
-            else:
-                raise RuntimeError("Failed to sample obstacle pose.")
-            # Update obstacles.
-            obstacles = possible_obstacles
-        
-        # TODO HERE!!
+        min_x = self._spec.obstacle_min_x
+        max_x = self._spec.obstacle_max_x
+        x_dist_between_passages = (max_x - min_x - self._num_passages * self._spec.obstacle_width) / (self._num_passages - 1)
+        assert x_dist_between_passages > 2 * self._spec.robot_base_radius
+        for i in range(self._num_passages):
+            # TODO actually do passages
+            x = min_x + i * (self._spec.obstacle_width + x_dist_between_passages)
+            y = self._spec.world_min_y
+            pose = SE2Pose(x, y, 0.0)
+            height = self._spec.obstacle_passage_height_bounds[1]
+            shape = (self._spec.obstacle_width, height)
+            obstacles.append((pose, shape))
 
-        # The state should already be finalized.
+        state = self._create_initial_state(robot_pose, target_region_pose, obstacles)
+
+        # TODO assert no collisions
+
         return state
 
-    def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
+
+    def _create_initial_state(
+        self,
+        robot_pose: SE2Pose,
+        target_region_pose: SE2Pose | None = None,
+        obstacles: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
+    ) -> ObjectCentricState:
+
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create room walls.
@@ -225,20 +191,6 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
             max_dy,
         )
         init_state_dict.update(wall_state_dict)
-
-        return init_state_dict
-
-    def _create_initial_state(
-        self,
-        constant_initial_state_dict: dict[Object, dict[str, float]],
-        robot_pose: SE2Pose,
-        target_region_pose: SE2Pose | None = None,
-        obstacles: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
-    ) -> ObjectCentricState:
-
-        # Shallow copy should be okay because the constant objects should not
-        # ever change in this method.
-        init_state_dict = constant_initial_state_dict.copy()
 
         # Create the robot.
         robot = Object("robot", CRVRobotType)

@@ -12,7 +12,7 @@ def test_object_centric_motion2d_env():
     """Tests for ObjectCentricMotion2DEnv()."""
 
     # Test env creation and random actions.
-    env = ObjectCentricMotion2DEnv(num_obstacles=10)
+    env = ObjectCentricMotion2DEnv(num_passages=5)
 
     if MAKE_VIDEOS:
         env = RecordVideo(env, "unit_test_videos")
