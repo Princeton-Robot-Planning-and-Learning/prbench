@@ -1,43 +1,32 @@
 """Environment where a block must be retrieved amidst clutter."""
 
-import inspect
-from typing import Any
-
-import gymnasium
-import numpy as np
-from geom2drobotenvs.object_types import Geom2DRobotEnvTypeFeatures
-from geom2drobotenvs.utils import CRVRobotActionSpace
-from numpy.typing import NDArray
-from relational_structs import ObjectCentricStateSpace
-from relational_structs.spaces import ObjectCentricBoxSpace
-
 from dataclasses import dataclass
 
 import numpy as np
-from relational_structs import Object, ObjectCentricState, Type
-from relational_structs.utils import create_state_from_dict
-
-from geom2drobotenvs.concepts import is_on
 from geom2drobotenvs.envs.base_env import Geom2DRobotEnv, Geom2DRobotEnvSpec
 from geom2drobotenvs.object_types import (
     CRVRobotType,
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
 )
-from geom2drobotenvs.structs import MultiBody2D, ZOrder
+from geom2drobotenvs.structs import ZOrder
 from geom2drobotenvs.utils import (
     PURPLE,
     CRVRobotActionSpace,
     SE2Pose,
     create_walls_from_world_boundaries,
+    get_suctioned_objects,
     sample_se2_pose,
     state_has_collision,
 )
+from relational_structs import Object, ObjectCentricState, Type
+from relational_structs.utils import create_state_from_dict
 
 TargetBlockType = Type("target_block", parent=RectangleType)
 Geom2DRobotEnvTypeFeatures[TargetBlockType] = list(
     Geom2DRobotEnvTypeFeatures[RectangleType]
 )
+
 
 @dataclass(frozen=True)
 class Clutter2DEnvSpec(Geom2DRobotEnvSpec):
@@ -93,7 +82,10 @@ class Clutter2DEnvSpec(Geom2DRobotEnvSpec):
             np.pi,
         ),
     )
-    target_block_shape: tuple[float, float] = (2 * robot_gripper_height, 2 * robot_gripper_height)
+    target_block_shape: tuple[float, float] = (
+        2 * robot_gripper_height,
+        2 * robot_gripper_height,
+    )
 
     # Obstruction hyperparameters.
     obstruction_rgb: tuple[float, float, float] = (0.75, 0.1, 0.1)
@@ -119,9 +111,9 @@ class Clutter2DEnvSpec(Geom2DRobotEnvSpec):
 
 class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
     """Environment where a block must be retrieved amidst clutter.
-    
-    This is an object-centric environment. The vectorized version with Box
-    spaces is defined below (TODO!!!!).
+
+    This is an object-centric environment. The vectorized version with
+    Box spaces is defined below (TODO!!!!).
     """
 
     def __init__(
@@ -141,9 +133,7 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
     def _sample_initial_state(self) -> ObjectCentricState:
         initial_state_dict = self._create_constant_initial_state_dict()
         static_objects = set(initial_state_dict)
-        robot_pose = sample_se2_pose(
-            self._spec.robot_init_pose_bounds, self.np_random
-        )
+        robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
         state = self._create_initial_state(initial_state_dict, robot_pose)
         robot = state.get_objects(CRVRobotType)[0]
         assert not state_has_collision(state, {robot}, static_objects, {})
@@ -158,7 +148,9 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
                 target_pose=target_pose,
             )
             target_block = state.get_objects(TargetBlockType)[0]
-            if not state_has_collision(state, {target_block}, {robot} | static_objects, {}):
+            if not state_has_collision(
+                state, {target_block}, {robot} | static_objects, {}
+            ):
                 break
         else:
             raise RuntimeError("Failed to sample target pose.")
@@ -168,11 +160,16 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
         for _ in range(self._num_obstructions):
             for _ in range(self._spec.max_init_sampling_attempts):
                 # Sample xy, relative to the target.
-                x, y = self.np_random.normal(loc=(target_pose.x, target_pose.y),
-                                             scale=self._spec.obstruction_pose_init_distance_scale,
-                                             size=(2,))
+                x, y = self.np_random.normal(
+                    loc=(target_pose.x, target_pose.y),
+                    scale=self._spec.obstruction_pose_init_distance_scale,
+                    size=(2,),
+                )
                 # Make sure in bounds.
-                if not (self._spec.world_min_x < x < self._spec.world_max_x and self._spec.world_min_y < y < self._spec.world_max_y):
+                if not (
+                    self._spec.world_min_x < x < self._spec.world_max_x
+                    and self._spec.world_min_y < y < self._spec.world_max_y
+                ):
                     continue
                 # Sample theta.
                 theta = self.np_random.uniform(-np.pi, np.pi)
@@ -183,7 +180,9 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
                     self.np_random.uniform(*self._spec.obstruction_width_bounds),
                     self.np_random.uniform(*self._spec.obstruction_height_bounds),
                 )
-                possible_obstructions = obstructions + [(obstruction_pose, obstruction_shape)]
+                possible_obstructions = obstructions + [
+                    (obstruction_pose, obstruction_shape)
+                ]
                 state = self._create_initial_state(
                     initial_state_dict,
                     robot_pose,
@@ -201,7 +200,6 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
             obstructions = possible_obstructions
         # The state should already be finalized.
         return state
-
 
     def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
         init_state_dict: dict[Object, dict[str, float]] = {}
@@ -223,18 +221,21 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
         init_state_dict.update(wall_state_dict)
 
         return init_state_dict
-    
-    def _create_initial_state(self, constant_initial_state_dict: dict[Object, dict[str, float]],
+
+    def _create_initial_state(
+        self,
+        constant_initial_state_dict: dict[Object, dict[str, float]],
         robot_pose: SE2Pose,
         target_pose: SE2Pose | None = None,
-        obstructions: list[tuple[SE2Pose, tuple[float, float]]] | None = None) -> ObjectCentricState:
-        
+        obstructions: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
+    ) -> ObjectCentricState:
+
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
         init_state_dict = constant_initial_state_dict.copy()
 
         # Create the robot.
-        robot = CRVRobotType("robot")
+        robot = Object("robot", CRVRobotType)
         init_state_dict[robot] = {
             "x": robot_pose.x,
             "y": robot_pose.y,
@@ -249,13 +250,13 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
 
         # Create the target block.
         if target_pose is not None:
-            target_block = TargetBlockType("target_block")
+            target_block = Object("target_block", TargetBlockType)
             init_state_dict[target_block] = {
                 "x": target_pose.x,
                 "y": target_pose.y,
                 "theta": target_pose.theta,
                 "width": self._spec.target_block_shape[0],
-                "height":self._spec.target_block_shape[1],
+                "height": self._spec.target_block_shape[1],
                 "static": False,
                 "color_r": self._spec.target_block_rgb[0],
                 "color_g": self._spec.target_block_rgb[1],
@@ -266,7 +267,7 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
         # Create the obstructions.
         if obstructions:
             for i, (obstruction_pose, obstruction_shape) in enumerate(obstructions):
-                obstruction = RectangleType(f"obstruction{i}")
+                obstruction = Object(f"obstruction{i}", RectangleType)
                 init_state_dict[obstruction] = {
                     "x": obstruction_pose.x,
                     "y": obstruction_pose.y,
@@ -284,6 +285,12 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
         return create_state_from_dict(init_state_dict, Geom2DRobotEnvTypeFeatures)
 
     def _get_reward_and_done(self) -> tuple[float, bool]:
-        # TODO
-        terminated = False
+        # Terminate when the target object is suctioned.
+        assert self._current_state is not None
+        robot = self._current_state.get_objects(CRVRobotType)[0]
+        target_object = self._current_state.get_objects(TargetBlockType)[0]
+        suctioned_objs = {
+            o for o, _ in get_suctioned_objects(self._current_state, robot)
+        }
+        terminated = target_object in suctioned_objs
         return -1.0, terminated

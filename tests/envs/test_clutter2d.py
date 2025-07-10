@@ -1,8 +1,9 @@
 """Tests for clutter2d.py."""
 
-from prbench.envs.clutter2d import ObjectCentricClutter2DEnv
 from conftest import MAKE_VIDEOS
 from gymnasium.wrappers import RecordVideo
+
+from prbench.envs.clutter2d import ObjectCentricClutter2DEnv
 
 
 def test_object_centric_clutter2d_env():
