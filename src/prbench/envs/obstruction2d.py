@@ -18,35 +18,7 @@ from numpy.typing import NDArray
 from relational_structs import ObjectCentricStateSpace
 from relational_structs.spaces import ObjectCentricBoxSpace
 
-
-def create_env_description(num_obstructions: int = 2) -> str:
-    """Create a human-readable environment description."""
-    # pylint: disable=line-too-long
-    if num_obstructions > 0:
-        obstruction_sentence = f"\nThe target surface may be initially obstructed. In this environment, there are always {num_obstructions} obstacle blocks.\n"
-    else:
-        obstruction_sentence = ""
-
-    return f"""A 2D environment where the goal is to place a target block onto a target surface. The block must be completely contained within the surface boundaries.
-{obstruction_sentence}    
-The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
-"""
-
-
-def create_reward_description() -> str:
-    """Create a human-readable description of environment rewards."""
-    # pylint: disable=line-too-long
-    return f"""A penalty of -1.0 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is given below:
-```python
-{inspect.getsource(is_on)}```
-"""
-
-
-def create_references() -> str:
-    """Create a human-readable reference section."""
-    # pylint: disable=line-too-long
-    return """Similar environments have been used many times, especially in the task and motion planning literature. We took inspiration especially from the "1D Continuous TAMP" environment in [PDDLStream](https://github.com/caelan/pddlstream).
-"""
+from prbench.utils import get_geom2d_crv_robot_action_from_gui_input
 
 
 class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
@@ -124,39 +96,36 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def get_action_from_gui_input(
         self, gui_input: dict[str, Any]
     ) -> NDArray[np.float32]:
-        """Get the mapping from human inputs to actions, derived from action
-        space."""
-        # Unpack the input.
-        keys_pressed = gui_input["keys"]
-        right_x, right_y = gui_input["right_stick"]
-        left_x, _ = gui_input["left_stick"]
-
-        # Initialize the action.
+        """Get the mapping from human inputs to actions."""
         assert isinstance(self.action_space, CRVRobotActionSpace)
-        low = self.action_space.low
-        high = self.action_space.high
-        action = np.zeros(self.action_space.shape, self.action_space.dtype)
+        return get_geom2d_crv_robot_action_from_gui_input(self.action_space, gui_input)
 
-        def _rescale(x: float, lb: float, ub: float) -> float:
-            """Rescale from [-1, 1] to [lb, ub]."""
-            return lb + (x + 1) * (ub - lb) / 2
 
-        # The right stick controls the x, y movement of the base.
-        action[0] = _rescale(right_x, low[0], high[0])
-        action[1] = _rescale(right_y, low[1], high[1])
+def create_env_description(num_obstructions: int = 2) -> str:
+    """Create a human-readable environment description."""
+    # pylint: disable=line-too-long
+    if num_obstructions > 0:
+        obstruction_sentence = f"\nThe target surface may be initially obstructed. In this environment, there are always {num_obstructions} obstacle blocks.\n"
+    else:
+        obstruction_sentence = ""
 
-        # The left stick controls the rotation of the base. Only the x axis
-        # is used right now.
-        action[2] = _rescale(left_x, low[2], high[2])
+    return f"""A 2D environment where the goal is to place a target block onto a target surface. The block must be completely contained within the surface boundaries.
+{obstruction_sentence}    
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
+"""
 
-        # The w/s mouse keys are used to adjust the robot arm.
-        if "w" in keys_pressed:
-            action[3] = low[3]
-        if "s" in keys_pressed:
-            action[3] = high[3]
 
-        # The space bar is used to turn on the vacuum.
-        if "space" in keys_pressed:
-            action[4] = 1.0
+def create_reward_description() -> str:
+    """Create a human-readable description of environment rewards."""
+    # pylint: disable=line-too-long
+    return f"""A penalty of -1.0 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is given below:
+```python
+{inspect.getsource(is_on)}```
+"""
 
-        return action
+
+def create_references() -> str:
+    """Create a human-readable reference section."""
+    # pylint: disable=line-too-long
+    return """Similar environments have been used many times, especially in the task and motion planning literature. We took inspiration especially from the "1D Continuous TAMP" environment in [PDDLStream](https://github.com/caelan/pddlstream).
+"""
