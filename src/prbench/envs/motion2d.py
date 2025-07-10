@@ -239,7 +239,7 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
                 "color_r": self._spec.target_region_rgb[0],
                 "color_g": self._spec.target_region_rgb[1],
                 "color_b": self._spec.target_region_rgb[2],
-                "z_order": ZOrder.ALL.value,
+                "z_order": ZOrder.NONE.value,
             }
 
         # Create the obstacles.
