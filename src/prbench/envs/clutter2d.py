@@ -341,11 +341,11 @@ class Clutter2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         assert isinstance(self.observation_space, ObjectCentricBoxSpace)
         assert isinstance(self.action_space, CRVRobotActionSpace)
         # Add descriptions to metadata for doc generation.
-        env_md = "TODO"
+        env_md = create_env_description(num_obstructions)
         obs_md = self.observation_space.create_markdown_description()
         act_md = self.action_space.create_markdown_description()
-        reward_md = "TODO"
-        references_md = "TODO"
+        reward_md = "A penalty of -1.0 is given at every time step until termination, which occurs when the target block is held.\n"  # pylint: disable=line-too-long
+        references_md = 'Similar environments have been considered by many others, especially in the task and motion planning literature, e.g., "Combined Task and Motion Planning Through an Extensible Planner-Independent Interface Layer" (Srivastava et al., ICRA 2014).\n'  # pylint: disable=line-too-long
         self.metadata = {
             "description": env_md,
             "observation_space_description": obs_md,
@@ -382,3 +382,17 @@ class Clutter2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Get the mapping from human inputs to actions."""
         assert isinstance(self.action_space, CRVRobotActionSpace)
         return get_geom2d_crv_robot_action_from_gui_input(self.action_space, gui_input)
+
+
+def create_env_description(num_obstructions: int = 2) -> str:
+    """Create a human-readable environment description."""
+    # pylint: disable=line-too-long
+    if num_obstructions > 0:
+        obstruction_sentence = f"\nThe target block may be initially obstructed. In this environment, there are always {num_obstructions} obstacle blocks.\n"
+    else:
+        obstruction_sentence = ""
+
+    return f"""A 2D environment where the goal is to "pick up" (suction) a target block.
+{obstruction_sentence}    
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
+"""

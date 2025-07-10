@@ -2,7 +2,12 @@
 ![random action GIF](assets/random_action_gifs/Clutter2D-o1.gif)
 
 ### Description
-TODO
+A 2D environment where the goal is to "pick up" (suction) a target block.
+
+The target block may be initially obstructed. In this environment, there are always 1 obstacle blocks.
+    
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
+
 ### Initial State Distribution
 ![initial state GIF](assets/initial_state_gifs/Clutter2D-o1.gif)
 
@@ -56,7 +61,8 @@ The entries of an array in this Box space correspond to the following action fea
 
 
 ### Rewards
-TODO
+A penalty of -1.0 is given at every time step until termination, which occurs when the target block is held.
+
 
 ### References
-TODO
+Similar environments have been considered by many others, especially in the task and motion planning literature, e.g., "Combined Task and Motion Planning Through an Extensible Planner-Independent Interface Layer" (Srivastava et al., ICRA 2014).
