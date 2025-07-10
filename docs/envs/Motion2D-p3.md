@@ -5,7 +5,7 @@
 A 2D environment where the goal is to reach a target region while avoiding static obstacles.
 
 In this environment, there are always 3 narrow passages.
-    
+
 The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. The arm and vacuum do not need to be used in this environment.
 
 ### Initial State Distribution

@@ -369,6 +369,6 @@ def create_env_description(num_passages: int = 2) -> str:
         obstacle_sentence = ""
 
     return f"""A 2D environment where the goal is to reach a target region while avoiding static obstacles.
-{obstacle_sentence}    
+{obstacle_sentence}
 The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. The arm and vacuum do not need to be used in this environment.
 """
