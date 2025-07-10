@@ -1,4 +1,5 @@
-"""Environment where only 2D motion planning is needed to reach a goal region."""
+"""Environment where only 2D motion planning is needed to reach a goal
+region."""
 
 from dataclasses import dataclass
 from typing import Any
@@ -11,15 +12,14 @@ from geom2drobotenvs.object_types import (
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
 )
-from geom2drobotenvs.utils import rectangle_object_to_geom
-
 from geom2drobotenvs.structs import ZOrder
 from geom2drobotenvs.utils import (
-    PURPLE,
     BLACK,
+    PURPLE,
     CRVRobotActionSpace,
     SE2Pose,
     create_walls_from_world_boundaries,
+    rectangle_object_to_geom,
     sample_se2_pose,
     state_has_collision,
 )
@@ -68,7 +68,7 @@ class Motion2DEnvSpec(Geom2DRobotEnvSpec):
     # The robot starts on the left side of the screen.
     robot_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
         SE2Pose(
-            world_min_x + 2 * robot_base_radius,
+            world_min_x + 2.5 * robot_base_radius,
             world_min_y + 3 * robot_base_radius,
             -np.pi,
         ),
@@ -89,7 +89,7 @@ class Motion2DEnvSpec(Geom2DRobotEnvSpec):
             0,
         ),
         SE2Pose(
-            world_max_x - 2 * robot_base_radius,
+            world_max_x - 2.5 * robot_base_radius,
             world_max_y - 3 * robot_base_radius,
             0,
         ),
@@ -103,14 +103,16 @@ class Motion2DEnvSpec(Geom2DRobotEnvSpec):
     obstacle_rgb: tuple[float, float, float] = BLACK
     obstacle_width: float = robot_base_radius / 10
     obstacle_min_x: float = robot_init_pose_bounds[1].x + 2 * robot_base_radius
-    obstacle_max_x: float = target_region_init_bounds[0].x - (2 * robot_base_radius + obstacle_width)
+    obstacle_max_x: float = target_region_init_bounds[0].x - (
+        2 * robot_base_radius + obstacle_width
+    )
     obstacle_passage_height_bounds: tuple[float, float] = (
-        2.05 * robot_base_radius,
         2.5 * robot_base_radius,
+        4.0 * robot_base_radius,
     )
     obstacle_passage_y_bounds: tuple[float, float] = (
         world_min_y + 2 * robot_base_radius,
-        world_max_y - 2 * robot_base_radius
+        world_max_y - 2 * robot_base_radius,
     )
 
     # For rendering.
@@ -149,23 +151,38 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         obstacles: list[tuple[SE2Pose, tuple[float, float]]] = []
         min_x = self._spec.obstacle_min_x
         max_x = self._spec.obstacle_max_x
-        x_dist_between_passages = (max_x - min_x - self._num_passages * self._spec.obstacle_width) / (self._num_passages - 1)
+        x_dist_between_passages = (
+            max_x - min_x - self._num_passages * self._spec.obstacle_width
+        ) / (self._num_passages - 1)
         assert x_dist_between_passages > 2 * self._spec.robot_base_radius
         for i in range(self._num_passages):
-            # TODO actually do passages
+            # Sample the passage parameters.
+            passage_y = self.np_random.uniform(*self._spec.obstacle_passage_y_bounds)
+            passage_height = self.np_random.uniform(
+                *self._spec.obstacle_passage_height_bounds
+            )
             x = min_x + i * (self._spec.obstacle_width + x_dist_between_passages)
+            # Create the bottom obstacle.
             y = self._spec.world_min_y
+            height = passage_y - y
             pose = SE2Pose(x, y, 0.0)
-            height = self._spec.obstacle_passage_height_bounds[1]
+            shape = (self._spec.obstacle_width, height)
+            obstacles.append((pose, shape))
+            # Create the top obstacle.
+            y = y + height + passage_height
+            pose = SE2Pose(x, y, 0.0)
+            height = self._spec.world_max_y - y
             shape = (self._spec.obstacle_width, height)
             obstacles.append((pose, shape))
 
         state = self._create_initial_state(robot_pose, target_region_pose, obstacles)
 
-        # TODO assert no collisions
+        # Sanity check.
+        robot = state.get_objects(CRVRobotType)[0]
+        target_region = state.get_objects(TargetRegionType)[0]
+        assert not state_has_collision(state, {robot, target_region}, set(state), {})
 
         return state
-
 
     def _create_initial_state(
         self,
@@ -249,6 +266,8 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         x = self._current_state.get(robot, "x")
         y = self._current_state.get(robot, "y")
         target_region = self._current_state.get_objects(TargetRegionType)[0]
-        target_region_geom = rectangle_object_to_geom(self._current_state, target_region, self._static_object_body_cache)
+        target_region_geom = rectangle_object_to_geom(
+            self._current_state, target_region, self._static_object_body_cache
+        )
         terminated = target_region_geom.contains_point(x, y)
         return -1.0, terminated
