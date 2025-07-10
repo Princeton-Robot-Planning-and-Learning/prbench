@@ -26,6 +26,20 @@ def register_all_environments() -> None:
             kwargs={"num_obstructions": num_obstruction},
         )
 
+    # CoffeeMaking2D environment with different ingredient combinations.
+    coffee_variants = [
+        ("coffee-basic", {"include_cream": False, "include_sugar": False}),
+        ("coffee-cream", {"include_cream": True, "include_sugar": False}),
+        ("coffee-sugar", {"include_cream": False, "include_sugar": True}),
+        ("coffee-full", {"include_cream": True, "include_sugar": True}),
+    ]
+    for variant_name, variant_kwargs in coffee_variants:
+        register(
+            id=f"prbench/CoffeeMaking2D-{variant_name}-v0",
+            entry_point="prbench.envs.coffeemaking2d:CoffeeMaking2DEnv",
+            kwargs=variant_kwargs,
+        )
+
 
 def make(*args, **kwargs) -> gymnasium.Env:
     """Create a registered environment from its name."""
