@@ -63,13 +63,13 @@ class Clutter2DEnvSpec(Geom2DRobotEnvSpec):
     robot_gripper_width: float = 0.01
     robot_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
         SE2Pose(
-            world_min_x + robot_base_radius,
-            world_min_y + robot_base_radius,
+            world_min_x + 4 * robot_base_radius,
+            world_min_y + 4 * robot_base_radius,
             -np.pi,
         ),
         SE2Pose(
-            world_max_x - robot_base_radius,
-            world_max_y - robot_base_radius,
+            world_max_x - 4 * robot_base_radius,
+            world_max_y - 4 * robot_base_radius,
             np.pi,
         ),
     )
@@ -106,7 +106,7 @@ class Clutter2DEnvSpec(Geom2DRobotEnvSpec):
     )
     # NOTE: obstruction poses are sampled using a 2D gaussian that is centered
     # at the target location. This hyperparameter controls the variance.
-    obstruction_pose_init_distance_scale: float = 0.1
+    obstruction_pose_init_distance_scale: float = 0.25
 
     # For initial state sampling.
     max_init_sampling_attempts: int = 10_000
