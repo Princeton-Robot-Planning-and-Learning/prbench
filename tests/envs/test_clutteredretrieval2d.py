@@ -1,18 +1,18 @@
-"""Tests for clutter2d.py."""
+"""Tests for clutteredretrieval2d.py."""
 
 from conftest import MAKE_VIDEOS
 from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
 
 import prbench
-from prbench.envs.clutter2d import ObjectCentricClutter2DEnv
+from prbench.envs.clutteredretrieval2d import ObjectCentricClutteredRetrieval2DEnv
 
 
-def test_object_centric_clutter2d_env():
-    """Tests for ObjectCentricClutter2DEnv()."""
+def test_object_centric_clutteredretrieval2d_env():
+    """Tests for ObjectCentricClutteredRetrieval2DEnv()."""
 
     # Test env creation and random actions.
-    env = ObjectCentricClutter2DEnv(num_obstructions=25)
+    env = ObjectCentricClutteredRetrieval2DEnv(num_obstructions=25)
 
     if MAKE_VIDEOS:
         env = RecordVideo(env, "unit_test_videos")
@@ -25,10 +25,10 @@ def test_object_centric_clutter2d_env():
     env.close()
 
 
-def test_clutter2d_observation_space():
+def test_clutteredretrieval2d_observation_space():
     """Tests that observations are vectors with fixed dimensionality."""
     prbench.register_all_environments()
-    env = prbench.make("prbench/Clutter2D-o10-v0")
+    env = prbench.make("prbench/ClutteredRetrieval2D-o10-v0")
     assert isinstance(env.observation_space, Box)
     for _ in range(5):
         obs, _ = env.reset()

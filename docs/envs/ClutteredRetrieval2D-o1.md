@@ -1,5 +1,5 @@
-# prbench/Clutter2D-o1-v0
-![random action GIF](assets/random_action_gifs/Clutter2D-o1.gif)
+# prbench/ClutteredRetrieval2D-o1-v0
+![random action GIF](assets/random_action_gifs/ClutteredRetrieval2D-o1.gif)
 
 ### Description
 A 2D environment where the goal is to "pick up" (suction) a target block.
@@ -9,10 +9,10 @@ The target block may be initially obstructed. In this environment, there are alw
 The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
 
 ### Initial State Distribution
-![initial state GIF](assets/initial_state_gifs/Clutter2D-o1.gif)
+![initial state GIF](assets/initial_state_gifs/ClutteredRetrieval2D-o1.gif)
 
 ### Example Demonstration
-![demo GIF](assets/demo_gifs/Clutter2D-o1.gif)
+![demo GIF](assets/demo_gifs/ClutteredRetrieval2D-o1.gif)
 
 ### Observation Space
 The entries of an array in this Box space correspond to the following object features:
