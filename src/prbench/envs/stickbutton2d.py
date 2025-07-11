@@ -10,6 +10,7 @@ from geom2drobotenvs.object_types import (
     CRVRobotType,
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
+    CircleType,
 )
 from geom2drobotenvs.structs import ZOrder
 from geom2drobotenvs.utils import (
@@ -92,6 +93,18 @@ class StickButton2DEnvSpec(Geom2DRobotEnvSpec):
                 table_pose.y - stick_shape[1] / 10, 0),
     )
 
+    # Button hyperparameters.
+    button_unpressed_rgb: tuple[float, float, float] = (0.9, 0.0, 0.0)
+    button_pressed_rgb: tuple[float, float, float] = (0.0, 0.9, 0.0)
+    button_radius: float = robot_base_radius / 2
+    button_init_position_bounds: tuple[tuple[float, float], tuple[float, float]] = (
+        (world_min_x + button_radius, world_min_y + button_radius),
+        (world_max_x - button_radius, world_max_y - button_radius),
+    )
+
+    # For initial state sampling.
+    max_init_sampling_attempts: int = 10_000
+
     # For rendering.
     render_dpi: int = 150
 
@@ -123,21 +136,60 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         }
 
     def _sample_initial_state(self) -> ObjectCentricState:
+        initial_state_dict = self._create_constant_initial_state_dict()
         # Sample initial robot pose.
         robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
         # Sample stick pose.
-        # TODO ensure no collisions between stick and robot.
-        stick_pose = sample_se2_pose(self._spec.stick_init_pose_bounds, self.np_random)
-        state = self._create_initial_state(robot_pose, stick_pose)
+        for _ in range(self._spec.max_init_sampling_attempts):
+            stick_pose = sample_se2_pose(self._spec.stick_init_pose_bounds, self.np_random)
+            state = self._create_initial_state(
+                initial_state_dict,
+                robot_pose,
+                stick_pose=stick_pose,
+                button_positions=[],
+            )
+            obj_name_to_obj = {o.name: o for o in state}
+            stick = obj_name_to_obj["stick"]
+            if not state_has_collision(
+                state, {stick}, set(state), {}
+            ):
+                break
+        else:
+            raise RuntimeError("Failed to sample target pose.")
 
+        # Sample button positions. Assume that the scene is never so dense
+        # that we need to resample earlier choices.
+        button_positions: list[tuple[float, float]] = []
+        for _ in range(self._num_buttons):
+            while True:
+                button_position = tuple(np.random.uniform(*self._spec.button_init_position_bounds))
+                new_button_positions = button_positions + [button_position]
+                state = self._create_initial_state(
+                    initial_state_dict,
+                    robot_pose,
+                    stick_pose=stick_pose,
+                    button_positions=new_button_positions,
+                    button_z_order=ZOrder.SURFACE.value,
+                )
+                obj_name_to_obj = {o.name: o for o in state}
+                new_button = obj_name_to_obj[f"button{len(button_positions)}"]
+                if not state_has_collision(
+                    state, {new_button}, set(state), {}
+                ):
+                    button_positions.append(button_position)
+                    break
+
+        # Recreate state now with no-collision buttons.
+        state = self._create_initial_state(
+            initial_state_dict,
+            robot_pose,
+            stick_pose=stick_pose,
+            button_positions=button_positions,
+            button_z_order=ZOrder.NONE.value,
+        )
         return state
-
-    def _create_initial_state(
-        self,
-        robot_pose: SE2Pose,
-        stick_pose: SE2Pose,
-    ) -> ObjectCentricState:
-
+    
+    def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create room walls.
@@ -171,6 +223,21 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
             "z_order": ZOrder.FLOOR.value,
         }
 
+        return init_state_dict
+
+    def _create_initial_state(
+        self,
+        constant_initial_state_dict: dict[Object, dict[str, float]],
+        robot_pose: SE2Pose,
+        stick_pose: SE2Pose,
+        button_positions: list[tuple[float, float]],
+        button_z_order: ZOrder = ZOrder.NONE.value,
+    ) -> ObjectCentricState:
+
+        # Shallow copy should be okay because the constant objects should not
+        # ever change in this method.
+        init_state_dict = constant_initial_state_dict.copy()
+
         # Create the robot.
         robot = Object("robot", CRVRobotType)
         init_state_dict[robot] = {
@@ -199,6 +266,21 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
             "color_b": self._spec.stick_rgb[2],
             "z_order": ZOrder.SURFACE.value,
         }
+
+        # Create the buttons.
+        for button_idx, button_position in enumerate(button_positions):
+            button = Object(f"button{button_idx}", CircleType)
+            init_state_dict[button] = {
+                "x": button_position[0],
+                "y": button_position[1],
+                "theta": 0,
+                "radius": self._spec.button_radius,
+                "static": True,
+                "color_r": self._spec.button_unpressed_rgb[0],
+                "color_g": self._spec.button_unpressed_rgb[1],
+                "color_b": self._spec.button_unpressed_rgb[2],
+                "z_order": button_z_order,
+            }
 
         # Finalize state.
         return create_state_from_dict(init_state_dict, Geom2DRobotEnvTypeFeatures)
