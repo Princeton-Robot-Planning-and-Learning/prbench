@@ -83,6 +83,15 @@ class StickButton2DEnvSpec(Geom2DRobotEnvSpec):
         (world_max_y - world_min_y) / 2,
     )
 
+    # Stick hyperparameters.
+    stick_rgb: tuple[float, float, float] = (0.4, 0.2, 0.1)
+    stick_shape: tuple[float, float] = (robot_base_radius / 2, table_shape[1])
+    stick_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
+        SE2Pose(world_min_x, table_pose.y - stick_shape[1] / 2, 0),
+        SE2Pose(world_max_x - stick_shape[0],
+                table_pose.y - stick_shape[1] / 10, 0),
+    )
+
     # For rendering.
     render_dpi: int = 150
 
@@ -116,13 +125,17 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
     def _sample_initial_state(self) -> ObjectCentricState:
         # Sample initial robot pose.
         robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
-        state = self._create_initial_state(robot_pose)
+        # Sample stick pose.
+        # TODO ensure no collisions between stick and robot.
+        stick_pose = sample_se2_pose(self._spec.stick_init_pose_bounds, self.np_random)
+        state = self._create_initial_state(robot_pose, stick_pose)
 
         return state
 
     def _create_initial_state(
         self,
         robot_pose: SE2Pose,
+        stick_pose: SE2Pose,
     ) -> ObjectCentricState:
 
         init_state_dict: dict[Object, dict[str, float]] = {}
@@ -170,6 +183,21 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
             "vacuum": 0.0,  # vacuum is off
             "gripper_height": self._spec.robot_gripper_height,
             "gripper_width": self._spec.robot_gripper_width,
+        }
+
+        # Create the stick.
+        stick = Object("stick", RectangleType)
+        init_state_dict[stick] = {
+            "x": stick_pose.x,
+            "y": stick_pose.y,
+            "theta": stick_pose.theta,
+            "width": self._spec.stick_shape[0],
+            "height": self._spec.stick_shape[1],
+            "static": False,
+            "color_r": self._spec.stick_rgb[0],
+            "color_g": self._spec.stick_rgb[1],
+            "color_b": self._spec.stick_rgb[2],
+            "z_order": ZOrder.SURFACE.value,
         }
 
         # Finalize state.
