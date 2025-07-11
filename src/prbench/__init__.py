@@ -17,12 +17,12 @@ def register_all_environments() -> None:
             kwargs={"num_obstructions": num_obstruction},
         )
 
-    # Clutter2D environment with different numbers of obstructions.
+    # ClutteredRetrieval2D environment with different numbers of obstructions.
     num_obstructions = [1, 10, 25]
     for num_obstruction in num_obstructions:
         register(
-            id=f"prbench/Clutter2D-o{num_obstruction}-v0",
-            entry_point="prbench.envs.clutter2d:Clutter2DEnv",
+            id=f"prbench/ClutteredRetrieval2D-o{num_obstruction}-v0",
+            entry_point="prbench.envs.clutteredretrieval2d:ClutteredRetrieval2DEnv",
             kwargs={"num_obstructions": num_obstruction},
         )
 

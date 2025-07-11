@@ -35,8 +35,8 @@ Geom2DRobotEnvTypeFeatures[TargetBlockType] = list(
 
 
 @dataclass(frozen=True)
-class Clutter2DEnvSpec(Geom2DRobotEnvSpec):
-    """Scene specification for Clutter2DEnv()."""
+class ClutteredRetreival2DEnvSpec(Geom2DRobotEnvSpec):
+    """Scene specification for ClutteredRetrieval2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
     world_min_x: float = 0.0
@@ -115,7 +115,7 @@ class Clutter2DEnvSpec(Geom2DRobotEnvSpec):
     render_dpi: int = 150
 
 
-class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
+class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
     """Environment where a block must be retrieved amidst clutter.
 
     This is an object-centric environment. The vectorized version with
@@ -125,12 +125,12 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
     def __init__(
         self,
         num_obstructions: int = 2,
-        spec: Clutter2DEnvSpec = Clutter2DEnvSpec(),
+        spec: ClutteredRetreival2DEnvSpec = ClutteredRetreival2DEnvSpec(),
         **kwargs,
     ) -> None:
         super().__init__(spec, **kwargs)
         self._num_obstructions = num_obstructions
-        self._spec: Clutter2DEnvSpec = spec  # for type checking
+        self._spec: ClutteredRetreival2DEnvSpec = spec  # for type checking
         self.metadata = {
             "render_modes": ["rgb_array"],
             "render_fps": 10,
@@ -302,20 +302,20 @@ class ObjectCentricClutter2DEnv(Geom2DRobotEnv):
         return -1.0, terminated
 
 
-class Clutter2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
-    """Clutter 2D env."""
+class ClutteredRetrieval2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
+    """Cluttered retrieval 2D env."""
 
     def __init__(
         self,
         num_obstructions: int = 2,
-        spec: Clutter2DEnvSpec = Clutter2DEnvSpec(),
+        spec: ClutteredRetreival2DEnvSpec = ClutteredRetreival2DEnvSpec(),
         **kwargs,
     ) -> None:
         super().__init__()
         # At the moment, all the real logic for this environment is defined
         # externally. We create that environment and then add some additional
         # code to vectorize observations, making it easier for RL approaches.
-        self._geom2d_env = ObjectCentricClutter2DEnv(
+        self._geom2d_env = ObjectCentricClutteredRetrieval2DEnv(
             num_obstructions=num_obstructions, spec=spec, **kwargs
         )
         # Create a Box version of the observation space by assuming a constant
