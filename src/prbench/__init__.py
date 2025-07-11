@@ -35,6 +35,15 @@ def register_all_environments() -> None:
             kwargs={"num_passages": num_passage},
         )
 
+    # StickButton2D environment with different numbers of buttons.
+    num_buttons = [1, 5, 10]
+    for num_button in num_buttons:
+        register(
+            id=f"prbench/StickButton2D-b{num_button}-v0",
+            entry_point="prbench.envs.stickbutton2d:StickButton2DEnv",
+            kwargs={"num_buttons": num_button},
+        )
+
 
 def make(*args, **kwargs) -> gymnasium.Env:
     """Create a registered environment from its name."""
