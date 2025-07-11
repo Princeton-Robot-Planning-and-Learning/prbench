@@ -7,24 +7,22 @@ import gymnasium
 import numpy as np
 from geom2drobotenvs.envs.base_env import Geom2DRobotEnv, Geom2DRobotEnvSpec
 from geom2drobotenvs.object_types import (
+    CircleType,
     CRVRobotType,
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
-    CircleType,
 )
 from geom2drobotenvs.structs import ZOrder
 from geom2drobotenvs.utils import (
     BLACK,
-    PURPLE,
     CRVRobotActionSpace,
     SE2Pose,
     create_walls_from_world_boundaries,
-    rectangle_object_to_geom,
     sample_se2_pose,
     state_has_collision,
 )
 from numpy.typing import NDArray
-from relational_structs import Object, ObjectCentricState, ObjectCentricStateSpace, Type
+from relational_structs import Object, ObjectCentricState, ObjectCentricStateSpace
 from relational_structs.spaces import ObjectCentricBoxSpace
 from relational_structs.utils import create_state_from_dict
 
@@ -89,8 +87,7 @@ class StickButton2DEnvSpec(Geom2DRobotEnvSpec):
     stick_shape: tuple[float, float] = (robot_base_radius / 2, table_shape[1])
     stick_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
         SE2Pose(world_min_x, table_pose.y - stick_shape[1] / 2, 0),
-        SE2Pose(world_max_x - stick_shape[0],
-                table_pose.y - stick_shape[1] / 10, 0),
+        SE2Pose(world_max_x - stick_shape[0], table_pose.y - stick_shape[1] / 10, 0),
     )
 
     # Button hyperparameters.
@@ -112,8 +109,8 @@ class StickButton2DEnvSpec(Geom2DRobotEnvSpec):
 class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
     """Environment with a stick and buttons that need to be pressed.
 
-    The robot cannot directly press buttons that are on the table but can
-    directly press buttons that are on the floor (by touching them).
+    The robot cannot directly press buttons that are on the table but
+    can directly press buttons that are on the floor (by touching them).
 
     The stick can be used to press buttons on the table (by touch).
 
@@ -141,7 +138,9 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
         # Sample stick pose.
         for _ in range(self._spec.max_init_sampling_attempts):
-            stick_pose = sample_se2_pose(self._spec.stick_init_pose_bounds, self.np_random)
+            stick_pose = sample_se2_pose(
+                self._spec.stick_init_pose_bounds, self.np_random
+            )
             state = self._create_initial_state(
                 initial_state_dict,
                 robot_pose,
@@ -150,9 +149,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
             )
             obj_name_to_obj = {o.name: o for o in state}
             stick = obj_name_to_obj["stick"]
-            if not state_has_collision(
-                state, {stick}, set(state), {}
-            ):
+            if not state_has_collision(state, {stick}, set(state), {}):
                 break
         else:
             raise RuntimeError("Failed to sample target pose.")
@@ -162,20 +159,20 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         button_positions: list[tuple[float, float]] = []
         for _ in range(self._num_buttons):
             while True:
-                button_position = tuple(np.random.uniform(*self._spec.button_init_position_bounds))
+                button_position = tuple(
+                    self.np_random.uniform(*self._spec.button_init_position_bounds)
+                )
                 new_button_positions = button_positions + [button_position]
                 state = self._create_initial_state(
                     initial_state_dict,
                     robot_pose,
                     stick_pose=stick_pose,
                     button_positions=new_button_positions,
-                    button_z_order=ZOrder.SURFACE.value,
+                    button_z_order=ZOrder.SURFACE,
                 )
                 obj_name_to_obj = {o.name: o for o in state}
                 new_button = obj_name_to_obj[f"button{len(button_positions)}"]
-                if not state_has_collision(
-                    state, {new_button}, set(state), {}
-                ):
+                if not state_has_collision(state, {new_button}, set(state), {}):
                     button_positions.append(button_position)
                     break
 
@@ -185,10 +182,10 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
             robot_pose,
             stick_pose=stick_pose,
             button_positions=button_positions,
-            button_z_order=ZOrder.NONE.value,
+            button_z_order=ZOrder.NONE,
         )
         return state
-    
+
     def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
         init_state_dict: dict[Object, dict[str, float]] = {}
 
@@ -231,7 +228,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         robot_pose: SE2Pose,
         stick_pose: SE2Pose,
         button_positions: list[tuple[float, float]],
-        button_z_order: ZOrder = ZOrder.NONE.value,
+        button_z_order: ZOrder = ZOrder.NONE,
     ) -> ObjectCentricState:
 
         # Shallow copy should be okay because the constant objects should not
@@ -279,7 +276,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
                 "color_r": self._spec.button_unpressed_rgb[0],
                 "color_g": self._spec.button_unpressed_rgb[1],
                 "color_b": self._spec.button_unpressed_rgb[2],
-                "z_order": button_z_order,
+                "z_order": button_z_order.value,
             }
 
         # Finalize state.
@@ -291,99 +288,94 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         return -1.0, terminated
 
 
-# class Motion2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
-#     """Motion 2D env."""
+class StickButton2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
+    """Stick button 2D env."""
 
-#     def __init__(
-#         self,
-#         num_passages: int = 2,
-#         spec: Motion2DEnvSpec = Motion2DEnvSpec(),
-#         **kwargs,
-#     ) -> None:
-#         super().__init__()
-#         # At the moment, all the real logic for this environment is defined
-#         # externally. We create that environment and then add some additional
-#         # code to vectorize observations, making it easier for RL approaches.
-#         self._geom2d_env = ObjectCentricMotion2DEnv(
-#             num_passages=num_passages, spec=spec, **kwargs
-#         )
-#         # Create a Box version of the observation space by assuming a constant
-#         # number of obstacles (and thus a constant number of objects).
-#         assert isinstance(self._geom2d_env.observation_space, ObjectCentricStateSpace)
-#         # Make observation vectors start with the robot, then target region,
-#         # then obstacle blocks. Don't include the walls because those are
-#         # universally constant.
-#         exemplar_object_centric_state, _ = self._geom2d_env.reset()
-#         obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
-#         self._constant_objects = [
-#             obj_name_to_obj["robot"],
-#             obj_name_to_obj["target_region"],
-#         ]
-#         obstacle_names = {o for o in obj_name_to_obj if o.startswith("obstacle")}
-#         assert len(obstacle_names) == 2 * num_passages
-#         for obstacle_name in sorted(obstacle_names):
-#             self._constant_objects.append(obj_name_to_obj[obstacle_name])
-#         self.observation_space = self._geom2d_env.observation_space.to_box(
-#             self._constant_objects, Geom2DRobotEnvTypeFeatures
-#         )
-#         self.action_space = self._geom2d_env.action_space
-#         assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-#         assert isinstance(self.action_space, CRVRobotActionSpace)
-#         # Add descriptions to metadata for doc generation.
-#         env_md = create_env_description(num_passages)
-#         obs_md = self.observation_space.create_markdown_description()
-#         act_md = self.action_space.create_markdown_description()
-#         reward_md = "A penalty of -1.0 is given at every time step until termination, which occurs when the robot's position is within the target region.\n"  # pylint: disable=line-too-long
-#         references_md = "Narrow passages are a classic challenge in motion planning.\n"  # pylint: disable=line-too-long
-#         self.metadata = {
-#             "description": env_md,
-#             "observation_space_description": obs_md,
-#             "action_space_description": act_md,
-#             "reward_description": reward_md,
-#             "references": references_md,
-#             "render_modes": self._geom2d_env.metadata["render_modes"],
-#             "render_fps": 10,
-#         }
+    def __init__(
+        self,
+        num_buttons: int = 2,
+        spec: StickButton2DEnvSpec = StickButton2DEnvSpec(),
+        **kwargs,
+    ) -> None:
+        super().__init__()
+        # At the moment, all the real logic for this environment is defined
+        # externally. We create that environment and then add some additional
+        # code to vectorize observations, making it easier for RL approaches.
+        self._geom2d_env = ObjectCentricStickButton2DEnv(
+            num_buttons=num_buttons, spec=spec, **kwargs
+        )
+        # Create a Box version of the observation space by assuming a constant
+        # number of buttons (and thus a constant number of objects).
+        assert isinstance(self._geom2d_env.observation_space, ObjectCentricStateSpace)
+        # Make observation vectors start with the robot, then the stick,
+        # then buttons. Don't include the walls or table because those are
+        # universally constant.
+        exemplar_object_centric_state, _ = self._geom2d_env.reset()
+        obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
+        self._constant_objects = [
+            obj_name_to_obj["robot"],
+            obj_name_to_obj["stick"],
+        ]
+        button_names = {o for o in obj_name_to_obj if o.startswith("button")}
+        assert len(button_names) == num_buttons
+        for button_name in sorted(button_names):
+            self._constant_objects.append(obj_name_to_obj[button_name])
+        self.observation_space = self._geom2d_env.observation_space.to_box(
+            self._constant_objects, Geom2DRobotEnvTypeFeatures
+        )
+        self.action_space = self._geom2d_env.action_space
+        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
+        assert isinstance(self.action_space, CRVRobotActionSpace)
+        # Add descriptions to metadata for doc generation.
+        env_md = create_env_description(num_buttons)
+        obs_md = self.observation_space.create_markdown_description()
+        act_md = self.action_space.create_markdown_description()
+        reward_md = "A penalty of -1.0 is given at every time step until termination, which occurs when all buttons have been pressed.\n"  # pylint: disable=line-too-long
+        references_md = 'This environment is based on the Stick Button environment that was originally introduced in "Learning Neuro-Symbolic Skills for Bilevel Planning" (Silver et al., CoRL 2022).\n'  # pylint: disable=line-too-long
+        self.metadata = {
+            "description": env_md,
+            "observation_space_description": obs_md,
+            "action_space_description": act_md,
+            "reward_description": reward_md,
+            "references": references_md,
+            "render_modes": self._geom2d_env.metadata["render_modes"],
+            "render_fps": 10,
+        }
 
-#     def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
-#         super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
-#         obs, info = self._geom2d_env.reset(*args, **kwargs)
-#         assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-#         vec_obs = self.observation_space.vectorize(obs)
-#         return vec_obs, info
+    def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
+        super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
+        obs, info = self._geom2d_env.reset(*args, **kwargs)
+        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
+        vec_obs = self.observation_space.vectorize(obs)
+        return vec_obs, info
 
-#     def step(
-#         self, *args, **kwargs
-#     ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
-#         obs, reward, terminated, truncated, done = self._geom2d_env.step(
-#             *args, **kwargs
-#         )
-#         assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-#         vec_obs = self.observation_space.vectorize(obs)
-#         return vec_obs, reward, terminated, truncated, done
+    def step(
+        self, *args, **kwargs
+    ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
+        obs, reward, terminated, truncated, done = self._geom2d_env.step(
+            *args, **kwargs
+        )
+        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
+        vec_obs = self.observation_space.vectorize(obs)
+        return vec_obs, reward, terminated, truncated, done
 
-#     def render(self):
-#         return self._geom2d_env.render()
+    def render(self):
+        return self._geom2d_env.render()
 
-#     def get_action_from_gui_input(
-#         self, gui_input: dict[str, Any]
-#     ) -> NDArray[np.float32]:
-#         """Get the mapping from human inputs to actions."""
-#         assert isinstance(self.action_space, CRVRobotActionSpace)
-#         return get_geom2d_crv_robot_action_from_gui_input(self.action_space, gui_input)
+    def get_action_from_gui_input(
+        self, gui_input: dict[str, Any]
+    ) -> NDArray[np.float32]:
+        """Get the mapping from human inputs to actions."""
+        assert isinstance(self.action_space, CRVRobotActionSpace)
+        return get_geom2d_crv_robot_action_from_gui_input(self.action_space, gui_input)
 
 
-# def create_env_description(num_passages: int = 2) -> str:
-#     """Create a human-readable environment description."""
-#     # pylint: disable=line-too-long
-#     if num_passages > 0:
-#         obstacle_sentence = (
-#             f"\nIn this environment, there are always {num_passages} narrow passages.\n"
-#         )
-#     else:
-#         obstacle_sentence = ""
+def create_env_description(num_buttons: int = 2) -> str:
+    """Create a human-readable environment description."""
+    # pylint: disable=line-too-long
+    return f"""A 2D environment where the goal is to touch all buttons, possibly by using a stick for buttons that are out of the robot's direct reach.
 
-#     return f"""A 2D environment where the goal is to reach a target region while avoiding static obstacles.
-# {obstacle_sentence}
-# The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. The arm and vacuum do not need to be used in this environment.
-# """
+In this environment, there are always {num_buttons} buttons.
+
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector.
+"""
