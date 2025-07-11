@@ -282,9 +282,52 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         # Finalize state.
         return create_state_from_dict(init_state_dict, Geom2DRobotEnvTypeFeatures)
 
+    def step(
+        self, action: NDArray[np.float32]
+    ) -> tuple[ObjectCentricState, float, bool, bool, dict]:
+        # For any button in contact with either the robot or the stick, change
+        # color to pressed.
+        super().step(action)
+        assert self._current_state is not None
+        newly_pressed_buttons: set[Object] = set()
+        obj_name_to_obj = {o.name: o for o in self._current_state}
+        robot = obj_name_to_obj["robot"]
+        stick = obj_name_to_obj["stick"]
+        for button in self._current_state.get_objects(CircleType):
+            if state_has_collision(
+                self._current_state,
+                {button},
+                {robot, stick},
+                self._static_object_body_cache,
+                ignore_z_orders=True,
+            ):
+                newly_pressed_buttons.add(button)
+        # Change colors.
+        for button in newly_pressed_buttons:
+            self._current_state.set(button, "color_r", self._spec.button_pressed_rgb[0])
+            self._current_state.set(button, "color_g", self._spec.button_pressed_rgb[1])
+            self._current_state.set(button, "color_b", self._spec.button_pressed_rgb[2])
+            # This is hacky, but it's the easiest way to force re-rendering.
+            del self._static_object_body_cache[button]
+
+        reward, terminated = self._get_reward_and_done()
+        truncated = False  # no maximum horizon, by default
+        observation = self._get_obs()
+        info = self._get_info()
+        return observation, reward, terminated, truncated, info
+
     def _get_reward_and_done(self) -> tuple[float, bool]:
-        # TODO
-        terminated = False
+        terminated = True
+        assert self._current_state is not None
+        for button in self._current_state.get_objects(CircleType):
+            color = (
+                self._current_state.get(button, "color_r"),
+                self._current_state.get(button, "color_g"),
+                self._current_state.get(button, "color_b"),
+            )
+            if not np.allclose(color, self._spec.button_pressed_rgb):
+                terminated = False
+                break
         return -1.0, terminated
 
 
@@ -331,7 +374,7 @@ class StickButton2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         obs_md = self.observation_space.create_markdown_description()
         act_md = self.action_space.create_markdown_description()
         reward_md = "A penalty of -1.0 is given at every time step until termination, which occurs when all buttons have been pressed.\n"  # pylint: disable=line-too-long
-        references_md = 'This environment is based on the Stick Button environment that was originally introduced in "Learning Neuro-Symbolic Skills for Bilevel Planning" (Silver et al., CoRL 2022).\n'  # pylint: disable=line-too-long
+        references_md = 'This environment is based on the Stick Button environment that was originally introduced in "Learning Neuro-Symbolic Skills for Bilevel Planning" (Silver et al., CoRL 2022). This version is simplified in that the robot or stick need only make contact with a button to press it, rather than explicitly pressing. Also, the full stick works for pressing, not just the tip.\n'  # pylint: disable=line-too-long
         self.metadata = {
             "description": env_md,
             "observation_space_description": obs_md,
