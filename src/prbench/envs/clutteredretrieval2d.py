@@ -35,7 +35,7 @@ Geom2DRobotEnvTypeFeatures[TargetBlockType] = list(
 
 
 @dataclass(frozen=True)
-class ClutteredRetreival2DEnvSpec(Geom2DRobotEnvSpec):
+class ClutteredRetrieval2DEnvSpec(Geom2DRobotEnvSpec):
     """Scene specification for ClutteredRetrieval2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
@@ -125,12 +125,12 @@ class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
     def __init__(
         self,
         num_obstructions: int = 2,
-        spec: ClutteredRetreival2DEnvSpec = ClutteredRetreival2DEnvSpec(),
+        spec: ClutteredRetrieval2DEnvSpec = ClutteredRetrieval2DEnvSpec(),
         **kwargs,
     ) -> None:
         super().__init__(spec, **kwargs)
         self._num_obstructions = num_obstructions
-        self._spec: ClutteredRetreival2DEnvSpec = spec  # for type checking
+        self._spec: ClutteredRetrieval2DEnvSpec = spec  # for type checking
         self.metadata = {
             "render_modes": ["rgb_array"],
             "render_fps": 10,
@@ -308,7 +308,7 @@ class ClutteredRetrieval2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.floa
     def __init__(
         self,
         num_obstructions: int = 2,
-        spec: ClutteredRetreival2DEnvSpec = ClutteredRetreival2DEnvSpec(),
+        spec: ClutteredRetrieval2DEnvSpec = ClutteredRetrieval2DEnvSpec(),
         **kwargs,
     ) -> None:
         super().__init__()
