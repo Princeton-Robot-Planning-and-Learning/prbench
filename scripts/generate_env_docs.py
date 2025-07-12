@@ -111,7 +111,7 @@ def create_initial_state_gif(
     env: gymnasium.Env,
     num_resets: int = 25,
     seed: int = 0,
-    default_fps: int = 10,
+    fps: int = 10,
 ) -> None:
     """Create a GIF of different initial states by calling reset()."""
     imgs: list = []
@@ -120,7 +120,6 @@ def create_initial_state_gif(
         imgs.append(env.render())
     env_filename = sanitize_env_id(env_id)
     outfile = OUTPUT_DIR / "assets" / "initial_state_gifs" / f"{env_filename}.gif"
-    fps = env.metadata.get("render_fps", default_fps)
     iio.mimsave(outfile, imgs, fps=fps, loop=0)
 
 

@@ -26,6 +26,15 @@ def register_all_environments() -> None:
             kwargs={"num_obstructions": num_obstruction},
         )
 
+    # ClutteredStorage2D environment with different numbers of blocks.
+    num_blocks = [1, 7, 15]
+    for num_block in num_blocks:
+        register(
+            id=f"prbench/ClutteredStorage2D-b{num_block}-v0",
+            entry_point="prbench.envs.clutteredstorage2d:ClutteredStorage2DEnv",
+            kwargs={"num_blocks": num_block},
+        )
+
     # Motion2D environment with different numbers of passages.
     num_passages = [1, 2, 3, 4, 5]
     for num_passage in num_passages:

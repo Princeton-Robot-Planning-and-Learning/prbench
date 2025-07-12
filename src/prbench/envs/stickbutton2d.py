@@ -104,6 +104,7 @@ class StickButton2DEnvSpec(Geom2DRobotEnvSpec):
 
     # For rendering.
     render_dpi: int = 150
+    render_fps: int = 20
 
 
 class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
@@ -129,7 +130,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         self._spec: StickButton2DEnvSpec = spec  # for type checking
         self.metadata = {
             "render_modes": ["rgb_array"],
-            "render_fps": 10,
+            "render_fps": self._spec.render_fps,
         }
 
     def _sample_initial_state(self) -> ObjectCentricState:
@@ -382,7 +383,7 @@ class StickButton2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             "reward_description": reward_md,
             "references": references_md,
             "render_modes": self._geom2d_env.metadata["render_modes"],
-            "render_fps": 10,
+            "render_fps": self._geom2d_env.metadata["render_fps"],
         }
 
     def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
