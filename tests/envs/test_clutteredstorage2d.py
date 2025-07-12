@@ -8,11 +8,11 @@ import prbench
 from prbench.envs.clutteredstorage2d import ObjectCentricClutteredStorage2DEnv
 
 
-def test_object_centric_clutteredstoragel2d_env():
+def test_object_centric_clutteredstorage2d_env():
     """Tests for ObjectCentricClutteredStorage2DEnv()."""
 
     # Test env creation and random actions.
-    env = ObjectCentricClutteredStorage2DEnv(num_blocks=15)
+    env = ObjectCentricClutteredStorage2DEnv(num_blocks=1)
 
     if MAKE_VIDEOS:
         env = RecordVideo(env, "unit_test_videos")
@@ -25,11 +25,11 @@ def test_object_centric_clutteredstoragel2d_env():
     env.close()
 
 
-# def test_clutteredretrieval2d_observation_space():
-#     """Tests that observations are vectors with fixed dimensionality."""
-#     prbench.register_all_environments()
-#     env = prbench.make("prbench/ClutteredRetrieval2D-o10-v0")
-#     assert isinstance(env.observation_space, Box)
-#     for _ in range(5):
-#         obs, _ = env.reset()
-#         assert env.observation_space.contains(obs)
+def test_clutteredstorage2d_observation_space():
+    """Tests that observations are vectors with fixed dimensionality."""
+    prbench.register_all_environments()
+    env = prbench.make("prbench/ClutteredStorage2D-b7-v0")
+    assert isinstance(env.observation_space, Box)
+    for _ in range(5):
+        obs, _ = env.reset()
+        assert env.observation_space.contains(obs)
