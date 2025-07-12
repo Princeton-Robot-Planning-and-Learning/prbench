@@ -113,7 +113,7 @@ class ClutteredRetrieval2DEnvSpec(Geom2DRobotEnvSpec):
 
     # For rendering.
     render_dpi: int = 150
-    render_fps: int = 30
+    render_fps: int = 20
 
 
 class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):

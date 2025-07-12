@@ -108,7 +108,7 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
 
     # For rendering.
     render_dpi: int = 150
-    render_fps: int = 30
+    render_fps: int = 20
 
     def get_shelf_width(self, num_init_shelf_blocks: int) -> float:
         """Calculate the shelf width as a function of number of blocks."""

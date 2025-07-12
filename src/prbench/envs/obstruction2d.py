@@ -70,7 +70,7 @@ class Obstruction2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             "reward_description": reward_md,
             "references": references_md,
             "render_modes": self._geom2d_env.metadata["render_modes"],
-            "render_fps": 30,
+            "render_fps": 20,
         }
 
     def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
