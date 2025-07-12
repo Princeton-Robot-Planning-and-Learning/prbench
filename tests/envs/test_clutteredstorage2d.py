@@ -12,7 +12,7 @@ def test_object_centric_clutteredstoragel2d_env():
     """Tests for ObjectCentricClutteredStorage2DEnv()."""
 
     # Test env creation and random actions.
-    env = ObjectCentricClutteredStorage2DEnv(num_blocks=9)
+    env = ObjectCentricClutteredStorage2DEnv(num_blocks=15)
 
     if MAKE_VIDEOS:
         env = RecordVideo(env, "unit_test_videos")
