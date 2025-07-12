@@ -14,6 +14,7 @@ from geom2drobotenvs.object_types import (
 from geom2drobotenvs.structs import ZOrder
 from geom2drobotenvs.utils import (
     PURPLE,
+    BLACK,
     CRVRobotActionSpace,
     SE2Pose,
     create_walls_from_world_boundaries,
@@ -266,17 +267,48 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
 
         # Create the shelf.
         shelf = Object("shelf", ShelfType)
+        shelf_width = self._spec.get_shelf_width(self._num_target_blocks)
         init_state_dict[shelf] = {
             "x": shelf_pose.x,
             "y": shelf_pose.y,
             "theta": shelf_pose.theta,
-            "width": self._spec.get_shelf_width(self._num_target_blocks),
+            "width": shelf_width,
             "height": self._spec.shelf_height,
             "static": True,
             "color_r": self._spec.shelf_rgb[0],
             "color_g": self._spec.shelf_rgb[1],
             "color_b": self._spec.shelf_rgb[2],
             "z_order": ZOrder.SURFACE.value,
+        }
+
+        # Create the left shelf bookend.
+        shelf_left_bookend = Object("shelf_left_bookend", RectangleType)
+        init_state_dict[shelf_left_bookend] = {
+            "x": self._spec.world_min_x,
+            "y": shelf_pose.y,
+            "theta": shelf_pose.theta,
+            "width": shelf_pose.x - self._spec.world_min_x,
+            "height": self._spec.shelf_height,
+            "static": True,
+            "color_r": BLACK[0],
+            "color_g": BLACK[1],
+            "color_b": BLACK[2],
+            "z_order": ZOrder.ALL.value,
+        }
+
+        # Create the right shelf bookend.
+        shelf_right_bookend = Object("shelf_right_bookend", RectangleType)
+        init_state_dict[shelf_right_bookend] = {
+            "x": shelf_pose.x + shelf_width,
+            "y": shelf_pose.y,
+            "theta": shelf_pose.theta,
+            "width": self._spec.world_max_x - (shelf_pose.x + shelf_width),
+            "height": self._spec.shelf_height,
+            "static": True,
+            "color_r": BLACK[0],
+            "color_g": BLACK[1],
+            "color_b": BLACK[2],
+            "z_order": ZOrder.ALL.value,
         }
 
         # Finalize state.
