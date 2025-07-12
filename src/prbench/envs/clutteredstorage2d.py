@@ -92,7 +92,7 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
 
     # Target block hyperparameters.
     target_block_rgb: tuple[float, float, float] = (0.0, 0.3, 1.0)
-    # All target blocks but one are initialized in the shelf.
+    # N blocks are initialized in the shelf and N + 1 are initialized outside.
     target_block_in_shelf_rotation_bounds: tuple[float, float] = (
         -np.pi / 16,
         np.pi / 16
@@ -109,32 +109,31 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
     # For rendering.
     render_dpi: int = 150
 
-    def get_shelf_width(self, num_target_blocks: int) -> float:
+    def get_shelf_width(self, num_init_shelf_blocks: int) -> float:
         """Calculate the shelf width as a function of number of blocks."""
-        shelf_width = (max(self.target_block_shape) + self.shelf_width_pad) * (num_target_blocks - 1)
+        shelf_width = (max(self.target_block_shape) + self.shelf_width_pad) * num_init_shelf_blocks
         assert shelf_width <= self.world_max_x - self.world_min_x
         return shelf_width
     
-    def get_shelf_init_pose_bounds(self, num_target_blocks: int) -> tuple[SE2Pose, SE2Pose]:
+    def get_shelf_init_pose_bounds(self, num_init_shelf_blocks: int) -> tuple[SE2Pose, SE2Pose]:
         """Calculate the init pose bounds for the shelf based on block number."""
-        shelf_width = self.get_shelf_width(num_target_blocks)
+        shelf_width = self.get_shelf_width(num_init_shelf_blocks)
         return (
             SE2Pose(self.world_min_x, self.shelf_y, 0),
             SE2Pose(self.world_max_x - shelf_width, self.shelf_y, 0),
         )
     
-    def get_target_block_in_shelf_center_positions(self, num_target_blocks: int, shelf_pose: SE2Pose) -> list[tuple[float, float]]:
+    def get_target_block_in_shelf_center_positions(self, num_init_shelf_blocks: int, shelf_pose: SE2Pose) -> list[tuple[float, float]]:
         """Get the init center positions for the target blocks in the shelf."""
-        shelf_width = self.get_shelf_width(num_target_blocks)
-        num_shelf_blocks = num_target_blocks - 1
+        shelf_width = self.get_shelf_width(num_init_shelf_blocks)
         assert np.isclose(shelf_pose.theta, 0.0)
         total_half_pad = (self.shelf_width_pad + self.target_block_shape[0]) / 2
         min_x = shelf_pose.x + total_half_pad
         max_x = shelf_pose.x + shelf_width - total_half_pad
-        xs = np.linspace(min_x, max_x, num=num_shelf_blocks, endpoint=True)
+        xs = np.linspace(min_x, max_x, num=num_init_shelf_blocks, endpoint=True)
         # NOTE: there is an implicit assumption here that the shelf is not too
         # deep for the robot to reach in and grab the objects.
-        y = shelf_pose.y + self.shelf_height / 2
+        y = shelf_pose.y + 2 * self.target_block_shape[1]
         return [(x, y) for x in xs]
 
 
@@ -147,12 +146,14 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
 
     def __init__(
         self,
-        num_target_blocks: int = 2,
+        num_blocks: int = 3,
         spec: ClutteredStorage2DEnvSpec = ClutteredStorage2DEnvSpec(),
         **kwargs,
     ) -> None:
         super().__init__(spec, **kwargs)
-        self._num_target_blocks = num_target_blocks
+        assert num_blocks % 2 == 1, "Number of blocks must be odd"
+        self._num_init_shelf_blocks = num_blocks // 2
+        self._num_init_outside_blocks = num_blocks - self._num_init_shelf_blocks
         self._spec: ClutteredStorage2DEnvSpec = spec  # for type checking
         self.metadata = {
             "render_modes": ["rgb_array"],
@@ -165,10 +166,10 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         # Sample robot pose.
         robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
         # Sample shelf pose.
-        shelf_init_pose_bounds = self._spec.get_shelf_init_pose_bounds(self._num_target_blocks)
+        shelf_init_pose_bounds = self._spec.get_shelf_init_pose_bounds(self._num_init_shelf_blocks)
         shelf_pose = sample_se2_pose(shelf_init_pose_bounds, self.np_random)
         # Sample the target block rotations.
-        shelf_target_block_rotations = self.np_random.uniform(*self._spec.target_block_in_shelf_rotation_bounds, size=self._num_target_blocks-1)
+        shelf_target_block_rotations = self.np_random.uniform(*self._spec.target_block_in_shelf_rotation_bounds, size=self._num_init_shelf_blocks)
         state = self._create_initial_state(initial_state_dict, robot_pose, shelf_pose, shelf_target_block_rotations)
         robot = state.get_objects(CRVRobotType)[0]
         assert not state_has_collision(state, {robot}, static_objects, {})
@@ -285,7 +286,7 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
 
         # Create the shelf.
         shelf = Object("shelf", ShelfType)
-        shelf_width = self._spec.get_shelf_width(self._num_target_blocks)
+        shelf_width = self._spec.get_shelf_width(self._num_init_shelf_blocks)
         init_state_dict[shelf] = {
             "x": shelf_pose.x,
             "y": shelf_pose.y,
@@ -331,7 +332,7 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
 
         # Create the target blocks that are initially in the shelf. Evenly space
         # them horizontally and apply rotations.
-        target_block_in_shelf_center_positions = self._spec.get_target_block_in_shelf_center_positions(self._num_target_blocks, shelf_pose)
+        target_block_in_shelf_center_positions = self._spec.get_target_block_in_shelf_center_positions(self._num_init_shelf_blocks, shelf_pose)
         for i, ((center_x, center_y), rot) in enumerate(zip(target_block_in_shelf_center_positions, shelf_target_block_rotations, strict=True)):
             block = Object(f"target_block{i}", TargetBlockType)
             rect = Rectangle.from_center(center_x, center_y, self._spec.target_block_shape[0], self._spec.target_block_shape[1], rot)
