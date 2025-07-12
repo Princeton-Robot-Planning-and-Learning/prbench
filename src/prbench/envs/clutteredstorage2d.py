@@ -26,6 +26,7 @@ from numpy.typing import NDArray
 from relational_structs import Object, ObjectCentricState, ObjectCentricStateSpace, Type
 from relational_structs.spaces import ObjectCentricBoxSpace
 from relational_structs.utils import create_state_from_dict
+from tomsgeoms2d.structs import Rectangle
 
 from prbench.utils import get_geom2d_crv_robot_action_from_gui_input
 
@@ -47,9 +48,9 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
     world_min_x: float = 0.0
-    world_max_x: float = 2.5
+    world_max_x: float = 5.0
     world_min_y: float = 0.0
-    world_max_y: float = 1.5
+    world_max_y: float = 3.0
 
     # Action space parameters.
     min_dx: float = -5e-2
@@ -70,10 +71,11 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
     shelf_y: float = world_max_y - shelf_height
 
     # Robot hyperparameters.
-    robot_base_radius: float = 0.1
-    robot_arm_length: float = 2 * robot_base_radius
-    robot_gripper_height: float = 0.07
-    robot_gripper_width: float = 0.01
+    robot_base_radius: float = 0.2
+    # NOTE: extra long robot arm to make it easier to reach into shelf.
+    robot_arm_length: float = 4 * robot_base_radius
+    robot_gripper_height: float = 0.14
+    robot_gripper_width: float = 0.02
     # NOTE: robot init y pose bounded above by shelf_y.
     robot_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
         SE2Pose(
@@ -89,11 +91,11 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
     )
 
     # Target block hyperparameters.
-    target_block_rgb: tuple[float, float, float] = (0, 0, 128 / 255)
+    target_block_rgb: tuple[float, float, float] = (0.0, 0.3, 1.0)
     # All target blocks but one are initialized in the shelf.
-    target_block_in_shelf_theta_bounds: tuple[float, float] = (
-        -np.pi / 8,
-        np.pi / 8
+    target_block_in_shelf_rotation_bounds: tuple[float, float] = (
+        -np.pi / 16,
+        np.pi / 16
     )
     target_block_out_of_shelf_pose_bounds: tuple[SE2Pose, SE2Pose] = robot_init_pose_bounds
     target_block_shape: tuple[float, float] = (
@@ -109,7 +111,7 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
 
     def get_shelf_width(self, num_target_blocks: int) -> float:
         """Calculate the shelf width as a function of number of blocks."""
-        shelf_width = (max(self.target_block_shape) + self.shelf_width_pad) * num_target_blocks
+        shelf_width = (max(self.target_block_shape) + self.shelf_width_pad) * (num_target_blocks - 1)
         assert shelf_width <= self.world_max_x - self.world_min_x
         return shelf_width
     
@@ -120,6 +122,20 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
             SE2Pose(self.world_min_x, self.shelf_y, 0),
             SE2Pose(self.world_max_x - shelf_width, self.shelf_y, 0),
         )
+    
+    def get_target_block_in_shelf_center_positions(self, num_target_blocks: int, shelf_pose: SE2Pose) -> list[tuple[float, float]]:
+        """Get the init center positions for the target blocks in the shelf."""
+        shelf_width = self.get_shelf_width(num_target_blocks)
+        num_shelf_blocks = num_target_blocks - 1
+        assert np.isclose(shelf_pose.theta, 0.0)
+        total_half_pad = (self.shelf_width_pad + self.target_block_shape[0]) / 2
+        min_x = shelf_pose.x + total_half_pad
+        max_x = shelf_pose.x + shelf_width - total_half_pad
+        xs = np.linspace(min_x, max_x, num=num_shelf_blocks, endpoint=True)
+        # NOTE: there is an implicit assumption here that the shelf is not too
+        # deep for the robot to reach in and grab the objects.
+        y = shelf_pose.y + self.shelf_height / 2
+        return [(x, y) for x in xs]
 
 
 class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
@@ -151,7 +167,9 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         # Sample shelf pose.
         shelf_init_pose_bounds = self._spec.get_shelf_init_pose_bounds(self._num_target_blocks)
         shelf_pose = sample_se2_pose(shelf_init_pose_bounds, self.np_random)
-        state = self._create_initial_state(initial_state_dict, robot_pose, shelf_pose)
+        # Sample the target block rotations.
+        shelf_target_block_rotations = self.np_random.uniform(*self._spec.target_block_in_shelf_rotation_bounds, size=self._num_target_blocks-1)
+        state = self._create_initial_state(initial_state_dict, robot_pose, shelf_pose, shelf_target_block_rotations)
         robot = state.get_objects(CRVRobotType)[0]
         assert not state_has_collision(state, {robot}, static_objects, {})
         # # Sample target pose and check for collisions with robot and static objects.
@@ -244,7 +262,7 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         constant_initial_state_dict: dict[Object, dict[str, float]],
         robot_pose: SE2Pose,
         shelf_pose: SE2Pose,
-        obstructions: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
+        shelf_target_block_rotations: list[float],
     ) -> ObjectCentricState:
 
         # Shallow copy should be okay because the constant objects should not
@@ -310,6 +328,25 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
             "color_b": BLACK[2],
             "z_order": ZOrder.ALL.value,
         }
+
+        # Create the target blocks that are initially in the shelf. Evenly space
+        # them horizontally and apply rotations.
+        target_block_in_shelf_center_positions = self._spec.get_target_block_in_shelf_center_positions(self._num_target_blocks, shelf_pose)
+        for i, ((center_x, center_y), rot) in enumerate(zip(target_block_in_shelf_center_positions, shelf_target_block_rotations, strict=True)):
+            block = Object(f"target_block{i}", TargetBlockType)
+            rect = Rectangle.from_center(center_x, center_y, self._spec.target_block_shape[0], self._spec.target_block_shape[1], rot)
+            init_state_dict[block] = {
+                "x": rect.x,
+                "y": rect.y,
+                "theta": rect.theta,
+                "width": rect.width,
+                "height": rect.height,
+                "static": False,
+                "color_r": self._spec.target_block_rgb[0],
+                "color_g": self._spec.target_block_rgb[1],
+                "color_b": self._spec.target_block_rgb[2],
+                "z_order": ZOrder.SURFACE.value,
+            }
 
         # Finalize state.
         return create_state_from_dict(init_state_dict, Geom2DRobotEnvTypeFeatures)
