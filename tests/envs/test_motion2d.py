@@ -31,7 +31,6 @@ def test_object_centric_motion2d_env():
 def test_motion2d_stay_in_bounds():
     """Tests that the robot stays in bounds of the world."""
     env = prbench.make("prbench/Motion2D-p1-v0")
-    obs, _ = env.reset(seed=123)
 
     # Cardinal directions.
     # The action space is (dx, dy, dtheta, darm, vacuum).
@@ -47,7 +46,6 @@ def test_motion2d_stay_in_bounds():
     world_min_y, world_max_y = default_spec.world_min_y, default_spec.world_max_y
 
     for _, direction in directions.items():
-        # print(f"Testing direction: {direction_name}")
         obs, _ = env.reset(seed=123)
         for _ in range(100):
             obs, _, _, _, _ = env.step(np.array(direction, dtype=np.float32))
