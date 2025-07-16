@@ -2,12 +2,11 @@
 
 import numpy as np
 from conftest import MAKE_VIDEOS
-from geom2drobotenvs.object_types import CRVRobotType
 from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
 
 import prbench
-from prbench.envs.motion2d import ObjectCentricMotion2DEnv
+from prbench.envs.motion2d import Motion2DEnvSpec, ObjectCentricMotion2DEnv
 
 prbench.register_all_environments()
 
@@ -32,7 +31,7 @@ def test_object_centric_motion2d_env():
 def test_motion2d_stay_in_bounds():
     """Tests that the robot stays in bounds of the world."""
     env = prbench.make("prbench/Motion2D-p1-v0")
-    env.reset(seed=123)
+    obs, _ = env.reset(seed=123)
 
     # Cardinal directions.
     # The action space is (dx, dy, dtheta, darm, vacuum).
@@ -42,19 +41,22 @@ def test_motion2d_stay_in_bounds():
     right = (env.action_space.high[0], 0.0, 0.0, 0.0, 0.0)
     directions = {"up": up, "down": down, "left": left, "right": right}
 
-    for direction_name, direction in directions.items():
+    # Get world bounds from the default spec
+    default_spec = Motion2DEnvSpec()
+    world_min_x, world_max_x = default_spec.world_min_x, default_spec.world_max_x
+    world_min_y, world_max_y = default_spec.world_min_y, default_spec.world_max_y
+
+    for _, direction in directions.items():
         # print(f"Testing direction: {direction_name}")
-        env.reset(seed=123)
+        obs, _ = env.reset(seed=123)
         for _ in range(100):
-            env.step(np.array(direction, dtype=np.float32))
-            robot = env.unwrapped._geom2d_env._current_state.get_objects(CRVRobotType)[
-                0
-            ]
-            robot_x = env.unwrapped._geom2d_env._current_state.get(robot, "x")
-            robot_y = env.unwrapped._geom2d_env._current_state.get(robot, "y")
-            spec = env.unwrapped._geom2d_env._spec
-            assert spec.world_min_x <= robot_x <= spec.world_max_x
-            assert spec.world_min_y <= robot_y <= spec.world_max_y
+            obs, _, _, _, _ = env.step(np.array(direction, dtype=np.float32))
+            # Robot position is in the first elements of the observation vector
+            # (x, y, theta are the first 3 elements since robot is first object)
+            robot_x = obs[0]
+            robot_y = obs[1]
+            assert world_min_x <= robot_x <= world_max_x
+            assert world_min_y <= robot_y <= world_max_y
 
     env.close()
 
