@@ -53,7 +53,7 @@ PRBench does not provide any models for TAMP. Users are welcome to engineer thei
 ## :octocat: Contributing
 
 ### :ballot_box_with_check: Requirements
-1. Python 3.10+
+1. Python >=3.10, <3.13
 2. Tested on MacOS Monterey and Ubuntu 22.04 (but we aim to support most platforms)
 
 ### :wrench: Installation
