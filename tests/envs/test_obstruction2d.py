@@ -14,6 +14,7 @@ def test_obstruction2d_observation_space():
         obs, _ = env.reset()
         assert env.observation_space.contains(obs)
 
+
 def test_obstruction2d_action_space():
     """Tests that the actions are valid and the step functions works."""
     prbench.register_all_environments()
@@ -28,3 +29,4 @@ def test_obstruction2d_action_space():
         assert isinstance(terminated, bool)
         assert isinstance(truncated, bool)
         assert isinstance(info, dict)
+
