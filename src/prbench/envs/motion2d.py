@@ -116,7 +116,7 @@ class Motion2DEnvSpec(Geom2DRobotEnvSpec):
     )
 
     # For rendering.
-    render_dpi: int = 150
+    render_dpi: int = 300
     render_fps: int = 20
 
 
