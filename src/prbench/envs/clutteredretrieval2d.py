@@ -306,10 +306,15 @@ class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
 class ClutteredRetrieval2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     """Cluttered retrieval 2D env."""
 
+    # NOTE: we need to define render_modes in the class instead of the instance because
+    # gym.make extracts render_modes from the class (entry_point) before instantiation.
+    metadata: dict[str, Any] = {"render_modes": ["rgb_array"]}
+
     def __init__(
         self,
         num_obstructions: int = 2,
         spec: ClutteredRetrieval2DEnvSpec = ClutteredRetrieval2DEnvSpec(),
+        render_mode: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -347,15 +352,17 @@ class ClutteredRetrieval2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.floa
         act_md = self.action_space.create_markdown_description()
         reward_md = "A penalty of -1.0 is given at every time step until termination, which occurs when the target block is held.\n"  # pylint: disable=line-too-long
         references_md = 'Similar environments have been considered by many others, especially in the task and motion planning literature, e.g., "Combined Task and Motion Planning Through an Extensible Planner-Independent Interface Layer" (Srivastava et al., ICRA 2014).\n'  # pylint: disable=line-too-long
-        self.metadata = {
+        instance_metadata = {
             "description": env_md,
             "observation_space_description": obs_md,
             "action_space_description": act_md,
             "reward_description": reward_md,
             "references": references_md,
-            "render_modes": self._geom2d_env.metadata["render_modes"],
             "render_fps": self._geom2d_env.metadata["render_fps"],
         }
+        self.metadata = self.metadata.copy()
+        self.metadata.update(**instance_metadata)
+        self.render_mode = render_mode
 
     def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
         super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
