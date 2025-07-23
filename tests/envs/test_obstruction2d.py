@@ -29,4 +29,3 @@ def test_obstruction2d_action_space():
         assert isinstance(terminated, bool)
         assert isinstance(truncated, bool)
         assert isinstance(info, dict)
-
