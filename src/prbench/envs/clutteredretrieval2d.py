@@ -112,7 +112,7 @@ class ClutteredRetrieval2DEnvSpec(Geom2DRobotEnvSpec):
     max_init_sampling_attempts: int = 10_000
 
     # For rendering.
-    render_dpi: int = 150
+    render_dpi: int = 300
     render_fps: int = 20
 
 
