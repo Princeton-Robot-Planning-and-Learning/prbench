@@ -41,14 +41,13 @@ def test_stickbutton2d_termination():
     """Tests that the environment terminates when all buttons are pressed."""
 
     env = ObjectCentricStickButton2DEnv(num_buttons=5)
-    env.reset()
+    state, _ = env.reset()
 
     # Manually press all buttons.
-    buttons = env._current_state.get_objects(CircleType)
+    buttons = state.get_objects(CircleType)
     for button in buttons:
-        env._current_state.set(button, "color_r", env._spec.button_pressed_rgb[0])
-        env._current_state.set(button, "color_g", env._spec.button_pressed_rgb[1])
-        env._current_state.set(button, "color_b", env._spec.button_pressed_rgb[2])
+        state = env.press_button(button)
+    env.reset(options={"init_state": state})
 
     # Any action should now result in termination.
     action = env.action_space.sample()
