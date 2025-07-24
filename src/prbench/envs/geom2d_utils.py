@@ -72,15 +72,15 @@ class ConstantObjectGeom2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.floa
         self.render_mode = render_mode
 
     @abc.abstractmethod
+    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom2DRobotEnv:
+        """Create the underlying object-centric environment."""
+
+    @abc.abstractmethod
     def _get_constant_object_names(
         self, exemplar_state: ObjectCentricState
     ) -> list[str]:
         """The ordered names of the constant objects extracted from the
         observations."""
-
-    @abc.abstractmethod
-    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom2DRobotEnv:
-        """Create the underlying object-centric environment."""
 
     @abc.abstractmethod
     def _create_env_markdown_description(self) -> str:
