@@ -297,9 +297,9 @@ class Motion2DEnv(ConstantObjectGeom2DEnv):
             obstacle_sentence = ""
 
         return f"""A 2D environment where the goal is to reach a target region while avoiding static obstacles.
-    {obstacle_sentence}
-    The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. The arm and vacuum do not need to be used in this environment.
-    """
+{obstacle_sentence}
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. The arm and vacuum do not need to be used in this environment.
+"""
 
     def _create_reward_markdown_description(self) -> str:
         return "A penalty of -1.0 is given at every time step until termination, which occurs when the robot's position is within the target region.\n"  # pylint: disable=line-too-long

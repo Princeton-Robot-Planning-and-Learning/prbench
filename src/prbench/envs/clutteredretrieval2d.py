@@ -323,9 +323,9 @@ class ClutteredRetrieval2DEnv(ConstantObjectGeom2DEnv):
             obstruction_sentence = ""
 
         return f"""A 2D environment where the goal is to "pick up" (suction) a target block.
-    {obstruction_sentence}
-    The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
-    """
+{obstruction_sentence}
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
+"""
 
     def _create_reward_markdown_description(self) -> str:
         return "A penalty of -1.0 is given at every time step until termination, which occurs when the target block is held.\n"  # pylint: disable=line-too-long

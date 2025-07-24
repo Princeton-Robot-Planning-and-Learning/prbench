@@ -403,10 +403,10 @@ class ClutteredStorage2DEnv(ConstantObjectGeom2DEnv):
         # pylint: disable=line-too-long
         return f"""A 2D environment where the goal is to put all blocks inside a shelf.
 
-    There are always {num_blocks} blocks in this environment.
+There are always {num_blocks} blocks in this environment.
 
-    The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
-    """
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
+"""
 
     def _create_reward_markdown_description(self) -> str:
         return "A penalty of -1.0 is given at every time step until termination, which occurs when all blocks are inside the shelf.\n"  # pylint: disable=line-too-long

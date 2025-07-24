@@ -34,9 +34,9 @@ class Obstruction2DEnv(ConstantObjectGeom2DEnv):
             obstruction_sentence = ""
 
         return f"""A 2D environment where the goal is to place a target block onto a target surface. The block must be completely contained within the surface boundaries.
-    {obstruction_sentence}
-    The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
-    """
+{obstruction_sentence}
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
+"""
 
     def _create_reward_markdown_description(self) -> str:
         # pylint: disable=line-too-long
@@ -48,4 +48,4 @@ class Obstruction2DEnv(ConstantObjectGeom2DEnv):
     def _create_references_markdown_description(self) -> str:
         # pylint: disable=line-too-long
         return """Similar environments have been used many times, especially in the task and motion planning literature. We took inspiration especially from the "1D Continuous TAMP" environment in [PDDLStream](https://github.com/caelan/pddlstream).
-    """
+"""

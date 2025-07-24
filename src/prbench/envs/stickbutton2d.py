@@ -349,10 +349,10 @@ class StickButton2DEnv(ConstantObjectGeom2DEnv):
         # pylint: disable=line-too-long
         return f"""A 2D environment where the goal is to touch all buttons, possibly by using a stick for buttons that are out of the robot's direct reach.
 
-    In this environment, there are always {num_buttons} buttons.
+In this environment, there are always {num_buttons} buttons.
 
-    The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector.
-    """
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector.
+"""
 
     def _create_reward_markdown_description(self) -> str:
         return "A penalty of -1.0 is given at every time step until termination, which occurs when all buttons have been pressed.\n"  # pylint: disable=line-too-long
