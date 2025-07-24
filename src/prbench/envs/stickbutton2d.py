@@ -1,9 +1,7 @@
 """Environment with a stick and buttons that need to be pressed."""
 
 from dataclasses import dataclass
-from typing import Any
 
-import gymnasium
 import numpy as np
 from geom2drobotenvs.envs.base_env import Geom2DRobotEnv, Geom2DRobotEnvSpec
 from geom2drobotenvs.object_types import (
@@ -22,11 +20,10 @@ from geom2drobotenvs.utils import (
     state_has_collision,
 )
 from numpy.typing import NDArray
-from relational_structs import Object, ObjectCentricState, ObjectCentricStateSpace
-from relational_structs.spaces import ObjectCentricBoxSpace
+from relational_structs import Object, ObjectCentricState
 from relational_structs.utils import create_state_from_dict
 
-from prbench.utils import get_geom2d_crv_robot_action_from_gui_input
+from prbench.envs.geom2d_utils import ConstantObjectGeom2DEnv
 
 
 @dataclass(frozen=True)
@@ -332,94 +329,33 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         return -1.0, terminated
 
 
-class StickButton2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
-    """Stick button 2D env."""
+class StickButton2DEnv(ConstantObjectGeom2DEnv):
+    """Stick button 2D env with a constant number of objects."""
 
-    def __init__(
-        self,
-        num_buttons: int = 2,
-        spec: StickButton2DEnvSpec = StickButton2DEnvSpec(),
-        **kwargs,
-    ) -> None:
-        super().__init__()
-        # At the moment, all the real logic for this environment is defined
-        # externally. We create that environment and then add some additional
-        # code to vectorize observations, making it easier for RL approaches.
-        self._geom2d_env = ObjectCentricStickButton2DEnv(
-            num_buttons=num_buttons, spec=spec, **kwargs
-        )
-        # Create a Box version of the observation space by assuming a constant
-        # number of buttons (and thus a constant number of objects).
-        assert isinstance(self._geom2d_env.observation_space, ObjectCentricStateSpace)
-        # Make observation vectors start with the robot, then the stick,
-        # then buttons. Don't include the walls or table because those are
-        # universally constant.
-        exemplar_object_centric_state, _ = self._geom2d_env.reset()
-        obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
-        self._constant_objects = [
-            obj_name_to_obj["robot"],
-            obj_name_to_obj["stick"],
-        ]
-        button_names = {o for o in obj_name_to_obj if o.startswith("button")}
-        assert len(button_names) == num_buttons
-        for button_name in sorted(button_names):
-            self._constant_objects.append(obj_name_to_obj[button_name])
-        self.observation_space = self._geom2d_env.observation_space.to_box(
-            self._constant_objects, Geom2DRobotEnvTypeFeatures
-        )
-        self.action_space = self._geom2d_env.action_space
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        assert isinstance(self.action_space, CRVRobotActionSpace)
-        # Add descriptions to metadata for doc generation.
-        env_md = create_env_description(num_buttons)
-        obs_md = self.observation_space.create_markdown_description()
-        act_md = self.action_space.create_markdown_description()
-        reward_md = "A penalty of -1.0 is given at every time step until termination, which occurs when all buttons have been pressed.\n"  # pylint: disable=line-too-long
-        references_md = 'This environment is based on the Stick Button environment that was originally introduced in "Learning Neuro-Symbolic Skills for Bilevel Planning" (Silver et al., CoRL 2022). This version is simplified in that the robot or stick need only make contact with a button to press it, rather than explicitly pressing. Also, the full stick works for pressing, not just the tip.\n'  # pylint: disable=line-too-long
-        self.metadata = {
-            "description": env_md,
-            "observation_space_description": obs_md,
-            "action_space_description": act_md,
-            "reward_description": reward_md,
-            "references": references_md,
-            "render_modes": self._geom2d_env.metadata["render_modes"],
-            "render_fps": self._geom2d_env.metadata["render_fps"],
-        }
+    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom2DRobotEnv:
+        return ObjectCentricStickButton2DEnv(*args, **kwargs)
 
-    def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
-        super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
-        obs, info = self._geom2d_env.reset(*args, **kwargs)
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        vec_obs = self.observation_space.vectorize(obs)
-        return vec_obs, info
+    def _get_constant_object_names(
+        self, exemplar_state: ObjectCentricState
+    ) -> list[str]:
+        constant_objects = ["robot", "stick"]
+        for obj in sorted(exemplar_state):
+            if obj.name.startswith("button"):
+                constant_objects.append(obj.name)
+        return constant_objects
 
-    def step(
-        self, *args, **kwargs
-    ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
-        obs, reward, terminated, truncated, done = self._geom2d_env.step(
-            *args, **kwargs
-        )
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        vec_obs = self.observation_space.vectorize(obs)
-        return vec_obs, reward, terminated, truncated, done
+    def _create_env_markdown_description(self) -> str:
+        num_buttons = len(self._constant_objects) - 2
+        # pylint: disable=line-too-long
+        return f"""A 2D environment where the goal is to touch all buttons, possibly by using a stick for buttons that are out of the robot's direct reach.
 
-    def render(self):
-        return self._geom2d_env.render()
+    In this environment, there are always {num_buttons} buttons.
 
-    def get_action_from_gui_input(
-        self, gui_input: dict[str, Any]
-    ) -> NDArray[np.float32]:
-        """Get the mapping from human inputs to actions."""
-        assert isinstance(self.action_space, CRVRobotActionSpace)
-        return get_geom2d_crv_robot_action_from_gui_input(self.action_space, gui_input)
+    The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector.
+    """
 
+    def _create_reward_markdown_description(self) -> str:
+        return "A penalty of -1.0 is given at every time step until termination, which occurs when all buttons have been pressed.\n"  # pylint: disable=line-too-long
 
-def create_env_description(num_buttons: int = 2) -> str:
-    """Create a human-readable environment description."""
-    # pylint: disable=line-too-long
-    return f"""A 2D environment where the goal is to touch all buttons, possibly by using a stick for buttons that are out of the robot's direct reach.
-
-In this environment, there are always {num_buttons} buttons.
-
-The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector.
-"""
+    def _create_references_markdown_description(self) -> str:
+        return 'This environment is based on the Stick Button environment that was originally introduced in "Learning Neuro-Symbolic Skills for Bilevel Planning" (Silver et al., CoRL 2022). This version is simplified in that the robot or stick need only make contact with a button to press it, rather than explicitly pressing. Also, the full stick works for pressing, not just the tip.\n'  # pylint: disable=line-too-long

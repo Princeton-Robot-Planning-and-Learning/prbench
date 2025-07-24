@@ -4,10 +4,10 @@
 ### Description
 A 2D environment where the goal is to touch all buttons, possibly by using a stick for buttons that are out of the robot's direct reach.
 
-In this environment, there are always 5 buttons.
+    In this environment, there are always 5 buttons.
 
-The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector.
-
+    The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector.
+    
 ### Initial State Distribution
 ![initial state GIF](assets/initial_state_gifs/StickButton2D-b5.gif)
 
