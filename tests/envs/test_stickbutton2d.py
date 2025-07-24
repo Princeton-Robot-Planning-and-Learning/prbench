@@ -1,6 +1,7 @@
 """Tests for stickbutton2d.py."""
 
 from conftest import MAKE_VIDEOS
+from geom2drobotenvs.object_types import CircleType
 from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
 
@@ -51,3 +52,21 @@ def test_stickbutton2d_action_space():
         assert isinstance(truncated, bool)
         assert isinstance(info, dict)
     env.close()
+
+def test_stickbutton2d_termination():
+    """Tests that the environment terminates when all buttons are pressed."""
+
+    env = ObjectCentricStickButton2DEnv(num_buttons=5)
+    state, _ = env.reset()
+
+    # Manually press all buttons.
+    buttons = state.get_objects(CircleType)
+    for button in buttons:
+        state = env.press_button(button)
+    env.reset(options={"init_state": state})
+
+    # Any action should now result in termination.
+    action = env.action_space.sample()
+    state, reward, terminated, _, _ = env.step(action)
+    assert reward == -1.0
+    assert terminated

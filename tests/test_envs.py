@@ -16,6 +16,8 @@ def test_env_make_and_check_env():
     env_ids = prbench.get_all_env_ids()
     assert len(env_ids) > 0
     for env_id in env_ids:
-        env = prbench.make(env_id)
+        # We currently require all environments to have RGB rendering.
+        env = prbench.make(env_id, render_mode="rgb_array")
+        assert env.render_mode == "rgb_array"
         assert isinstance(env, gymnasium.Env)
         check_env(env.unwrapped)
