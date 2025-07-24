@@ -231,7 +231,6 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         button_positions: list[tuple[float, float]],
         button_z_order: ZOrder = ZOrder.NONE,
     ) -> ObjectCentricState:
-
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
         init_state_dict = constant_initial_state_dict.copy()

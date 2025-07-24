@@ -236,7 +236,6 @@ class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
         target_pose: SE2Pose | None = None,
         obstructions: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
     ) -> ObjectCentricState:
-
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
         init_state_dict = constant_initial_state_dict.copy()

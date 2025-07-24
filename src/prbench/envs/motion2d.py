@@ -194,7 +194,6 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         target_region_pose: SE2Pose | None = None,
         obstacles: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
     ) -> ObjectCentricState:
-
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create room walls.

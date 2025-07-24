@@ -1,5 +1,6 @@
 """Tests for clutteredstoragel2d.py."""
 
+import numpy as np
 from conftest import MAKE_VIDEOS
 from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
@@ -33,3 +34,79 @@ def test_clutteredstorage2d_observation_space():
     for _ in range(5):
         obs, _ = env.reset()
         assert env.observation_space.contains(obs)
+
+
+def test_clutteredstorage2d_move_block():
+    """Tests that the robot can attach and move one block."""
+    prbench.register_all_environments()
+
+    env = ObjectCentricClutteredStorage2DEnv(num_blocks=1)
+
+    if MAKE_VIDEOS:
+        env = RecordVideo(env, "unit_test_videos")
+
+    obs, _ = env.reset()
+    block0 = list(obs.data.keys())[0]
+    robot = list(obs.data.keys())[4]
+    # unpack initial obs
+
+    obs.set(robot, "x", 1.9)
+    obs.set(robot, "y", 0.5)
+    obs.set(robot, "theta", 0.0)
+
+    obs.set(block0, "x", 1.3)
+    obs.set(block0, "y", 0.5)
+    obs.set(block0, "theta", np.pi / 3)
+
+    robot_theta = obs.data[robot][2]
+    block_theta0 = obs.data[block0][2]
+
+    options = {
+        "init_state": obs,
+    }
+    obs, _ = env.reset(options=options)
+
+    # action limits
+    dtheta_max, darm_max = env.action_space.high[2], env.action_space.high[3]
+
+    # 1) Rotate base to face the block
+    desired_theta = block_theta0 + np.pi / 2
+    if desired_theta >= np.pi:
+        desired_theta -= np.pi
+    diff = desired_theta - robot_theta
+    # rotate in chunks
+    while abs(diff) > 1e-3:
+        step = np.clip(diff, -dtheta_max, dtheta_max)
+        action = np.zeros(env.action_space.shape, dtype=np.float32)
+        action[2] = step
+        obs, _, _, _, _ = env.step(action)
+        robot_theta = obs.data[robot][2]
+        diff = desired_theta - robot_theta
+
+    # 2) Stretch arm to reach the block
+    desired_arm = 0.5
+    curr_arm = obs.data[robot][4]
+    while abs(curr_arm - desired_arm) > 1e-3:
+        step = np.clip(desired_arm - curr_arm, -darm_max, darm_max)
+        action = np.zeros(env.action_space.shape, dtype=np.float32)
+        action[3] = step
+        obs, _, _, _, _ = env.step(action)
+        curr_arm = obs.data[robot][4]
+
+    # 3) Attach the block
+    action = np.zeros(env.action_space.shape, dtype=np.float32)
+    action[4] = 1.0  # turn on vacuum
+    obs, _, _, _, _ = env.step(action)
+
+    # 4) Move the block
+    action = np.zeros(env.action_space.shape, dtype=np.float32)
+    curr_block_x = obs.data[block0][0]
+    action[0] = 0.05  # move right
+    action[4] = 1.0  # turn on vacuum
+    obs, _, _, _, _ = env.step(action)
+    new_block_x = obs.data[block0][0]
+    assert (
+        abs(new_block_x - 0.05 - curr_block_x) < 1e-3
+    )  # block should have moved right
+
+    env.close()
