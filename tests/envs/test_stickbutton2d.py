@@ -1,10 +1,9 @@
 """Tests for stickbutton2d.py."""
 
 from conftest import MAKE_VIDEOS
+from geom2drobotenvs.object_types import CircleType
 from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
-
-from geom2drobotenvs.object_types import CircleType
 
 import prbench
 from prbench.envs.stickbutton2d import ObjectCentricStickButton2DEnv
