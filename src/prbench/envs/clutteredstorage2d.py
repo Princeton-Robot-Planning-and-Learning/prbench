@@ -1,9 +1,7 @@
 """Cluttered environment where blocks must be stored on a shelf."""
 
 from dataclasses import dataclass
-from typing import Any
 
-import gymnasium
 import numpy as np
 from geom2drobotenvs.concepts import is_inside
 from geom2drobotenvs.envs.base_env import Geom2DRobotEnv, Geom2DRobotEnvSpec
@@ -22,13 +20,11 @@ from geom2drobotenvs.utils import (
     sample_se2_pose,
     state_has_collision,
 )
-from numpy.typing import NDArray
-from relational_structs import Object, ObjectCentricState, ObjectCentricStateSpace, Type
-from relational_structs.spaces import ObjectCentricBoxSpace
+from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 from tomsgeoms2d.structs import Rectangle
 
-from prbench.utils import get_geom2d_crv_robot_action_from_gui_input
+from prbench.envs.geom2d_utils import ConstantObjectGeom2DEnv
 
 # NOTE: unlike some other environments, there are multiple target blocks here.
 TargetBlockType = Type("target_block", parent=RectangleType)
@@ -387,94 +383,33 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         return -1.0, terminated
 
 
-class ClutteredStorage2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
-    """Cluttered sotrage 2D env."""
+class ClutteredStorage2DEnv(ConstantObjectGeom2DEnv):
+    """Cluttered storage 2D env with a constant number of objects."""
 
-    def __init__(
-        self,
-        num_blocks: int = 3,
-        spec: ClutteredStorage2DEnvSpec = ClutteredStorage2DEnvSpec(),
-        **kwargs,
-    ) -> None:
-        super().__init__()
-        # At the moment, all the real logic for this environment is defined
-        # externally. We create that environment and then add some additional
-        # code to vectorize observations, making it easier for RL approaches.
-        self._geom2d_env = ObjectCentricClutteredStorage2DEnv(
-            num_blocks=num_blocks, spec=spec, **kwargs
-        )
-        # Create a Box version of the observation space by assuming a constant
-        # number of obstructions (and thus a constant number of objects).
-        assert isinstance(self._geom2d_env.observation_space, ObjectCentricStateSpace)
-        # Make observation vectors start with the robot, then the shelf,
-        # then target blocks. Don't include the walls or because those are
-        # universally constant.
-        exemplar_object_centric_state, _ = self._geom2d_env.reset()
-        obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
-        self._constant_objects = [
-            obj_name_to_obj["robot"],
-            obj_name_to_obj["shelf"],
-        ]
-        block_names = {o for o in obj_name_to_obj if o.startswith("block")}
-        assert len(block_names) == num_blocks
-        for block_name in sorted(block_names):
-            self._constant_objects.append(obj_name_to_obj[block_name])
-        self.observation_space = self._geom2d_env.observation_space.to_box(
-            self._constant_objects, Geom2DRobotEnvTypeFeatures
-        )
-        self.action_space = self._geom2d_env.action_space
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        assert isinstance(self.action_space, CRVRobotActionSpace)
-        # Add descriptions to metadata for doc generation.
-        env_md = create_env_description(num_blocks)
-        obs_md = self.observation_space.create_markdown_description()
-        act_md = self.action_space.create_markdown_description()
-        reward_md = "A penalty of -1.0 is given at every time step until termination, which occurs when all blocks are inside the shelf.\n"  # pylint: disable=line-too-long
-        references_md = "Similar environments have been considered by many others, especially in the task and motion planning literature.\n"  # pylint: disable=line-too-long
-        self.metadata = {
-            "description": env_md,
-            "observation_space_description": obs_md,
-            "action_space_description": act_md,
-            "reward_description": reward_md,
-            "references": references_md,
-            "render_modes": self._geom2d_env.metadata["render_modes"],
-            "render_fps": self._geom2d_env.metadata["render_fps"],
-        }
+    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom2DRobotEnv:
+        return ObjectCentricClutteredStorage2DEnv(*args, **kwargs)
 
-    def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
-        super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
-        obs, info = self._geom2d_env.reset(*args, **kwargs)
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        vec_obs = self.observation_space.vectorize(obs)
-        return vec_obs, info
+    def _get_constant_object_names(
+        self, exemplar_state: ObjectCentricState
+    ) -> list[str]:
+        constant_objects = ["robot", "shelf"]
+        for obj in sorted(exemplar_state):
+            if obj.name.startswith("block"):
+                constant_objects.append(obj.name)
+        return constant_objects
 
-    def step(
-        self, *args, **kwargs
-    ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
-        obs, reward, terminated, truncated, done = self._geom2d_env.step(
-            *args, **kwargs
-        )
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        vec_obs = self.observation_space.vectorize(obs)
-        return vec_obs, reward, terminated, truncated, done
+    def _create_env_markdown_description(self) -> str:
+        num_blocks = len(self._constant_objects) - 2
+        # pylint: disable=line-too-long
+        return f"""A 2D environment where the goal is to put all blocks inside a shelf.
 
-    def render(self):
-        return self._geom2d_env.render()
+    There are always {num_blocks} blocks in this environment.
 
-    def get_action_from_gui_input(
-        self, gui_input: dict[str, Any]
-    ) -> NDArray[np.float32]:
-        """Get the mapping from human inputs to actions."""
-        assert isinstance(self.action_space, CRVRobotActionSpace)
-        return get_geom2d_crv_robot_action_from_gui_input(self.action_space, gui_input)
+    The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
+    """
 
+    def _create_reward_markdown_description(self) -> str:
+        return "A penalty of -1.0 is given at every time step until termination, which occurs when all blocks are inside the shelf.\n"  # pylint: disable=line-too-long
 
-def create_env_description(num_blocks: int = 3) -> str:
-    """Create a human-readable environment description."""
-    # pylint: disable=line-too-long
-    return f"""A 2D environment where the goal is to put all blocks inside a shelf.
-
-There are always {num_blocks} blocks in this environment.
-
-The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
-"""
+    def _create_references_markdown_description(self) -> str:
+        return "Similar environments have been considered by many others, especially in the task and motion planning literature.\n"  # pylint: disable=line-too-long
