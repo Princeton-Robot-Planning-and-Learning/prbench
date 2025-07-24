@@ -283,6 +283,14 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         # Finalize state.
         return create_state_from_dict(init_state_dict, Geom2DRobotEnvTypeFeatures)
 
+    def press_button(self, button: Object) -> ObjectCentricState:
+        """Press a button by changing its color."""
+        assert self._current_state is not None
+        self._current_state.set(button, "color_r", self._spec.button_pressed_rgb[0])
+        self._current_state.set(button, "color_g", self._spec.button_pressed_rgb[1])
+        self._current_state.set(button, "color_b", self._spec.button_pressed_rgb[2])
+        return self._current_state
+
     def step(
         self, action: NDArray[np.float32]
     ) -> tuple[ObjectCentricState, float, bool, bool, dict]:
@@ -305,9 +313,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
                 newly_pressed_buttons.add(button)
         # Change colors.
         for button in newly_pressed_buttons:
-            self._current_state.set(button, "color_r", self._spec.button_pressed_rgb[0])
-            self._current_state.set(button, "color_g", self._spec.button_pressed_rgb[1])
-            self._current_state.set(button, "color_b", self._spec.button_pressed_rgb[2])
+            self.press_button(button)
             # This is hacky, but it's the easiest way to force re-rendering.
             del self._static_object_body_cache[button]
 
