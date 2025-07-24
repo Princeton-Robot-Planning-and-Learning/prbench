@@ -33,3 +33,21 @@ def test_stickbutton2d_observation_space():
     for _ in range(5):
         obs, _ = env.reset()
         assert env.observation_space.contains(obs)
+
+
+def test_stickbutton2d_action_space():
+    """Tests that actions are vectors with fixed dimensionality."""
+    prbench.register_all_environments()
+    env = prbench.make("prbench/StickButton2D-b5-v0")
+    assert isinstance(env.action_space, Box)
+    env.reset()
+    for _ in range(5):
+        action = env.action_space.sample()
+        assert env.action_space.contains(action)
+        obs, reward, terminated, truncated, info = env.step(action)
+        assert env.observation_space.contains(obs)
+        assert isinstance(reward, (int, float))
+        assert isinstance(terminated, bool)
+        assert isinstance(truncated, bool)
+        assert isinstance(info, dict)
+    env.close()
