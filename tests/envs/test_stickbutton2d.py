@@ -4,6 +4,8 @@ from conftest import MAKE_VIDEOS
 from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
 
+from geom2drobotenvs.object_types import CircleType
+
 import prbench
 from prbench.envs.stickbutton2d import ObjectCentricStickButton2DEnv
 
@@ -33,3 +35,23 @@ def test_stickbutton2d_observation_space():
     for _ in range(5):
         obs, _ = env.reset()
         assert env.observation_space.contains(obs)
+
+
+def test_stickbutton2d_termination():
+    """Tests that the environment terminates when all buttons are pressed."""
+
+    env = ObjectCentricStickButton2DEnv(num_buttons=5)
+    env.reset()
+
+    # Manually press all buttons.
+    buttons = env._current_state.get_objects(CircleType)
+    for button in buttons:
+        env._current_state.set(button, "color_r", env._spec.button_pressed_rgb[0])
+        env._current_state.set(button, "color_g", env._spec.button_pressed_rgb[1])
+        env._current_state.set(button, "color_b", env._spec.button_pressed_rgb[2])
+
+    # Any action should now result in termination.
+    action = env.action_space.sample()
+    state, reward, terminated, _, _ = env.step(action)
+    assert reward == -1.0
+    assert terminated
