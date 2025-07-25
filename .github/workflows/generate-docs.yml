@@ -74,6 +74,5 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add docs/envs/
-          git add .cache/env_docs/
           git commit -m "Auto-generate environment documentation [skip ci]"
           git push 
