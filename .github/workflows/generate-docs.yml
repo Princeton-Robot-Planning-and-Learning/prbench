@@ -57,7 +57,7 @@ jobs:
           mkdir -p docs/envs/assets/random_action_gifs
           mkdir -p docs/envs/assets/initial_state_gifs
           mkdir -p docs/envs/assets/demo_gifs
-          python scripts/generate_env_docs.py
+          uv run python scripts/generate_env_docs.py
 
       - name: Check for changes
         id: check-changes
