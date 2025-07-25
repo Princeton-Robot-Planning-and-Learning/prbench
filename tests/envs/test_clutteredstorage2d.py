@@ -85,8 +85,8 @@ def test_clutteredstorage2d_move_block():
     obs.set(block0, "y", 0.5)
     obs.set(block0, "theta", np.pi / 3)
 
-    robot_theta = obs.data[robot][2]
-    block_theta0 = obs.data[block0][2]
+    robot_theta = obs.get(robot, "theta")
+    block_theta0 = obs.get(block0, "theta")
 
     options = {
         "init_state": obs,
@@ -107,18 +107,18 @@ def test_clutteredstorage2d_move_block():
         action = np.zeros(env.action_space.shape, dtype=np.float32)
         action[2] = step
         obs, _, _, _, _ = env.step(action)
-        robot_theta = obs.data[robot][2]
+        robot_theta = obs.get(robot, "theta")
         diff = desired_theta - robot_theta
 
     # 2) Stretch arm to reach the block
     desired_arm = 0.5
-    curr_arm = obs.data[robot][4]
+    curr_arm = obs.get(robot, "arm_joint")
     while abs(curr_arm - desired_arm) > 1e-3:
         step = np.clip(desired_arm - curr_arm, -darm_max, darm_max)
         action = np.zeros(env.action_space.shape, dtype=np.float32)
         action[3] = step
         obs, _, _, _, _ = env.step(action)
-        curr_arm = obs.data[robot][4]
+        curr_arm = obs.get(robot, "arm_joint")
 
     # 3) Attach the block
     action = np.zeros(env.action_space.shape, dtype=np.float32)
@@ -127,11 +127,11 @@ def test_clutteredstorage2d_move_block():
 
     # 4) Move the block
     action = np.zeros(env.action_space.shape, dtype=np.float32)
-    curr_block_x = obs.data[block0][0]
+    curr_block_x = obs.get(block0, "x")
     action[0] = 0.05
     action[4] = 1.0
     obs, _, _, _, _ = env.step(action)
-    new_block_x = obs.data[block0][0]
+    new_block_x = obs.get(block0, "x")
     assert abs(new_block_x - 0.05 - curr_block_x) < 1e-3
 
     env.close()
