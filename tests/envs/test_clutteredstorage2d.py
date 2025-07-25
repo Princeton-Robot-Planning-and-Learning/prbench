@@ -72,9 +72,10 @@ def test_clutteredstorage2d_move_block():
         env = RecordVideo(env, "unit_test_videos")
 
     obs, _ = env.reset()
-    block0 = list(obs.data.keys())[0]
-    robot = list(obs.data.keys())[4]
-    # unpack initial obs
+    obj_name_to_obj = {o.name: o for o in obs}
+    block0 = obj_name_to_obj["block0"]
+    robot = obj_name_to_obj["robot"]
+    # Unpack initial obs
 
     obs.set(robot, "x", 1.9)
     obs.set(robot, "y", 0.5)
@@ -92,7 +93,7 @@ def test_clutteredstorage2d_move_block():
     }
     obs, _ = env.reset(options=options)
 
-    # action limits
+    # Action limits
     dtheta_max, darm_max = env.action_space.high[2], env.action_space.high[3]
 
     # 1) Rotate base to face the block
@@ -100,7 +101,7 @@ def test_clutteredstorage2d_move_block():
     if desired_theta >= np.pi:
         desired_theta -= np.pi
     diff = desired_theta - robot_theta
-    # rotate in chunks
+    # Rotate in chunks
     while abs(diff) > 1e-3:
         step = np.clip(diff, -dtheta_max, dtheta_max)
         action = np.zeros(env.action_space.shape, dtype=np.float32)
@@ -121,18 +122,18 @@ def test_clutteredstorage2d_move_block():
 
     # 3) Attach the block
     action = np.zeros(env.action_space.shape, dtype=np.float32)
-    action[4] = 1.0  # turn on vacuum
+    action[4] = 1.0
     obs, _, _, _, _ = env.step(action)
 
     # 4) Move the block
     action = np.zeros(env.action_space.shape, dtype=np.float32)
     curr_block_x = obs.data[block0][0]
-    action[0] = 0.05  # move right
-    action[4] = 1.0  # turn on vacuum
+    action[0] = 0.05
+    action[4] = 1.0
     obs, _, _, _, _ = env.step(action)
     new_block_x = obs.data[block0][0]
     assert (
         abs(new_block_x - 0.05 - curr_block_x) < 1e-3
-    )  # block should have moved right
+    )
 
     env.close()
