@@ -132,8 +132,6 @@ def test_clutteredstorage2d_move_block():
     action[4] = 1.0
     obs, _, _, _, _ = env.step(action)
     new_block_x = obs.data[block0][0]
-    assert (
-        abs(new_block_x - 0.05 - curr_block_x) < 1e-3
-    )
+    assert abs(new_block_x - 0.05 - curr_block_x) < 1e-3
 
     env.close()
