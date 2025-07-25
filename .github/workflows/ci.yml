@@ -40,8 +40,8 @@ jobs:
         git config user.name github-actions
         git config user.email github-actions@github.com
         git add docs
-        git commit --amend --no-edit
-        git push --force
+        git commit --am --no-edit
+        git push
   autoformat:
     needs: generate-docs  # need to make sure this passes after the last commit
     runs-on: ubuntu-latest
