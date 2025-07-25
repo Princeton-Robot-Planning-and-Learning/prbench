@@ -1,0 +1,79 @@
+name: Generate Environment Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/prbench/envs/**'
+      - 'scripts/generate_env_docs.py'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/prbench/envs/**'
+      - 'scripts/generate_env_docs.py'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0  # Needed for git history
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liblapack-dev libblas-dev
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Set up Python
+        run: uv python install 3.10
+
+      - name: Install project dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Cache environment documentation
+        uses: actions/cache@v4
+        with:
+          path: .cache/env_docs
+          key: env-docs-${{ hashFiles('src/prbench/envs/**/*.py', 'scripts/generate_env_docs.py') }}
+          restore-keys: |
+            env-docs-
+
+      - name: Generate environment documentation
+        run: |
+          # Ensure cache directory exists
+          mkdir -p .cache/env_docs
+          # Ensure output directories exist
+          mkdir -p docs/envs/assets/random_action_gifs
+          mkdir -p docs/envs/assets/initial_state_gifs
+          mkdir -p docs/envs/assets/demo_gifs
+          python scripts/generate_env_docs.py
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.check-changes.outputs.changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/envs/
+          git add .cache/env_docs/
+          git commit -m "Auto-generate environment documentation [skip ci]"
+          git push 
