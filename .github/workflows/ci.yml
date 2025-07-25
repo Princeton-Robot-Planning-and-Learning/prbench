@@ -10,6 +10,12 @@ jobs:
       matrix:
         python-version: ["3.11"]
     steps:
+    - name: Avoid infinite loop
+      run: |
+        if [[ "${GITHUB_ACTOR}" == "github-actions[bot]" ]]; then
+          echo "Skipping to avoid loop"
+          exit 0
+        fi
     - name: Install LAPACK and BLAS
       run: |
         sudo apt-get update
