@@ -33,12 +33,9 @@ jobs:
     - name: Generate environment documentation
       run: uv run python scripts/generate_env_docs.py
     - name: Commit and push
-      run: |
-        git config user.name github-actions
-        git config user.email github-actions@github.com
-        git add docs
-        git commit --am --no-edit
-        git push
+      uses: EndBug/add-and-commit@v9
+      with:
+        add: docs
   autoformat:
     needs: generate-docs  # need to make sure this passes after the last commit
     runs-on: ubuntu-latest
