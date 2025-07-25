@@ -23,6 +23,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0  # Needed for git history
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Install system dependencies
         run: |
@@ -75,4 +76,8 @@ jobs:
           git config --local user.name "GitHub Action"
           git add docs/envs/
           git commit -m "Auto-generate environment documentation [skip ci]"
-          git push 
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git push origin HEAD:${{ github.head_ref }}
+          else
+            git push origin HEAD:${{ github.ref_name }}
+          fi 
