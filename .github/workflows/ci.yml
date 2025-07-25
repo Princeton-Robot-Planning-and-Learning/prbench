@@ -3,7 +3,38 @@ name: CI Checks
 on: [push]
 
 jobs:
+  # Generate docs first, then run CI.
+  generate-docs:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+    steps:
+    - name: Install LAPACK and BLAS
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y liblapack-dev libblas-dev
+    - uses: actions/checkout@v4
+      with:
+        repository: ${{ github.event.pull_request.head.repo.full_name }}
+        ref: ${{ github.event.pull_request.head.ref }}
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}    
+    - name: Install the project
+      run: uv sync --all-extras --dev
+    - name: Generate environment documentation
+      run: uv run python scripts/generate_env_docs.py
+    - name: Add and commit changes
+      uses: EndBug/add-and-commit@v9
+      with:
+        add: docs
   autoformat:
+    needs: generate-docs  # need to make sure this passes after the last commit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,6 +46,7 @@ jobs:
       - name: Run isort to organize imports
         uses: isort/isort-action@master
   linting:
+    needs: generate-docs  # need to make sure this passes after the last commit
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -34,6 +66,7 @@ jobs:
       run: |
         uv run pytest . --pylint -m pylint --pylint-rcfile=.pylintrc
   static-type-checking:
+    needs: generate-docs  # need to make sure this passes after the last commit
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -53,6 +86,7 @@ jobs:
       run: |
         uv run mypy .
   unit-tests:
+    needs: generate-docs  # need to make sure this passes after the last commit
     runs-on: ubuntu-latest
     strategy:
       matrix:
