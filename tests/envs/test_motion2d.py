@@ -69,8 +69,7 @@ def test_motion2d_observation_space():
 
 
 def test_motion2d_vacuum_and_arm_actions():
-    """Tests that vacuum and arm actions don't affect movement or
-    termination."""
+    """Tests that vacuum and arm actions don't affect movement or termination."""
     env = prbench.make("prbench/Motion2D-p1-v0")
 
     # Reset environment and get initial state
