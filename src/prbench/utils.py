@@ -10,8 +10,7 @@ from numpy.typing import NDArray
 def get_geom2d_crv_robot_action_from_gui_input(
     action_space: CRVRobotActionSpace, gui_input: dict[str, Any]
 ) -> NDArray[np.float32]:
-    """Get the mapping from human inputs to actions, derived from action
-    space."""
+    """Get the mapping from human inputs to actions, derived from action space."""
     # Unpack the input.
     keys_pressed = gui_input["keys"]
     right_x, right_y = gui_input["right_stick"]
