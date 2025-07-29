@@ -53,10 +53,76 @@ def register_all_environments() -> None:
             kwargs={"num_buttons": num_button},
         )
 
+    # TidyBot3D environments with different scene types, object counts, and policy types
+    scene_configs = [
+        ("table", [3, 5, 7]),  # Table stacking with different object counts
+        ("drawer", [2, 4, 6]),  # Drawer tasks with different object counts
+        ("cupboard", [3, 5, 8]),  # Cupboard organization with different object counts
+        ("cabinet", [2, 4, 6]),  # Cabinet manipulation with different object counts
+    ]
+
+    policy_types = [
+        "mp",  # Motion planning policies
+        # "teleop",  # Phone-based teleoperation
+        # "remote",  # Remote policy execution
+        # "stack",  # Object stacking policies
+        # "stack_three",  # Three-object stacking policies
+        # "mp_three",  # Three-sequential motion planning
+        # "mp_cabinet_two_phase",  # Two-phase cabinet manipulation
+        # "custom_grasp",  # Custom grasping policies
+        # "custom_grasp_three",  # Three-sequential custom grasping
+        # "mp_n_cupboard",  # N-object cupboard manipulation
+    ]
+
+    for scene_type, object_counts in scene_configs:
+        for num_objects in object_counts:
+            for policy_type in policy_types:
+                # Skip incompatible combinations
+                if (
+                    (
+                        scene_type == "cabinet"
+                        and policy_type in ["stack", "stack_three"]
+                    )
+                    or (
+                        scene_type == "table"
+                        and policy_type in ["mp_cabinet_two_phase"]
+                    )
+                    or (
+                        scene_type == "drawer"
+                        and policy_type in ["mp_cabinet_two_phase", "mp_n_cupboard"]
+                    )
+                    or (
+                        scene_type == "cupboard"
+                        and policy_type in ["mp_cabinet_two_phase"]
+                    )
+                ):
+                    continue
+
+                register(
+                    id=f"prbench/TidyBot3D-{scene_type}-o{num_objects}-{policy_type}-v0",
+                    entry_point="prbench.envs.tidybot3d:TidyBot3DEnv",
+                    kwargs={
+                        "scene_type": scene_type,
+                        "num_objects": num_objects,
+                        "policy_type": policy_type,
+                    },
+                )
+
 
 def make(*args, **kwargs) -> gymnasium.Env:
     """Create a registered environment from its name."""
     return gymnasium.make(*args, **kwargs)
+
+
+def make_unwrapped(*args, **kwargs) -> gymnasium.Env:
+    """Create a registered environment and return the unwrapped version.
+
+    This allows access to custom methods like step_with_policy.
+    """
+    env = gymnasium.make(*args, **kwargs)
+    while hasattr(env, "env"):
+        env = env.env
+    return env
 
 
 def get_all_env_ids() -> set[str]:
