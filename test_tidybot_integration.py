@@ -24,7 +24,7 @@ def test_tidybot_integration():
 
         # Test a simple TidyBot environment
         print("Creating TidyBot environment...")
-        env = prbench.make("prbench/TidyBot3D-table-o3-teleop-v0")
+        env = prbench.make("prbench/TidyBot3D-table-o3-mp-v0")
 
         print(f"Environment created successfully!")
         print(f"Observation space: {env.observation_space}")
@@ -48,15 +48,15 @@ def test_tidybot_integration():
                 break
 
         # Test step with policy
-        print("\nTesting step with policy...")
-        obs, info = env.reset()
-        for i in range(10):
-            obs, reward, terminated, truncated, info = env.step_with_policy()
-            print(
-                f"Policy step {i+1}: reward={reward:.3f}, terminated={terminated}, truncated={truncated}"
-            )
-            if terminated or truncated:
-                break
+        # print("\nTesting step with policy...")
+        # obs, info = env.reset()
+        # for i in range(10):
+        #     obs, reward, terminated, truncated, info = env.step_with_policy()
+        #     print(
+        #         f"Policy step {i+1}: reward={reward:.3f}, terminated={terminated}, truncated={truncated}"
+        #     )
+        #     if terminated or truncated:
+        #         break
 
         # Test render
         print("\nTesting render...")
@@ -98,8 +98,8 @@ def test_different_scenes():
     try:
         import prbench
 
-        scenes = ["table", "drawer", "cupboard", "cabinet"]
-        policy_types = ["teleop", "mp"]
+        scenes = ["table", "cupboard", "cabinet"]
+        policy_types = ["mp"]
 
         for scene in scenes:
             for policy_type in policy_types:

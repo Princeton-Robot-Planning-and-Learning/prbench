@@ -33,8 +33,6 @@ from .policies import (
     MotionPlannerPolicyStackTableWrapper,
     MotionPlannerPolicyStackThreeWrapper,
     MotionPlannerPolicyStackWrapper,
-    RemotePolicy,
-    TeleopPolicy,
 )
 
 
@@ -47,7 +45,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self,
         scene_type: str = "table",  # "table", "drawer", "cupboard", "cabinet"
         num_objects: int = 3,
-        policy_type: str = "teleop",  # "teleop", "motion_planning", "stack", "mp"
+        policy_type: str = "mp",  # "motion_planning", "stack", "mp"
         render_mode: str | None = None,
         custom_grasp: bool = False,
         **kwargs,
@@ -116,7 +114,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         kwargs = {
             "render_images": True,
-            "show_viewer": True,  # Disable viewer for headless operation
+            "show_viewer": False,  # Disable viewer for headless operation
             "show_images": False,
             "custom_grasp": self.custom_grasp,
             "mjcf_path": absolute_model_path,
@@ -135,11 +133,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def _create_policy(self):
         """Create appropriate policy based on policy_type."""
-        if self.policy_type == "teleop":
-            return TeleopPolicy()
-        elif self.policy_type == "remote":
-            return RemotePolicy()
-        elif self.policy_type == "stack":
+        if self.policy_type == "stack":
             if self.scene_type == "table":
                 return MotionPlannerPolicyStackTableWrapper()
             elif self.scene_type == "drawer":
@@ -190,8 +184,8 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 custom_grasp=self.custom_grasp,
             )
         else:
-            # Default to teleop
-            return TeleopPolicy()
+            # Default to motion planning
+            return MotionPlannerPolicyMPWrapper(custom_grasp=self.custom_grasp)
 
     def _create_observation_space(self) -> spaces.Box:
         """Create observation space based on TidyBot's observation
@@ -348,8 +342,6 @@ Available scenes:
 - cabinet: Cabinet manipulation tasks
 
 Available policy types:
-- teleop: Phone-based teleoperation using WebXR
-- remote: Remote policy execution via network
 - stack: Object stacking policies
 - stack_three: Three-object stacking policies
 - mp: Motion planning policies
@@ -414,8 +406,6 @@ https://github.com/tidybot2/tidybot2
         ]
 
         policy_types = [
-            "teleop",
-            "remote",
             "stack",
             "stack_three",
             "mp",

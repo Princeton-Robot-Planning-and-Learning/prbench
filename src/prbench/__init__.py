@@ -63,15 +63,13 @@ def register_all_environments() -> None:
 
     policy_types = [
         "mp",  # Motion planning policies
-        # "teleop",  # Phone-based teleoperation
-        # "remote",  # Remote policy execution
-        # "stack",  # Object stacking policies
-        # "stack_three",  # Three-object stacking policies
-        # "mp_three",  # Three-sequential motion planning
-        # "mp_cabinet_two_phase",  # Two-phase cabinet manipulation
-        # "custom_grasp",  # Custom grasping policies
-        # "custom_grasp_three",  # Three-sequential custom grasping
-        # "mp_n_cupboard",  # N-object cupboard manipulation
+        "stack",  # Object stacking policies
+        "stack_three",  # Three-object stacking policies
+        "mp_three",  # Three-sequential motion planning
+        "mp_cabinet_two_phase",  # Two-phase cabinet manipulation
+        "custom_grasp",  # Custom grasping policies
+        "custom_grasp_three",  # Three-sequential custom grasping
+        "mp_n_cupboard",  # N-object cupboard manipulation
     ]
 
     for scene_type, object_counts in scene_configs:
