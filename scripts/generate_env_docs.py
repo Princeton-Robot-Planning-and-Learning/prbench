@@ -5,7 +5,6 @@ import hashlib
 import inspect
 import json
 import os
-import subprocess
 from pathlib import Path
 
 import gymnasium
@@ -188,9 +187,6 @@ def _main() -> None:
             print(f"  Skipping {env_id} (no changes detected)")
 
     print("Finished generating environment docs.")
-
-    # Add the results.
-    subprocess.run(["git", "add", OUTPUT_DIR], check=True)
 
 
 if __name__ == "__main__":
