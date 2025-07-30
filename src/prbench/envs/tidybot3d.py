@@ -96,7 +96,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         # Determine the correct model file based on scene type
         if self.scene_type == "table":
-            model_file = "scene.xml"
+            model_file = "blocks_table_scene.xml"
         elif self.scene_type == "drawer":
             model_file = "drawer_scene.xml"
         elif self.scene_type == "cupboard":

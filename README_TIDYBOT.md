@@ -174,6 +174,23 @@ This will test:
 
 ## Examples
 
+### Example 0: Table Stacking with Teleoperation
+```python
+import prbench
+
+prbench.register_all_environments()
+env = prbench.make_unwrapped("prbench/TidyBot3D-ground-o3-mp-v0")
+
+obs, info = env.reset()
+for _ in range(10000):
+    obs, reward, terminated, truncated, info = env.step_with_policy()
+    print(f"Reward: {reward:.3f}")
+    if terminated or truncated:
+        break
+
+env.close()
+```
+
 ### Example 1: Table Stacking with Teleoperation
 ```python
 import prbench
@@ -185,7 +202,7 @@ obs, info = env.reset()
 for _ in range(10000):
     obs, reward, terminated, truncated, info = env.step_with_policy()
     print(f"Reward: {reward:.3f}")
-    if truncated:
+    if terminated or truncated:
         break
 
 env.close()

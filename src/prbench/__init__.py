@@ -59,6 +59,7 @@ def register_all_environments() -> None:
         ("drawer", [2, 4, 6]),  # Drawer tasks with different object counts
         ("cupboard", [3, 5, 8]),  # Cupboard organization with different object counts
         ("cabinet", [2, 4, 6]),  # Cabinet manipulation with different object counts
+        ("ground", [3, 5, 7]),  # Ground/scene.xml with different object counts
     ]
 
     policy_types = [
@@ -105,6 +106,7 @@ def register_all_environments() -> None:
                         "policy_type": policy_type,
                     },
                 )
+
 
 
 def make(*args, **kwargs) -> gymnasium.Env:
