@@ -231,9 +231,9 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         elif self.policy_type == "mp_n_cupboard":
             # Default target locations for N objects
             target_locations = [
-                np.array([0.8, 0.08, 0.38]),  # Center position
-                np.array([0.8, -0.08, 0.38]),  # Left position
-                np.array([0.73, 0, 0.38]),  # Right position
+                np.array([0.9, 0.08, 0.38]),  # Center position
+                # np.array([0.9, -0.08, 0.38]),  # Left position
+                # np.array([0.83, 0, 0.38]),  # Right position
             ]
             return MotionPlannerPolicyMPNCupboardWrapper(
                 target_locations=target_locations[: self.num_objects],
@@ -334,13 +334,15 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # Get action from policy
         action = self._policy.step(obs)
 
+        
+
+        if self._policy.episode_ended:
+            # Policy signaled episode end
+            return self._vectorize_observation(obs), 0.0, True, False, {}
+
         if action is None:
             # Policy returned no action
             return self._vectorize_observation(obs), -0.01, False, False, {}
-
-        if action == "end_episode":
-            # Policy signaled episode end
-            return self._vectorize_observation(obs), 0.0, True, False, {}
 
         if action == "reset_env":
             # Policy signaled reset
@@ -367,6 +369,10 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def _is_terminated(self, obs: Dict[str, Any]) -> bool:
         """Check if episode should terminate."""
         return self._reward_calculator.is_terminated(obs)
+        # # Align with policy's episode_ended if available
+        # print('terminated', self._policy.episode_ended)
+        # return self._policy.episode_ended
+        
 
     def render(self):
         """Render the environment."""

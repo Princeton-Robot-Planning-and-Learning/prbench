@@ -53,12 +53,16 @@ class Policy:
 class MotionPlannerPolicyStackWrapper(Policy):
     def __init__(self):
         self.impl = MotionPlannerPolicyStack()
+        self.episode_ended = False
 
     def reset(self):
         self.impl.reset()
+        self.episode_ended = False
 
     def step(self, obs):
-        return self.impl.step(obs)
+        action = self.impl.step(obs)
+        self.episode_ended = getattr(self.impl, 'episode_ended', False)
+        return action
 
 
 # Stacking three cubes using two sequential stack policies
@@ -114,12 +118,16 @@ class MotionPlannerPolicyStackThreeWrapper(Policy):
 class MotionPlannerPolicyStackTableWrapper(Policy):
     def __init__(self):
         self.impl = MotionPlannerPolicyStackTable()
+        self.episode_ended = False
 
     def reset(self):
         self.impl.reset()
+        self.episode_ended = False
 
     def step(self, obs):
-        return self.impl.step(obs)
+        action = self.impl.step(obs)
+        self.episode_ended = getattr(self.impl, 'episode_ended', False)
+        return action
 
 
 # Table stacking three cubes using two sequential table stack policies
@@ -177,12 +185,16 @@ class MotionPlannerPolicyStackTableThreeWrapper(Policy):
 class MotionPlannerPolicyStackDrawerWrapper(Policy):
     def __init__(self):
         self.impl = MotionPlannerPolicyStackDrawer()
+        self.episode_ended = False
 
     def reset(self):
         self.impl.reset()
+        self.episode_ended = False
 
     def step(self, obs):
-        return self.impl.step(obs)
+        action = self.impl.step(obs)
+        self.episode_ended = getattr(self.impl, 'episode_ended', False)
+        return action
 
 
 # Drawer stacking three cubes using two sequential drawer stack policies
@@ -235,12 +247,16 @@ class MotionPlannerPolicyStackDrawerThreeWrapper(Policy):
 class MotionPlannerPolicyStackCupboardWrapper(Policy):
     def __init__(self):
         self.impl = MotionPlannerPolicyStackCupboard()
+        self.episode_ended = False
 
     def reset(self):
         self.impl.reset()
+        self.episode_ended = False
 
     def step(self, obs):
-        return self.impl.step(obs)
+        action = self.impl.step(obs)
+        self.episode_ended = getattr(self.impl, 'episode_ended', False)
+        return action
 
 
 # Cupboard stacking three cubes using two sequential cupboard stack policies
@@ -297,12 +313,16 @@ class MotionPlannerPolicyMPWrapper(Policy):
         self.impl.PLACEMENT_Y_OFFSET = 0.1
         self.impl.PLACEMENT_Z_OFFSET = 0.2
         self.impl.target_location = np.array([0, 0, 0.5])
+        self.episode_ended = False
 
     def reset(self):
         self.impl.reset()
+        self.episode_ended = False
 
     def step(self, obs):
-        return self.impl.step(obs)
+        action = self.impl.step(obs)
+        self.episode_ended = getattr(self.impl, 'episode_ended', False)
+        return action
 
 
 # Motion planner policy for cupboard environment
@@ -313,12 +333,16 @@ class MotionPlannerPolicyMPCupboardWrapper(Policy):
         self.impl.PLACEMENT_Y_OFFSET = 0.1
         self.impl.PLACEMENT_Z_OFFSET = 0.5
         self.impl.target_location = np.array([0.8, 0, 0.5])
+        self.episode_ended = False
 
     def reset(self):
         self.impl.reset()
+        self.episode_ended = False
 
     def step(self, obs):
-        return self.impl.step(obs)
+        action = self.impl.step(obs)
+        self.episode_ended = getattr(self.impl, 'episode_ended', False)
+        return action
 
 
 # Motion planner policy for cabinet environment
@@ -330,12 +354,16 @@ class MotionPlannerPolicyMPCabinetWrapper(Policy):
         self.impl.PLACEMENT_Y_OFFSET = 0.0  # Center alignment
         self.impl.PLACEMENT_Z_OFFSET = 0.25  # Cabinet shelf height
         self.impl.target_location = np.array([0, -0.1, 0.25])  # Cabinet position
+        self.episode_ended = False
 
     def reset(self):
         self.impl.reset()
+        self.episode_ended = False
 
     def step(self, obs):
-        return self.impl.step(obs)
+        action = self.impl.step(obs)
+        self.episode_ended = getattr(self.impl, 'episode_ended', False)
+        return action
 
 
 # Motion planner policy for cabinet environment with two-phase execution
@@ -354,7 +382,7 @@ class MotionPlannerPolicyMPCabinetTwoPhaseWrapper(Policy):
 
         # First phase: MotionPlannerPolicyCabinetMP
         self.mp1 = MotionPlannerPolicyCabinetMP(
-            custom_grasp=custom_grasp, open_left_cabinet=True
+            custom_grasp=True, open_left_cabinet=True
         )
 
         # Second phase: MotionPlannerPolicyCabinetMP_1
@@ -363,30 +391,30 @@ class MotionPlannerPolicyMPCabinetTwoPhaseWrapper(Policy):
         )
 
         # First phase: MotionPlannerPolicyCabinetMP
-        # self.mp3 = MotionPlannerPolicyCabinetMP(custom_grasp=custom_grasp, open_left_cabinet=False)
+        self.mp3 = MotionPlannerPolicyCabinetMP(custom_grasp=True, open_left_cabinet=False)
+
+        # Second phase: MotionPlannerPolicyCabinetMP_1
+        self.mp4 = MotionPlannerPolicyCabinetMP_1(custom_grasp=False, open_left_cabinet=False)
+
+        # First phase: MotionPlannerPolicyCabinetMP
+        self.mp5 = CloseCabinetPolicy(custom_grasp=False, close_left_cabinet=True)
 
         # # Second phase: MotionPlannerPolicyCabinetMP_1
-        # self.mp4 = MotionPlannerPolicyCabinetMP_1(custom_grasp=False, open_left_cabinet=False)
+        self.mp6 = CloseCabinetPolicy(custom_grasp=False, close_left_cabinet=False)
 
-        # # First phase: MotionPlannerPolicyCabinetMP
-        # self.mp5 = CloseCabinetPolicy(custom_grasp=False, close_left_cabinet=True)
+        # self.mp3 = MotionPlannerPolicyMP(cupboard_mode=True, low_grasp=True)
+        # self.mp3.target_location = np.array([0.75, -0.15, 0.12])  # Center position
+        # self.mp3.PICK_APPROACH_HEIGHT_OFFSET = 0.05
+        # self.mp3.PLACE_APPROACH_HEIGHT_OFFSET = 0.05
 
-        # # # Second phase: MotionPlannerPolicyCabinetMP_1
-        # self.mp6 = CloseCabinetPolicy(custom_grasp=False, close_left_cabinet=False)
+        # self.mp4 = MotionPlannerPolicyMP(cupboard_mode=True, low_grasp=True)
+        # self.mp4.target_location = np.array([0.75, -0.3, 0.12])  # Left position
+        # self.mp4.PICK_APPROACH_HEIGHT_OFFSET = 0.05
+        # self.mp4.PLACE_APPROACH_HEIGHT_OFFSET = 0.05
 
-        self.mp3 = MotionPlannerPolicyMP(cupboard_mode=True, low_grasp=True)
-        self.mp3.target_location = np.array([0.75, -0.15, 0.12])  # Center position
-        self.mp3.PICK_APPROACH_HEIGHT_OFFSET = 0.05
-        self.mp3.PLACE_APPROACH_HEIGHT_OFFSET = 0.05
+        # self.mps = [self.mp1, self.mp2, self.mp3, self.mp4]
 
-        self.mp4 = MotionPlannerPolicyMP(cupboard_mode=True, low_grasp=True)
-        self.mp4.target_location = np.array([0.75, -0.3, 0.12])  # Left position
-        self.mp4.PICK_APPROACH_HEIGHT_OFFSET = 0.05
-        self.mp4.PLACE_APPROACH_HEIGHT_OFFSET = 0.05
-
-        self.mps = [self.mp1, self.mp2, self.mp3, self.mp4]
-
-        # self.mps = [self.mp1, self.mp2, self.mp3, self.mp4, self.mp5, self.mp6]
+        self.mps = [self.mp1, self.mp2, self.mp3, self.mp4, self.mp5, self.mp6]
         self.phase = 0
         self.episode_ended = False
 
@@ -473,6 +501,7 @@ class MotionPlannerPolicyCustomGraspWrapper(Policy):
         self.impl.PICK_LOWER_DIST = 0.09
         self.impl.PICK_LIFT_DIST = 0.18
         self.impl.target_location = np.array([0.8, 0, 0.5])
+        self.episode_ended = False
         print("Custom grasp policy initialized with experimental parameters")
         print(
             "Designed for cupboard_scene_objects_inside.xml (objects already in cupboard)"
@@ -480,9 +509,12 @@ class MotionPlannerPolicyCustomGraspWrapper(Policy):
 
     def reset(self):
         self.impl.reset()
+        self.episode_ended = False
 
     def step(self, obs):
-        return self.impl.step(obs)
+        action = self.impl.step(obs)
+        self.episode_ended = getattr(self.impl, 'episode_ended', False)
+        return action
 
 
 # Custom grasp policy wrapper for three sequential pick-place actions in cupboard environment
@@ -577,7 +609,7 @@ class MotionPlannerPolicyMPNCupboardWrapper(Policy):
             target_locations = [
                 np.array([0.8, 0.08, 0.38]),  # Center position
                 np.array([0.8, -0.08, 0.38]),  # Left position
-                np.array([0.73, 0, 0.38]),  # Right position
+                # np.array([0.73, 0, 0.38]),  # Right position
             ]
 
         self.target_locations = target_locations
@@ -636,6 +668,7 @@ class MotionPlannerPolicyMPNCupboardWrapper(Policy):
         if self.current_phase >= self.num_objects:
             self.episode_ended = True
             print(f"All {self.num_objects} pick-place actions completed!")
+            print('episode_ended', self.episode_ended)
             return None
 
         # Execute current motion planner

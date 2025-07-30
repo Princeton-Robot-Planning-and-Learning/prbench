@@ -199,9 +199,10 @@ prbench.register_all_environments()
 env = prbench.make_unwrapped("prbench/TidyBot3D-table-o5-mp-v0")
 
 obs, info = env.reset()
-for _ in range(10000):
+for _ in range(1000):
     obs, reward, terminated, truncated, info = env.step_with_policy()
     print(f"Reward: {reward:.3f}")
+    print([terminated, truncated])
     if terminated or truncated:
         break
 
@@ -216,9 +217,10 @@ prbench.register_all_environments()
 env = prbench.make_unwrapped("prbench/TidyBot3D-cupboard-o3-mp_n_cupboard-v0")
 
 obs, info = env.reset()
-for _ in range(200):
+for _ in range(1000):
     obs, reward, terminated, truncated, info = env.step_with_policy()
     print(f"Reward: {reward:.3f}")
+    print([terminated, truncated])
     if terminated or truncated:
         break
 
@@ -230,10 +232,10 @@ env.close()
 import prbench
 
 prbench.register_all_environments()
-env = prbench.make("prbench/TidyBot3D-cupboard-o3-custom_grasp-v0")
+env = prbench.make_unwrapped("prbench/TidyBot3D-cabinet-o2-mp_cabinet_two_phase-v0")
 
 obs, info = env.reset()
-for _ in range(150):
+for _ in range(1000):
     obs, reward, terminated, truncated, info = env.step_with_policy()
     print(f"Reward: {reward:.3f}")
     if terminated or truncated:
