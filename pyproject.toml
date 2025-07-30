@@ -13,7 +13,7 @@ dependencies = [
    "numpy",
    "geom2drobotenvs@git+https://github.com/tomsilver/geom2d-robot-envs",
    # TidyBot dependencies
-   "mujoco>=3.2.4",
+   "mujoco==3.2.4",
    "pin>=2.7.0", 
    "ruckig>=0.12.2",
    "opencv-python>=4.9.0",

@@ -38,6 +38,7 @@ def test_tidybot_integration():
 
         # Test step with random actions
         print("\nTesting step with random actions...")
+        
         for i in range(5):
             action = env.action_space.sample()
             obs, reward, terminated, truncated, info = env.step(action)

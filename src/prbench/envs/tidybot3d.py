@@ -96,7 +96,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         # Determine the correct model file based on scene type
         if self.scene_type == "table":
-            model_file = "blocks_table_scene.xml"
+            model_file = "scene.xml"
         elif self.scene_type == "drawer":
             model_file = "drawer_scene.xml"
         elif self.scene_type == "cupboard":
@@ -114,8 +114,8 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         kwargs = {
             "render_images": True,
-            "show_viewer": False,  # Disable viewer for headless operation
-            "show_images": False,
+            "show_viewer": True,  
+            "show_images": True,
             "custom_grasp": self.custom_grasp,
             "mjcf_path": absolute_model_path,
         }

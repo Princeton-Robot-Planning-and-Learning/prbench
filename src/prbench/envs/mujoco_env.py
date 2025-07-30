@@ -2,7 +2,7 @@
 # Date: October 2024
 #
 # Note: This is a basic simulation environment for sanity checking the
-# real-world pipeline for robot learning. Performance metrics,
+# real-world pipeline for teleop and imitation learning. Performance metrics,
 # reward signals, and termination signals are not implemented.
 #
 # This environment supports custom grasping policies from agent/mp_policy.py
@@ -516,7 +516,7 @@ class MujocoEnv:
         self.render_images = render_images
         self.show_viewer = show_viewer
         self.show_images = show_images
-        self.command_queue = mp.Queue(10)  # Allow more commands to queue up
+        self.command_queue = mp.Queue(1)
         self.table_scene = table_scene
         self.drawer_scene = drawer_scene
         self.cupboard_scene = cupboard_scene
@@ -555,25 +555,30 @@ class MujocoEnv:
             mp.Process(target=self.visualizer_loop, daemon=True).start()
 
     def physics_loop(self):
-        # Create sim
-        sim = MujocoSim(
-            self.mjcf_path,
-            self.command_queue,
-            self.shm_state,
-            show_viewer=self.show_viewer,
-            table_scene=self.table_scene,
-            cupboard_scene=self.cupboard_scene,
-            cabinet_scene=self.cabinet_scene,
-        )
+        try: 
+            # Create sim
+            sim = MujocoSim(
+                self.mjcf_path,
+                self.command_queue,
+                self.shm_state,
+                show_viewer=self.show_viewer,
+                table_scene=self.table_scene,
+                cupboard_scene=self.cupboard_scene,
+                cabinet_scene=self.cabinet_scene,
+            )
 
-        # Start render loop
-        if self.render_images:
-            Thread(
-                target=self.render_loop, args=(sim.model, sim.data), daemon=True
-            ).start()
+            # Start render loop
+            if self.render_images:
+                Thread(
+                    target=self.render_loop, args=(sim.model, sim.data), daemon=True
+                ).start()
 
-        # Launch sim
-        sim.launch()  # Launch in same thread as creation to avoid segfault
+            # Launch sim
+            sim.launch()  # Launch in same thread as creation to avoid segfault
+        except Exception as e:
+            import traceback
+            print("Physics process crashed:", e)
+            traceback.print_exc()
 
     def render_loop(self, model, data):
         # Set up renderers
@@ -608,31 +613,15 @@ class MujocoEnv:
 
     def reset(self):
         self.shm_state.initialized[:] = 0.0
-        
-        # Send reset command with timeout
-        try:
-            self.command_queue.put("reset", timeout=0.1)
-        except:
-            print("Warning: Could not send reset command - queue may be full")
-        
-        # Wait for state publishing to initialize with timeout
-        timeout = 5.0  # 5 second timeout
-        start_time = time.time()
+        self.command_queue.put("reset")
+
+        # Wait for state publishing to initialize
         while self.shm_state.initialized == 0.0:
-            if time.time() - start_time > timeout:
-                print("Warning: Reset timeout - physics process may be slow or unresponsive")
-                # Force initialization to prevent infinite hang
-                self.shm_state.initialized[:] = 1.0
-                break
             time.sleep(0.01)
 
-        # Wait for image rendering to initialize with timeout (only if needed)
+        # Wait for image rendering to initialize (Note: Assumes all zeros is not a valid image)
         if self.render_images:
-            start_time = time.time()
             while any(np.all(shm_image.data == 0) for shm_image in self.shm_images):
-                if time.time() - start_time > timeout:
-                    print("Warning: Image initialization timeout - continuing with zero images")
-                    break
                 time.sleep(0.01)
 
     def get_obs(self):
@@ -671,12 +660,7 @@ class MujocoEnv:
 
     def step(self, action):
         # Note: We intentionally do not return obs here to prevent the policy from using outdated data
-        try:
-            # Use non-blocking put with timeout to prevent hanging
-            self.command_queue.put(action, timeout=0.1)
-        except:
-            # If queue is full, skip this command to prevent hanging
-            pass
+        self.command_queue.put(action)
 
     def close(self):
         self.shm_state.close()

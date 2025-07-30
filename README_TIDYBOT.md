@@ -20,7 +20,7 @@ The TidyBot integration requires additional dependencies beyond the base PRBench
 
 ```bash
 # Install TidyBot dependencies
-pip install mujoco>=3.2.4 pin>=2.7.0 ruckig>=0.12.2
+pip install mujoco==3.2.4 pin>=2.7.0 ruckig>=0.12.2
 pip install opencv-python>=4.9.0 flask>=3.0.2 flask_socketio>=5.3.6
 pip install pyzmq>=25.1.2 redis>=5.0.6 phoenix6 pygame>=2.5.2
 ```
@@ -179,7 +179,7 @@ This will test:
 import prbench
 
 prbench.register_all_environments()
-env = prbench.make_unwrapped("prbench/TidyBot3D-table-o5-mp-v0")
+env = prbench.make_unwrapped("prbench/TidyBot3D-table-o3-mp-v0")
 
 obs, info = env.reset()
 for _ in range(10000):
