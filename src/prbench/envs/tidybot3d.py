@@ -10,6 +10,10 @@ import numpy as np
 from gymnasium import spaces
 from numpy.typing import NDArray
 
+import tempfile
+import xml.etree.ElementTree as ET
+import random
+
 # Import local constants
 from . import constants
 from .agent.mp_policy import MotionPlannerPolicy
@@ -112,12 +116,64 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # Construct absolute path to model file
         absolute_model_path = os.path.join(model_base_path, model_file)
 
+        # --- Dynamic object insertion logic ---
+        needs_dynamic_objects = self.scene_type in ["ground", "table", "drawer", "cupboard", "cabinet"]
+        if needs_dynamic_objects:
+            tree = ET.parse(absolute_model_path)
+            root = tree.getroot()
+            worldbody = root.find("worldbody")
+            # Remove all existing cube bodies
+            for body in list(worldbody):
+                if body.tag == "body" and body.attrib.get("name", "").startswith("cube"):
+                    worldbody.remove(body)
+            # Insert new cubes
+            for i in range(self.num_objects):
+                name = f"cube{i+1}"
+                if self.scene_type == "ground":
+                    # Randomize positions for ground
+                    x = round(random.uniform(0.4, 0.8), 3)
+                    y = round(random.uniform(-0.3, 0.3), 3)
+                    z = 0.02
+                    pos = f"{x} {y} {z}"
+                elif self.scene_type == "table":
+                    x = 0.5 - 0.05 * i
+                    y = 0.1 * ((i % 3) - 1)
+                    z = 0.44
+                    pos = f"{x} {y} {z}"
+                elif self.scene_type == "drawer":
+                    x = 0.7 - 0.05 * i
+                    y = -0.1 + 0.05 * (i % 3)
+                    z = 0.12
+                    pos = f"{x} {y} {z}"
+                elif self.scene_type == "cupboard":
+                    x = 1.0
+                    y = -0.4 + 0.1 * (i % 3)
+                    z = 0.33
+                    pos = f"{x} {y} {z}"
+                elif self.scene_type == "cabinet":
+                    x = 0.75
+                    y = -0.1 - 0.1 * (i % 3)
+                    z = 0.12
+                    pos = f"{x} {y} {z}"
+                else:
+                    pos = "0.6 0 0.02"
+                body = ET.Element("body", name=name, pos=pos)
+                ET.SubElement(body, "freejoint")
+                ET.SubElement(body, "geom", type="box", size="0.02 0.02 0.02", rgba=".5 .7 .5 1", mass="0.1")
+                worldbody.append(body)
+            # Write to a file in the models directory
+            dynamic_model_filename = f"auto_{self.scene_type}_{self.num_objects}_objs.xml"
+            dynamic_model_path = os.path.join(model_base_path, dynamic_model_filename)
+            tree.write(dynamic_model_path)
+        else:
+            dynamic_model_path = absolute_model_path
+
         kwargs = {
             "render_images": True,
-            "show_viewer": True,  
+            "show_viewer": True,
             "show_images": True,
             "custom_grasp": self.custom_grasp,
-            "mjcf_path": absolute_model_path,
+            "mjcf_path": dynamic_model_path,
         }
 
         if self.scene_type == "table":

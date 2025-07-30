@@ -88,7 +88,6 @@ def register_all_environments() -> None:
                     )
                     or (
                         scene_type == "drawer"
-                        and policy_type in ["mp_cabinet_two_phase", "mp_n_cupboard"]
                     )
                     or (
                         scene_type == "cupboard"

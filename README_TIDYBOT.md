@@ -179,7 +179,7 @@ This will test:
 import prbench
 
 prbench.register_all_environments()
-env = prbench.make_unwrapped("prbench/TidyBot3D-ground-o3-mp-v0")
+env = prbench.make_unwrapped("prbench/TidyBot3D-ground-o7-mp-v0")
 
 obs, info = env.reset()
 for _ in range(10000):
@@ -196,7 +196,7 @@ env.close()
 import prbench
 
 prbench.register_all_environments()
-env = prbench.make_unwrapped("prbench/TidyBot3D-table-o3-mp-v0")
+env = prbench.make_unwrapped("prbench/TidyBot3D-table-o5-mp-v0")
 
 obs, info = env.reset()
 for _ in range(10000):
