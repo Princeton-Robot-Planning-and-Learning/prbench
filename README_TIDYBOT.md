@@ -174,7 +174,7 @@ This will test:
 
 ## Examples
 
-### Example 0: Table Stacking with Teleoperation
+### Example 0: ground motion planning
 ```python
 import prbench
 
@@ -191,7 +191,7 @@ for _ in range(10000):
 env.close()
 ```
 
-### Example 1: Table Stacking with Teleoperation
+### Example 1: Table motion planning
 ```python
 import prbench
 
@@ -213,7 +213,7 @@ env.close()
 import prbench
 
 prbench.register_all_environments()
-env = prbench.make("prbench/TidyBot3D-cupboard-o5-mp-v0")
+env = prbench.make_unwrapped("prbench/TidyBot3D-cupboard-o3-mp_n_cupboard-v0")
 
 obs, info = env.reset()
 for _ in range(200):
@@ -225,7 +225,7 @@ for _ in range(200):
 env.close()
 ```
 
-### Example 3: Custom Grasping
+### Example 3: Motion Planning in Cabinet
 ```python
 import prbench
 
