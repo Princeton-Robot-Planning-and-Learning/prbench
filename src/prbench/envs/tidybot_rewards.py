@@ -8,10 +8,9 @@ import numpy as np
 class TidyBotRewardCalculator:
     """Base class for TidyBot task rewards."""
 
-    def __init__(self, scene_type: str, num_objects: int, policy_type: str):
+    def __init__(self, scene_type: str, num_objects: int):
         self.scene_type = scene_type
         self.num_objects = num_objects
-        self.policy_type = policy_type
         self.completed_objects = set()
         self.episode_step = 0
 
@@ -47,8 +46,8 @@ class TidyBotRewardCalculator:
 class TableStackingReward(TidyBotRewardCalculator):
     """Reward for table stacking tasks."""
 
-    def __init__(self, num_objects: int, policy_type: str):
-        super().__init__("table", num_objects, policy_type)
+    def __init__(self, num_objects: int):
+        super().__init__("table", num_objects)
         self.target_height = 0.1  # Target stacking height
         self.target_area = np.array([0.6, 0.4])  # Target stacking area
         self.stack_height = 0.0
@@ -111,8 +110,8 @@ class TableStackingReward(TidyBotRewardCalculator):
 class DrawerReward(TidyBotRewardCalculator):
     """Reward for drawer opening/closing tasks."""
 
-    def __init__(self, num_objects: int, policy_type: str):
-        super().__init__("drawer", num_objects, policy_type)
+    def __init__(self, num_objects: int):
+        super().__init__("drawer", num_objects)
         self.drawer_opened = False
         self.objects_placed = 0
         self.drawer_area = np.array(
@@ -157,8 +156,8 @@ class DrawerReward(TidyBotRewardCalculator):
 class CupboardReward(TidyBotRewardCalculator):
     """Reward for cupboard organization tasks."""
 
-    def __init__(self, num_objects: int, policy_type: str):
-        super().__init__("cupboard", num_objects, policy_type)
+    def __init__(self, num_objects: int):
+        super().__init__("cupboard", num_objects)
         self.cupboard_opened = False
         self.objects_placed = 0
         self.cupboard_area = np.array(
@@ -201,8 +200,8 @@ class CupboardReward(TidyBotRewardCalculator):
 class CabinetReward(TidyBotRewardCalculator):
     """Reward for cabinet manipulation tasks."""
 
-    def __init__(self, num_objects: int, policy_type: str):
-        super().__init__("cabinet", num_objects, policy_type)
+    def __init__(self, num_objects: int):
+        super().__init__("cabinet", num_objects)
         self.cabinet_opened = False
         self.objects_placed = 0
         self.cabinet_area = np.array(
@@ -247,8 +246,8 @@ class CabinetReward(TidyBotRewardCalculator):
 class MotionPlanningReward(TidyBotRewardCalculator):
     """Reward for motion planning tasks."""
 
-    def __init__(self, scene_type: str, num_objects: int, policy_type: str):
-        super().__init__(scene_type, num_objects, policy_type)
+    def __init__(self, scene_type: str, num_objects: int):
+        super().__init__(scene_type, num_objects)
         self.target_locations = self._get_target_locations()
         self.objects_placed = 0
 
@@ -296,19 +295,17 @@ class MotionPlanningReward(TidyBotRewardCalculator):
 
 
 def create_reward_calculator(
-    scene_type: str, num_objects: int, policy_type: str
+    scene_type: str, num_objects: int
 ) -> TidyBotRewardCalculator:
     """Factory function to create appropriate reward calculator."""
-    if policy_type.startswith("mp"):
-        return MotionPlanningReward(scene_type, num_objects, policy_type)
-    elif scene_type == "table":
-        return TableStackingReward(num_objects, policy_type)
+    if scene_type == "table":
+        return TableStackingReward(num_objects)
     elif scene_type == "drawer":
-        return DrawerReward(num_objects, policy_type)
+        return DrawerReward(num_objects)
     elif scene_type == "cupboard":
-        return CupboardReward(num_objects, policy_type)
+        return CupboardReward(num_objects)
     elif scene_type == "cabinet":
-        return CabinetReward(num_objects, policy_type)
+        return CabinetReward(num_objects)
     else:
         # Default to motion planning reward
-        return MotionPlanningReward(scene_type, num_objects, policy_type)
+        return MotionPlanningReward(scene_type, num_objects)

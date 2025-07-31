@@ -1,28 +1,11 @@
-# prbench/TidyBot3D-cupboard-o8-mp_n_cupboard-v0
-![random action GIF](assets/random_action_gifs/TidyBot3D-cupboard-o8-mp_n_cupboard.gif)
+# prbench/TidyBot3D-cupboard-o8-v0
+![random action GIF](assets/random_action_gifs/TidyBot3D-cupboard-o8.gif)
 
 ### Description
 A 3D mobile manipulation environment using the TidyBot platform.
         
 The robot has a holonomic mobile base with powered casters and a Kinova Gen3 arm.
 Scene type: cupboard with 8 objects.
-Policy type: mp_n_cupboard
-
-Available scenes:
-- table: Object stacking and manipulation on a table
-- drawer: Opening/closing drawers and placing objects inside
-- cupboard: Opening cupboards and organizing objects
-- cabinet: Cabinet manipulation tasks
-
-Available policy types:
-- stack: Object stacking policies
-- stack_three: Three-object stacking policies
-- mp: Motion planning policies
-- mp_three: Three-sequential motion planning
-- mp_cabinet_two_phase: Two-phase cabinet manipulation
-- custom_grasp: Custom grasping policies
-- custom_grasp_three: Three-sequential custom grasping
-- mp_n_cupboard: N-object cupboard manipulation
 
 The robot can control:
 - Base pose (x, y, theta)
@@ -31,10 +14,10 @@ The robot can control:
 - Gripper position (open/close)
 
 ### Initial State Distribution
-![initial state GIF](assets/initial_state_gifs/TidyBot3D-cupboard-o8-mp_n_cupboard.gif)
+![initial state GIF](assets/initial_state_gifs/TidyBot3D-cupboard-o8.gif)
 
 ### Example Demonstration
-![demo GIF](assets/demo_gifs/TidyBot3D-cupboard-o8-mp_n_cupboard.gif)
+![demo GIF](assets/demo_gifs/TidyBot3D-cupboard-o8.gif)
 
 ### Observation Space
 Observation includes:

@@ -53,7 +53,7 @@ def register_all_environments() -> None:
             kwargs={"num_buttons": num_button},
         )
 
-    # TidyBot3D environments with different scene types, object counts, and policy types
+    # TidyBot3D environments with different scene types and object counts (no policy_type)
     scene_configs = [
         ("table", [3, 5, 7]),  # Table stacking with different object counts
         ("cupboard", [8]),  # Cupboard organization with different object counts
@@ -61,50 +61,16 @@ def register_all_environments() -> None:
         ("ground", [3, 5, 7]),  # Ground/scene.xml with different object counts
     ]
 
-    policy_types = [
-        "mp",  # Motion planning policies
-        "stack",  # Object stacking policies
-        "stack_three",  # Three-object stacking policies
-        "mp_three",  # Three-sequential motion planning
-        "mp_cabinet_two_phase",  # Two-phase cabinet manipulation
-        "custom_grasp",  # Custom grasping policies
-        "custom_grasp_three",  # Three-sequential custom grasping
-        "mp_n_cupboard",  # N-object cupboard manipulation
-    ]
-
     for scene_type, object_counts in scene_configs:
         for num_objects in object_counts:
-            for policy_type in policy_types:
-                # Skip incompatible combinations
-                if (
-                    (
-                        scene_type == "cabinet"
-                        and policy_type not in ["mp_cabinet_two_phase"]
-                    )
-                    or (
-                        scene_type == "table"
-                        and policy_type not in ["mp"]
-                    )
-                    or (
-                        scene_type == "cupboard"
-                        and policy_type not in ["mp_n_cupboard"]
-                    )
-                    or (
-                        scene_type == "ground"
-                        and policy_type not in ["mp", "stack", "stack_three"]
-                    )
-                ):
-                    continue
-
-                register(
-                    id=f"prbench/TidyBot3D-{scene_type}-o{num_objects}-{policy_type}-v0",
-                    entry_point="prbench.envs.tidybot3d:TidyBot3DEnv",
-                    kwargs={
-                        "scene_type": scene_type,
-                        "num_objects": num_objects,
-                        "policy_type": policy_type,
-                    },
-                )
+            register(
+                id=f"prbench/TidyBot3D-{scene_type}-o{num_objects}-v0",
+                entry_point="prbench.envs.tidybot3d:TidyBot3DEnv",
+                kwargs={
+                    "scene_type": scene_type,
+                    "num_objects": num_objects,
+                },
+            )
 
 
 

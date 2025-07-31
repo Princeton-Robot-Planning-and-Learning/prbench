@@ -9,7 +9,6 @@ The TidyBot integration adds 3D mobile manipulation capabilities to PRBench, fea
 - **Holonomic Mobile Base**: Powered casters for full planar motion control
 - **Kinova Gen3 Arm**: 7-DOF robotic arm with gripper
 - **Multiple Scene Types**: Table, drawer, cupboard, and cabinet environments
-- **Various Policy Types**: Teleoperation, motion planning, and stacking policies
 - **Task-Specific Rewards**: Custom reward functions for different tasks
 
 ## Installation
@@ -42,9 +41,9 @@ import prbench
 # Register all environments (including TidyBot)
 prbench.register_all_environments()
 
-# Create a TidyBot environment
+# Create a TidyBot environment (no policy_type)
 env = prbench.make(
-    "prbench/TidyBot3D-table-o3-mp-v0"
+    "prbench/TidyBot3D-table-o3-v0",
     show_viewer=True,
     show_images=True
     )
@@ -61,13 +60,12 @@ env.close()
 
 TidyBot environments follow the naming pattern:
 ```
-prbench/TidyBot3D-{scene_type}-o{num_objects}-{policy_type}-v0
+prbench/TidyBot3D-{scene_type}-o{num_objects}-v0
 ```
 
 Where:
 - `scene_type`: `table`, `drawer`, `cupboard`, `cabinet`
 - `num_objects`: Number of objects in the scene (varies by scene)
-- `policy_type`: Type of policy to use
 
 ### Available Scenes
 
@@ -90,41 +88,6 @@ Where:
 - **Description**: Cabinet manipulation tasks
 - **Object counts**: 2, 4, 6 objects
 - **Tasks**: Open cabinet, place objects inside, close cabinet
-
-### Available Policy Types
-
-#### Teleoperation Policies
-- `teleop`: Phone-based teleoperation using WebXR
-- `remote`: Remote policy execution via network
-
-#### Motion Planning Policies
-- `mp`: General motion planning policies
-- `mp_three`: Three-sequential motion planning
-- `mp_cabinet_two_phase`: Two-phase cabinet manipulation
-- `mp_n_cupboard`: N-object cupboard manipulation
-
-#### Stacking Policies
-- `stack`: Object stacking policies
-- `stack_three`: Three-object stacking policies
-
-#### Custom Grasping Policies
-- `custom_grasp`: Custom grasping policies
-- `custom_grasp_three`: Three-sequential custom grasping
-
-### Using Policies
-
-#### Standard Step (Manual Control)
-```python
-# Manual action control
-action = env.action_space.sample()  # Random action
-obs, reward, terminated, truncated, info = env.step(action)
-```
-
-#### Policy-Based Step (Automatic Control)
-```python
-# Use the environment's internal policy
-obs, reward, terminated, truncated, info = env.step_with_policy()
-```
 
 ### Action Space
 
@@ -178,19 +141,20 @@ This will test:
 
 ## Examples
 
-### Example 0: ground motion planning
+### Example 0: ground random actions
 ```python
 import prbench
 prbench.register_all_environments()
 env = prbench.make_unwrapped(
-    "prbench/TidyBot3D-ground-o7-mp-v0",
+    "prbench/TidyBot3D-ground-o7-v0",
     show_viewer=True,
     show_images=True,
     )
 
 obs, info = env.reset()
 for _ in range(1000):
-    obs, reward, terminated, truncated, info = env.step_with_policy()
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
     print(f"Reward: {reward:.3f}")
     if terminated or truncated:
         break
@@ -198,39 +162,19 @@ for _ in range(1000):
 env.close()
 ```
 
-### Example 1: Table motion planning
+### Example 1: Table random actions
 ```python
 import prbench
 prbench.register_all_environments()
 env = prbench.make_unwrapped(
-    "prbench/TidyBot3D-table-o5-mp-v0",
+    "prbench/TidyBot3D-table-o5-v0",
     show_viewer=True,
     show_images=True)
 
 obs, info = env.reset()
 for _ in range(1000):
-    obs, reward, terminated, truncated, info = env.step_with_policy()
-    print(f"Reward: {reward:.3f}")
-    print([terminated, truncated])
-    if terminated or truncated:
-        break
-
-env.close()
-```
-
-### Example 2: Motion Planning in Cupboard
-```python
-import prbench
-
-prbench.register_all_environments()
-env = prbench.make_unwrapped(
-    "prbench/TidyBot3D-cupboard-o8-mp_n_cupboard-v0",
-    show_viewer=True,
-    show_images=True)
-
-obs, info = env.reset()
-for _ in range(1000):
-    obs, reward, terminated, truncated, info = env.step_with_policy()
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
     print(f"Reward: {reward:.3f}")
     print([terminated, truncated])
     if terminated or truncated:
@@ -239,19 +183,42 @@ for _ in range(1000):
 env.close()
 ```
 
-### Example 3: Motion Planning in Cabinet
+### Example 2: Random actions in Cupboard
 ```python
 import prbench
 
 prbench.register_all_environments()
 env = prbench.make_unwrapped(
-    "prbench/TidyBot3D-cabinet-o3-mp_cabinet_two_phase-v0",
+    "prbench/TidyBot3D-cupboard-o8-v0",
     show_viewer=True,
     show_images=True)
 
 obs, info = env.reset()
 for _ in range(1000):
-    obs, reward, terminated, truncated, info = env.step_with_policy()
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
+    print(f"Reward: {reward:.3f}")
+    print([terminated, truncated])
+    if terminated or truncated:
+        break
+
+env.close()
+```
+
+### Example 3: Random actions in Cabinet
+```python
+import prbench
+
+prbench.register_all_environments()
+env = prbench.make_unwrapped(
+    "prbench/TidyBot3D-cabinet-o3-v0",
+    show_viewer=True,
+    show_images=True)
+
+obs, info = env.reset()
+for _ in range(1000):
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
     print(f"Reward: {reward:.3f}")
     if terminated or truncated:
         break
@@ -265,8 +232,7 @@ env.close()
 
 1. **Import Errors**: Make sure all TidyBot dependencies are installed
 2. **Model File Errors**: Verify model files are in the correct location
-3. **Policy Errors**: Check that the policy type is compatible with the scene type
-4. **Memory Issues**: TidyBot environments can be memory-intensive; close environments properly
+3. **Memory Issues**: TidyBot environments can be memory-intensive; close environments properly
 
 ### Getting Help
 

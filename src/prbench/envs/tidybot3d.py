@@ -16,32 +16,15 @@ import random
 
 # Import local constants
 from . import constants
-from .agent.mp_policy import MotionPlannerPolicy
+# Remove all policy imports
 
 # Import TidyBot components from local files
 from .mujoco_env import MujocoEnv
-from .policies import (
-    MotionPlannerPolicyCustomGraspThreeWrapper,
-    MotionPlannerPolicyCustomGraspWrapper,
-    MotionPlannerPolicyMPCabinetTwoPhaseWrapper,
-    MotionPlannerPolicyMPCabinetWrapper,
-    MotionPlannerPolicyMPCupboardWrapper,
-    MotionPlannerPolicyMPNCupboardWrapper,
-    MotionPlannerPolicyMPThreeWrapper,
-    MotionPlannerPolicyMPWrapper,
-    MotionPlannerPolicyStackCupboardThreeWrapper,
-    MotionPlannerPolicyStackCupboardWrapper,
-    MotionPlannerPolicyStackDrawerThreeWrapper,
-    MotionPlannerPolicyStackDrawerWrapper,
-    MotionPlannerPolicyStackTableThreeWrapper,
-    MotionPlannerPolicyStackTableWrapper,
-    MotionPlannerPolicyStackThreeWrapper,
-    MotionPlannerPolicyStackWrapper,
-)
+# Remove all policy imports
 
 
 class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
-    """TidyBot 3D environment with mobile manipulation tasks."""
+    """TidyBot 3D environment with mobile manipulation tasks. (Policy-agnostic, random actions only)"""
 
     metadata: dict[str, Any] = {"render_modes": ["rgb_array"]}
 
@@ -49,7 +32,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self,
         scene_type: str = "table",  # "table", "drawer", "cupboard", "cabinet"
         num_objects: int = 3,
-        policy_type: str = "mp",  # "motion_planning", "stack", "mp"
         render_mode: str | None = None,
         custom_grasp: bool = False,
         **kwargs,
@@ -58,7 +40,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         self.scene_type = scene_type
         self.num_objects = num_objects
-        self.policy_type = policy_type
         self.render_mode = render_mode
         self.custom_grasp = custom_grasp
         # Allow show_viewer/show_images to be set via kwargs
@@ -70,21 +51,19 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # Initialize TidyBot environment
         self._tidybot_env = self._create_tidybot_env()
 
-        # Initialize policy
-        self._policy = self._create_policy()
+        # Remove policy initialization
 
         # Initialize reward calculator
         from prbench.envs.tidybot_rewards import create_reward_calculator
-
         self._reward_calculator = create_reward_calculator(
-            self.scene_type, self.num_objects, self.policy_type
+            self.scene_type, self.num_objects
         )
 
         # Define observation and action spaces
         self.observation_space = self._create_observation_space()
         self.action_space = self._create_action_space()
 
-        # Add metadata for documentation
+        # Add metadata for documentation (remove policy references)
         self.metadata.update(
             {
                 "description": self._create_env_markdown_description(),
@@ -194,61 +173,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         return MujocoEnv(**kwargs)
 
-    def _create_policy(self):
-        """Create appropriate policy based on policy_type."""
-        if self.policy_type == "stack":
-            if self.scene_type == "table":
-                return MotionPlannerPolicyStackTableWrapper()
-            elif self.scene_type == "drawer":
-                return MotionPlannerPolicyStackDrawerWrapper()
-            elif self.scene_type == "cupboard":
-                return MotionPlannerPolicyStackCupboardWrapper()
-            else:
-                return MotionPlannerPolicyStackWrapper()
-        elif self.policy_type == "stack_three":
-            if self.scene_type == "table":
-                return MotionPlannerPolicyStackTableThreeWrapper()
-            elif self.scene_type == "drawer":
-                return MotionPlannerPolicyStackDrawerThreeWrapper()
-            elif self.scene_type == "cupboard":
-                return MotionPlannerPolicyStackCupboardThreeWrapper()
-            else:
-                return MotionPlannerPolicyStackThreeWrapper()
-        elif self.policy_type == "mp":
-            if self.scene_type == "cupboard":
-                return MotionPlannerPolicyMPCupboardWrapper(
-                    custom_grasp=self.custom_grasp
-                )
-            elif self.scene_type == "cabinet":
-                return MotionPlannerPolicyMPCabinetWrapper(
-                    custom_grasp=self.custom_grasp
-                )
-            else:
-                return MotionPlannerPolicyMPWrapper(custom_grasp=self.custom_grasp)
-        elif self.policy_type == "mp_three":
-            return MotionPlannerPolicyMPThreeWrapper(custom_grasp=self.custom_grasp)
-        elif self.policy_type == "mp_cabinet_two_phase":
-            return MotionPlannerPolicyMPCabinetTwoPhaseWrapper(
-                custom_grasp=self.custom_grasp
-            )
-        elif self.policy_type == "custom_grasp":
-            return MotionPlannerPolicyCustomGraspWrapper()
-        elif self.policy_type == "custom_grasp_three":
-            return MotionPlannerPolicyCustomGraspThreeWrapper()
-        elif self.policy_type == "mp_n_cupboard":
-            # Default target locations for N objects
-            target_locations = [
-                np.array([0.9, 0.08, 0.38]),  # Center position
-                # np.array([0.9, -0.08, 0.38]),  # Left position
-                # np.array([0.83, 0, 0.38]),  # Right position
-            ]
-            return MotionPlannerPolicyMPNCupboardWrapper(
-                target_locations=target_locations[: self.num_objects],
-                custom_grasp=self.custom_grasp,
-            )
-        else:
-            # Default to motion planning
-            return MotionPlannerPolicyMPWrapper(custom_grasp=self.custom_grasp)
+    # Remove _create_policy method
 
     def _create_observation_space(self) -> spaces.Box:
         """Create observation space based on TidyBot's observation
@@ -302,12 +227,11 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Reset the environment."""
         super().reset(*args, **kwargs)
         self._tidybot_env.reset()
-        self._policy.reset()
+        # Remove policy reset
         # Reset reward calculator
         from prbench.envs.tidybot_rewards import create_reward_calculator
-
         self._reward_calculator = create_reward_calculator(
-            self.scene_type, self.num_objects, self.policy_type
+            self.scene_type, self.num_objects
         )
         obs = self._tidybot_env.get_obs()
         vec_obs = self._vectorize_observation(obs)
@@ -331,43 +255,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         return vec_obs, reward, terminated, truncated, {}
 
-    def step_with_policy(
-        self, obs: Optional[Dict[str, Any]] = None
-    ) -> Tuple[NDArray[np.float32], float, bool, bool, dict]:
-        """Execute step using the internal policy."""
-        if obs is None:
-            obs = self._tidybot_env.get_obs()
-
-        # Get action from policy
-        action = self._policy.step(obs)
-
-        
-
-        if self._policy.episode_ended:
-            # Policy signaled episode end
-            return self._vectorize_observation(obs), 0.0, True, False, {}
-
-        if action is None:
-            # Policy returned no action
-            return self._vectorize_observation(obs), -0.01, False, False, {}
-
-        if action == "reset_env":
-            # Policy signaled reset
-            return self.reset()[0], 0.0, False, True, {}
-
-        # Execute action
-        self._tidybot_env.step(action)
-
-        # Get new observation
-        new_obs = self._tidybot_env.get_obs()
-        vec_obs = self._vectorize_observation(new_obs)
-
-        # Calculate reward and termination
-        reward = self._calculate_reward(new_obs)
-        terminated = self._is_terminated(new_obs)
-        truncated = False
-
-        return vec_obs, reward, terminated, truncated, {}
+    # Remove step_with_policy method
 
     def _calculate_reward(self, obs: Dict[str, Any]) -> float:
         """Calculate reward based on task completion."""
@@ -395,28 +283,11 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self._tidybot_env.close()
 
     def _create_env_markdown_description(self) -> str:
-        """Create environment description."""
+        """Create environment description (policy-agnostic)."""
         return f"""A 3D mobile manipulation environment using the TidyBot platform.
         
 The robot has a holonomic mobile base with powered casters and a Kinova Gen3 arm.
 Scene type: {self.scene_type} with {self.num_objects} objects.
-Policy type: {self.policy_type}
-
-Available scenes:
-- table: Object stacking and manipulation on a table
-- drawer: Opening/closing drawers and placing objects inside
-- cupboard: Opening cupboards and organizing objects
-- cabinet: Cabinet manipulation tasks
-
-Available policy types:
-- stack: Object stacking policies
-- stack_three: Three-object stacking policies
-- mp: Motion planning policies
-- mp_three: Three-sequential motion planning
-- mp_cabinet_two_phase: Two-phase cabinet manipulation
-- custom_grasp: Custom grasping policies
-- custom_grasp_three: Three-sequential custom grasping
-- mp_n_cupboard: N-object cupboard manipulation
 
 The robot can control:
 - Base pose (x, y, theta)
@@ -464,52 +335,17 @@ https://github.com/tidybot2/tidybot2
 
     @classmethod
     def get_available_environments(cls) -> List[str]:
-        """Get list of available TidyBot environment IDs."""
+        """Get list of available TidyBot environment IDs (policy-agnostic)."""
         scene_configs = [
             ("table", [3, 5, 7]),
             ("drawer", [2, 4, 6]),
             ("cupboard", [3, 5, 8]),
             ("cabinet", [2, 4, 6]),
         ]
-
-        policy_types = [
-            "stack",
-            "stack_three",
-            "mp",
-            "mp_three",
-            "mp_cabinet_two_phase",
-            "custom_grasp",
-            "custom_grasp_three",
-            "mp_n_cupboard",
-        ]
-
         env_ids = []
         for scene_type, object_counts in scene_configs:
             for num_objects in object_counts:
-                for policy_type in policy_types:
-                    # Skip incompatible combinations
-                    if (
-                        (
-                            scene_type == "cabinet"
-                            and policy_type in ["stack", "stack_three"]
-                        )
-                        or (
-                            scene_type == "table"
-                            and policy_type in ["mp_cabinet_two_phase"]
-                        )
-                        or (
-                            scene_type == "drawer"
-                            and policy_type in ["mp_cabinet_two_phase", "mp_n_cupboard"]
-                        )
-                        or (
-                            scene_type == "cupboard"
-                            and policy_type in ["mp_cabinet_two_phase"]
-                        )
-                    ):
-                        continue
-
-                    env_ids.append(
-                        f"prbench/TidyBot3D-{scene_type}-o{num_objects}-{policy_type}-v0"
-                    )
-
+                env_ids.append(
+                    f"prbench/TidyBot3D-{scene_type}-o{num_objects}-v0"
+                )
         return env_ids
