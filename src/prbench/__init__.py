@@ -56,8 +56,8 @@ def register_all_environments() -> None:
     # TidyBot3D environments with different scene types, object counts, and policy types
     scene_configs = [
         ("table", [3, 5, 7]),  # Table stacking with different object counts
-        ("cupboard", [3, 5, 8]),  # Cupboard organization with different object counts
-        ("cabinet", [2, 4, 6]),  # Cabinet manipulation with different object counts
+        ("cupboard", [8]),  # Cupboard organization with different object counts
+        ("cabinet", [3]),  # Cabinet manipulation with different object counts
         ("ground", [3, 5, 7]),  # Ground/scene.xml with different object counts
     ]
 
@@ -79,18 +79,19 @@ def register_all_environments() -> None:
                 if (
                     (
                         scene_type == "cabinet"
-                        and policy_type in ["stack", "stack_three"]
+                        and policy_type not in ["mp_cabinet_two_phase"]
                     )
                     or (
                         scene_type == "table"
-                        and policy_type in ["mp_cabinet_two_phase"]
-                    )
-                    or (
-                        scene_type == "drawer"
+                        and policy_type not in ["mp"]
                     )
                     or (
                         scene_type == "cupboard"
-                        and policy_type in ["mp_cabinet_two_phase"]
+                        and policy_type not in ["mp_n_cupboard"]
+                    )
+                    or (
+                        scene_type == "ground"
+                        and policy_type not in ["mp", "stack", "stack_three"]
                     )
                 ):
                     continue

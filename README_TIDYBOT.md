@@ -43,7 +43,11 @@ import prbench
 prbench.register_all_environments()
 
 # Create a TidyBot environment
-env = prbench.make("prbench/TidyBot3D-table-o3-mp-v0")
+env = prbench.make(
+    "prbench/TidyBot3D-table-o3-mp-v0"
+    show_viewer=True,
+    show_images=True
+    )
 
 # Standard Gymnasium interface
 obs, info = env.reset()
@@ -177,12 +181,15 @@ This will test:
 ### Example 0: ground motion planning
 ```python
 import prbench
-
 prbench.register_all_environments()
-env = prbench.make_unwrapped("prbench/TidyBot3D-ground-o7-mp-v0")
+env = prbench.make_unwrapped(
+    "prbench/TidyBot3D-ground-o7-mp-v0",
+    show_viewer=True,
+    show_images=True,
+    )
 
 obs, info = env.reset()
-for _ in range(10000):
+for _ in range(1000):
     obs, reward, terminated, truncated, info = env.step_with_policy()
     print(f"Reward: {reward:.3f}")
     if terminated or truncated:
@@ -194,9 +201,11 @@ env.close()
 ### Example 1: Table motion planning
 ```python
 import prbench
-
 prbench.register_all_environments()
-env = prbench.make_unwrapped("prbench/TidyBot3D-table-o5-mp-v0")
+env = prbench.make_unwrapped(
+    "prbench/TidyBot3D-table-o5-mp-v0",
+    show_viewer=True,
+    show_images=True)
 
 obs, info = env.reset()
 for _ in range(1000):
@@ -214,7 +223,10 @@ env.close()
 import prbench
 
 prbench.register_all_environments()
-env = prbench.make_unwrapped("prbench/TidyBot3D-cupboard-o3-mp_n_cupboard-v0")
+env = prbench.make_unwrapped(
+    "prbench/TidyBot3D-cupboard-o8-mp_n_cupboard-v0",
+    show_viewer=True,
+    show_images=True)
 
 obs, info = env.reset()
 for _ in range(1000):
@@ -232,7 +244,10 @@ env.close()
 import prbench
 
 prbench.register_all_environments()
-env = prbench.make_unwrapped("prbench/TidyBot3D-cabinet-o2-mp_cabinet_two_phase-v0")
+env = prbench.make_unwrapped(
+    "prbench/TidyBot3D-cabinet-o3-mp_cabinet_two_phase-v0",
+    show_viewer=True,
+    show_images=True)
 
 obs, info = env.reset()
 for _ in range(1000):

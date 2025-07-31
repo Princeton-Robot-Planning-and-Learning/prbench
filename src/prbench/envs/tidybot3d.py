@@ -61,6 +61,11 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.policy_type = policy_type
         self.render_mode = render_mode
         self.custom_grasp = custom_grasp
+        # Allow show_viewer/show_images to be set via kwargs
+        self.show_viewer = kwargs.pop("show_viewer", False)
+        self.show_images = kwargs.pop("show_images", False)
+        # Store any other kwargs for future use
+        self._extra_kwargs = kwargs
 
         # Initialize TidyBot environment
         self._tidybot_env = self._create_tidybot_env()
@@ -170,11 +175,13 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         kwargs = {
             "render_images": True,
-            "show_viewer": True,
-            "show_images": True,
+            "show_viewer": self.show_viewer,
+            "show_images": self.show_images,
             "custom_grasp": self.custom_grasp,
             "mjcf_path": dynamic_model_path,
         }
+        # Allow any extra kwargs to override
+        kwargs.update(self._extra_kwargs)
 
         if self.scene_type == "table":
             kwargs["table_scene"] = True
@@ -369,9 +376,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def _is_terminated(self, obs: Dict[str, Any]) -> bool:
         """Check if episode should terminate."""
         return self._reward_calculator.is_terminated(obs)
-        # # Align with policy's episode_ended if available
-        # print('terminated', self._policy.episode_ended)
-        # return self._policy.episode_ended
+        
         
 
     def render(self):

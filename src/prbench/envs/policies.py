@@ -312,7 +312,7 @@ class MotionPlannerPolicyMPWrapper(Policy):
         self.impl.PLACEMENT_X_OFFSET = 0.1
         self.impl.PLACEMENT_Y_OFFSET = 0.1
         self.impl.PLACEMENT_Z_OFFSET = 0.2
-        self.impl.target_location = np.array([0, 0, 0.5])
+        # self.impl.target_location = np.array([0, 0, 0.5])
         self.episode_ended = False
 
     def reset(self):
