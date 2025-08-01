@@ -1,3 +1,14 @@
+"""MuJoCo environment for robotic simulation and control.
+
+This module provides a comprehensive MuJoCo-based environment for
+simulating robotic systems with shared memory communication, real-time
+control, and multi-process rendering capabilities. It includes classes
+for state management, image handling, rendering, and various controllers
+for base and arm control.
+"""
+
+# pylint: disable=no-member
+# pylint: disable=no-name-in-module
 # Author: Jimmy Wu
 # Date: October 2024
 #
@@ -10,7 +21,9 @@
 
 import math
 import multiprocessing as mp
+import re
 import time
+import traceback
 from multiprocessing import shared_memory
 from threading import Thread
 
@@ -25,9 +38,18 @@ from .ik_solver import IKSolver
 
 
 class ShmState:
+    """Shared memory state manager for robotic environment data.
+
+    This class manages shared memory for storing and accessing robot
+    state information including base pose, arm position/orientation,
+    gripper state, and object positions/orientations across multiple
+    processes.
+    """
+
     def __init__(self, existing_instance=None, num_objects=3, object_names=None):
-        # Calculate array size: 3 (base_pose) + 3 (arm_pos) + 4 (arm_quat) + 1 (gripper_pos) + 1 (initialized) +
-        # num_objects * 7 (pos + quat for each object) + 6 (2 handle positions)
+        # Calculate array size: 3 (base_pose) + 3 (arm_pos) + 4 (arm_quat) +
+        # 1 (gripper_pos) + 1 (initialized) + num_objects * 7 (pos + quat for
+        # each object) + 6 (2 handle positions)
         arr_size = 3 + 3 + 4 + 1 + 1 + num_objects * 7 + 6
         arr = np.empty(arr_size)
         if existing_instance is None:
@@ -69,10 +91,18 @@ class ShmState:
         self.initialized[:] = 0.0
 
     def close(self):
+        """Close the shared memory segment."""
         self.shm.close()
 
 
 class ShmImage:
+    """Shared memory image manager for camera data.
+
+    This class manages shared memory for storing and accessing camera
+    image data across multiple processes, supporting both creation of
+    new shared memory segments and attachment to existing ones.
+    """
+
     def __init__(
         self, camera_name=None, width=None, height=None, existing_instance=None
     ):
@@ -88,11 +118,20 @@ class ShmImage:
         self.data.fill(0)
 
     def close(self):
+        """Close the shared memory segment."""
         self.shm.close()
 
 
-# Adapted from https://github.com/google-deepmind/mujoco/blob/main/python/mujoco/renderer.py
+# Adapted from https://github.com/google-deepmind/mujoco/
+# blob/main/python/mujoco/renderer.py
 class Renderer:
+    """MuJoCo renderer for offscreen image generation.
+
+    This class provides offscreen rendering capabilities for MuJoCo
+    simulations, generating camera images and storing them in shared
+    memory for access by other processes.
+    """
+
     def __init__(self, model, data, shm_image):
         self.model = model
         self.data = data
@@ -126,6 +165,7 @@ class Renderer:
         self.scene = mujoco.MjvScene(model, 10000)
 
     def render(self):
+        """Render the current scene to shared memory image."""
         self.gl_context.make_current()
         mujoco.mjv_updateScene(
             self.model,
@@ -141,6 +181,7 @@ class Renderer:
         self.shm_image.data[:] = np.flipud(self.image)
 
     def close(self):
+        """Free OpenGL and MuJoCo rendering resources."""
         self.gl_context.free()
         self.gl_context = None
         self.mjr_context.free()
@@ -148,6 +189,13 @@ class Renderer:
 
 
 class BaseController:
+    """Controller for mobile base movement using online trajectory generation.
+
+    This class implements a controller for the mobile base using
+    Ruckig's online trajectory generation to ensure smooth, constrained
+    motion with velocity and acceleration limits.
+    """
+
     def __init__(self, qpos, qvel, ctrl, timestep):
         self.qpos = qpos
         self.qvel = qvel
@@ -166,6 +214,7 @@ class BaseController:
         self.otg_res = None
 
     def reset(self):
+        """Reset the base controller to origin position."""
         # Initialize base at origin
         self.qpos[:] = np.zeros(3)
         self.ctrl[:] = self.qpos
@@ -178,6 +227,7 @@ class BaseController:
         self.otg_res = Result.Finished
 
     def control_callback(self, command):
+        """Process control commands and update base trajectory."""
         if command is not None:
             self.last_command_time = time.time()
             if "base_pose" in command:
@@ -198,6 +248,14 @@ class BaseController:
 
 
 class ArmController:
+    """Controller for robotic arm movement using inverse kinematics and
+    trajectory generation.
+
+    This class implements a controller for the robotic arm using inverse
+    kinematics to convert end-effector poses to joint configurations,
+    and Ruckig's online trajectory generation for smooth motion control.
+    """
+
     def __init__(self, qpos, qvel, ctrl, qpos_gripper, ctrl_gripper, timestep):
         self.qpos = qpos
         self.qvel = qvel
@@ -221,6 +279,7 @@ class ArmController:
         self.otg_res = None
 
     def reset(self):
+        """Reset the arm controller to retract configuration."""
         # Initialize arm in "retract" configuration
         self.qpos[:] = np.array(
             [0.0, -0.34906585, 3.14159265, -2.54818071, 0.0, -0.87266463, 1.57079633]
@@ -236,6 +295,7 @@ class ArmController:
         self.otg_res = Result.Finished
 
     def control_callback(self, command):
+        """Process control commands and update arm trajectory."""
         if command is not None:
             self.last_command_time = time.time()
 
@@ -271,6 +331,14 @@ class ArmController:
 
 
 class MujocoSim:
+    """MuJoCo simulation environment with shared memory communication.
+
+    This class manages a MuJoCo simulation with real-time control,
+    object detection, state management, and multi-process rendering
+    capabilities. It provides the core simulation loop and handles
+    communication between different processes via shared memory.
+    """
+
     def __init__(
         self,
         mjcf_path,
@@ -317,7 +385,7 @@ class MujocoSim:
         # Dynamically track object qpos arrays
         self.qpos_objects = []
         current_idx = base_dofs + arm_dofs + 8  # After gripper
-        for i in range(self.num_objects):
+        for _ in range(self.num_objects):
             self.qpos_objects.append(self.data.qpos[current_idx : current_idx + 7])
             current_idx += 7
 
@@ -361,7 +429,6 @@ class MujocoSim:
         self.body_names = {self.model.body(i).name for i in range(self.model.nbody)}
 
         # Find all objects that match the pattern 'cube' + number
-        import re
 
         self.object_names = []
         for body_name in self.body_names:
@@ -375,11 +442,12 @@ class MujocoSim:
         print(f"Detected {self.num_objects} objects: {self.object_names}")
 
     def reset(self):
+        """Reset the simulation and randomize object positions."""
         # Reset simulation
         mujoco.mj_resetData(self.model, self.data)
 
         # Randomize positions and orientations for all detected objects
-        for i, (object_name, cube_qpos) in enumerate(
+        for _, (object_name, cube_qpos) in enumerate(
             zip(self.object_names, self.qpos_objects)
         ):
             # Randomize position within a reasonable range around the table
@@ -397,7 +465,9 @@ class MujocoSim:
             cube_qpos[3:7] = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
 
             print(
-                f"{object_name} reset to position: [{cube_qpos[0]:.3f}, {cube_qpos[1]:.3f}, {cube_qpos[2]:.3f}], theta: {theta:.3f}"
+                f"{object_name} reset to position: "
+                f"[{cube_qpos[0]:.3f}, {cube_qpos[1]:.3f}, {cube_qpos[2]:.3f}], "
+                f"theta: {theta:.3f}"
             )
 
         mujoco.mj_forward(self.model, self.data)
@@ -407,6 +477,7 @@ class MujocoSim:
         self.arm_controller.reset()
 
     def control_callback(self, *_):
+        """Process control commands and update simulation state."""
         # Check for new command
         command = None if self.command_queue.empty() else self.command_queue.get()
         if command == "reset":
@@ -444,9 +515,7 @@ class MujocoSim:
         )  # right_driver_joint, joint range [0, 0.8]
 
         # Update all object positions and quaternions
-        for i, (object_name, qpos_obj) in enumerate(
-            zip(self.object_names, self.qpos_objects)
-        ):
+        for i, (_, qpos_obj) in enumerate(zip(self.object_names, self.qpos_objects)):
             self.shm_state.object_positions[i][:] = qpos_obj[
                 :3
             ]  # First 3 elements are position
@@ -468,6 +537,7 @@ class MujocoSim:
         self.shm_state.initialized[:] = 1.0
 
     def launch(self):
+        """Launch the MuJoCo viewer or run headless simulation."""
         if self.show_viewer:
             mujoco.viewer.launch(
                 self.model, self.data, show_left_ui=False, show_right_ui=False
@@ -484,6 +554,14 @@ class MujocoSim:
 
 
 class MujocoEnv:
+    """Main MuJoCo environment interface for robotic control.
+
+    This class provides the main interface for interacting with the
+    MuJoCo simulation environment, including observation retrieval,
+    action execution, and multi-process management for rendering and
+    physics simulation.
+    """
+
     def __init__(
         self,
         render_images=True,
@@ -526,7 +604,6 @@ class MujocoEnv:
         # Detect objects from the model to determine shared memory size
         model = mujoco.MjModel.from_xml_path(self.mjcf_path)
         body_names = {model.body(i).name for i in range(model.nbody)}
-        import re
 
         object_names = []
         for body_name in body_names:
@@ -555,7 +632,8 @@ class MujocoEnv:
             mp.Process(target=self.visualizer_loop, daemon=True).start()
 
     def physics_loop(self):
-        try: 
+        """Run the physics simulation loop in a separate process."""
+        try:
             # Create sim
             sim = MujocoSim(
                 self.mjcf_path,
@@ -576,11 +654,12 @@ class MujocoEnv:
             # Launch sim
             sim.launch()  # Launch in same thread as creation to avoid segfault
         except Exception as e:
-            import traceback
+
             print("Physics process crashed:", e)
             traceback.print_exc()
 
     def render_loop(self, model, data):
+        """Run the rendering loop for camera images in a separate process."""
         # Set up renderers
         renderers = [Renderer(model, data, shm_image) for shm_image in self.shm_images]
 
@@ -592,10 +671,13 @@ class MujocoEnv:
             render_time = time.time() - start_time
             if render_time > 0.1:  # 10 fps
                 print(
-                    f"Warning: Offscreen rendering took {1000 * render_time:.1f} ms, try making the Mujoco viewer window smaller to speed up offscreen rendering"
+                    f"Warning: Offscreen rendering took {1000 * render_time:.1f} ms, "
+                    f"try making the Mujoco viewer window smaller to speed up "
+                    f"offscreen rendering"
                 )
 
     def visualizer_loop(self):
+        """Run the visualizer loop for displaying camera images."""
         shm_images = [
             ShmImage(existing_instance=shm_image) for shm_image in self.shm_images
         ]
@@ -612,6 +694,7 @@ class MujocoEnv:
             cv.waitKey(1)
 
     def reset(self):
+        """Reset the environment and wait for initialization."""
         self.shm_state.initialized[:] = 0.0
         self.command_queue.put("reset")
 
@@ -619,12 +702,14 @@ class MujocoEnv:
         while self.shm_state.initialized == 0.0:
             time.sleep(0.01)
 
-        # Wait for image rendering to initialize (Note: Assumes all zeros is not a valid image)
+        # Wait for image rendering to initialize
+        # (Note: Assumes all zeros is not a valid image)
         if self.render_images:
             while any(np.all(shm_image.data == 0) for shm_image in self.shm_images):
                 time.sleep(0.01)
 
     def get_obs(self):
+        """Get the current observation from the environment."""
         arm_quat = self.shm_state.arm_quat[[1, 2, 3, 0]]  # (w, x, y, z) -> (x, y, z, w)
         if arm_quat[3] < 0.0:  # Enforce quaternion uniqueness
             np.negative(arm_quat, out=arm_quat)
@@ -659,49 +744,20 @@ class MujocoEnv:
         return obs
 
     def step(self, action):
-        # Note: We intentionally do not return obs here to prevent the policy from using outdated data
+        """Execute an action in the environment.
+
+        Args:
+            action: Dictionary containing control commands for base, arm, and gripper.
+        """
+        # Note: We intentionally do not return obs here to prevent the policy
+        # from using outdated data
         self.command_queue.put(action)
 
     def close(self):
+        """Close the environment and clean up shared memory resources."""
         self.shm_state.close()
         self.shm_state.shm.unlink()
         if self.render_images:
             for shm_image in self.shm_images:
                 shm_image.close()
                 shm_image.shm.unlink()
-
-
-if __name__ == "__main__":
-    env = MujocoEnv()
-    # env = MujocoEnv(show_images=True)
-    # env = MujocoEnv(render_images=False)
-    try:
-        while True:
-            env.reset()
-            for _ in range(100):
-                action = {
-                    "base_pose": 0.1 * np.random.rand(3) - 0.05,
-                    "arm_pos": 0.1 * np.random.rand(3) + np.array([0.55, 0.0, 0.4]),
-                    "arm_quat": np.random.rand(4),
-                    "gripper_pos": np.random.rand(1),
-                }
-                env.step(action)
-                obs = env.get_obs()
-                # Print object positions dynamically
-                object_positions = []
-                for key in obs.keys():
-                    if (
-                        key.endswith("_pos")
-                        and not key.startswith("arm_")
-                        and not key.startswith("base_")
-                        and not key.startswith("left_")
-                        and not key.startswith("right_")
-                    ):
-                        object_positions.append(f"{key}: {obs[key]}")
-                print(f"Object positions: {', '.join(object_positions)}")
-                print(
-                    [(k, v.shape) if v.ndim == 3 else (k, v) for (k, v) in obs.items()]
-                )
-                time.sleep(POLICY_CONTROL_PERIOD)  # Note: Not precise
-    finally:
-        env.close()

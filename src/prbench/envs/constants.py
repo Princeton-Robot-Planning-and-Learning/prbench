@@ -1,3 +1,10 @@
+"""Constants and configuration values for the PRBench environment.
+
+This module contains various constants used throughout the PRBench
+environment, including mobile base parameters, encoder configurations,
+and policy settings.
+"""
+
 import numpy as np
 
 ################################################################################
@@ -7,10 +14,12 @@ import numpy as np
 h_x, h_y = 0.190150 * np.array([1.0, 1.0, -1.0, -1.0]), 0.170150 * np.array(
     [-1.0, 1.0, 1.0, -1.0]
 )  # Kinova / Franka
-# h_x, h_y = 0.140150 * np.array([1.0, 1.0, -1.0, -1.0]), 0.120150 * np.array([-1.0, 1.0, 1.0, -1.0])  # ARX5
+# h_x, h_y = 0.140150 * np.array([1.0, 1.0, -1.0, -1.0]), 0.120150 * np.array(
+#     [-1.0, 1.0, 1.0, -1.0]
+# )  # ARX5
 
 # Encoder magnet offsets
-ENCODER_MAGNET_OFFSETS = [0.0 / 4096, 0.0 / 4096, 0.0 / 4096, 0.0 / 4096]  # TODO
+ENCODER_MAGNET_OFFSETS = [0.0 / 4096, 0.0 / 4096, 0.0 / 4096, 0.0 / 4096]
 
 ################################################################################
 # Policy

@@ -53,7 +53,7 @@ def register_all_environments() -> None:
             kwargs={"num_buttons": num_button},
         )
 
-    # TidyBot3D environments with different scene types and object counts (no policy_type)
+    # TidyBot3D environments with different scenes and object counts (no policy_type)
     scene_configs = [
         ("table", [3, 5, 7]),  # Table stacking with different object counts
         ("cupboard", [8]),  # Cupboard organization with different object counts
@@ -71,7 +71,6 @@ def register_all_environments() -> None:
                     "num_objects": num_objects,
                 },
             )
-
 
 
 def make(*args, **kwargs) -> gymnasium.Env:

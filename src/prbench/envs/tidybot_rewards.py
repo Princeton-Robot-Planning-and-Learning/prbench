@@ -8,6 +8,9 @@ import numpy as np
 class TidyBotRewardCalculator:
     """Base class for TidyBot task rewards."""
 
+    completed_objects: set[int]
+    episode_step: int
+
     def __init__(self, scene_type: str, num_objects: int):
         self.scene_type = scene_type
         self.num_objects = num_objects
@@ -86,7 +89,7 @@ class TableStackingReward(TidyBotRewardCalculator):
         if current_height >= self.target_height and current_stacked == self.num_objects:
             reward += 5.0
 
-        return reward
+        return float(reward)
 
     def _is_task_completed(self, obs: Dict[str, Any]) -> bool:
         # Terminate when all objects are stacked to target height
@@ -147,7 +150,7 @@ class DrawerReward(TidyBotRewardCalculator):
                             self.completed_objects.add(i)
                             self.objects_placed += 1
 
-        return reward
+        return float(reward)
 
     def _is_task_completed(self, obs: Dict[str, Any]) -> bool:
         return len(self.completed_objects) == self.num_objects
@@ -191,7 +194,7 @@ class CupboardReward(TidyBotRewardCalculator):
                             self.completed_objects.add(i)
                             self.objects_placed += 1
 
-        return reward
+        return float(reward)
 
     def _is_task_completed(self, obs: Dict[str, Any]) -> bool:
         return len(self.completed_objects) == self.num_objects
@@ -237,7 +240,7 @@ class CabinetReward(TidyBotRewardCalculator):
                             self.completed_objects.add(i)
                             self.objects_placed += 1
 
-        return reward
+        return float(reward)
 
     def _is_task_completed(self, obs: Dict[str, Any]) -> bool:
         return len(self.completed_objects) == self.num_objects
@@ -286,9 +289,11 @@ class MotionPlanningReward(TidyBotRewardCalculator):
                         self.completed_objects.add(i)
                         self.objects_placed += 1
                 elif distance < 0.1:  # 10cm tolerance
-                    reward += 0.1 * (0.1 - distance)  # Small reward for being close
+                    reward += float(
+                        0.1 * (0.1 - distance)
+                    )  # Small reward for being close
 
-        return reward
+        return float(reward)
 
     def _is_task_completed(self, obs: Dict[str, Any]) -> bool:
         return len(self.completed_objects) == self.num_objects

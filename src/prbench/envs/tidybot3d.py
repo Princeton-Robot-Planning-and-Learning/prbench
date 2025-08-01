@@ -1,30 +1,24 @@
 """TidyBot 3D environment wrapper for PRBench."""
 
-import inspect
 import os
-import sys
-from typing import Any, Dict, List, Optional, Tuple
+import random
+import xml.etree.ElementTree as ET
+from typing import Any, Dict, List, Tuple
 
 import gymnasium
 import numpy as np
 from gymnasium import spaces
 from numpy.typing import NDArray
-
-import tempfile
-import xml.etree.ElementTree as ET
-import random
-
-# Import local constants
-from . import constants
-# Remove all policy imports
+from prbench.envs.tidybot_rewards import create_reward_calculator
 
 # Import TidyBot components from local files
 from .mujoco_env import MujocoEnv
-# Remove all policy imports
-
 
 class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
-    """TidyBot 3D environment with mobile manipulation tasks. (Policy-agnostic, random actions only)"""
+    """TidyBot 3D environment with mobile manipulation tasks.
+
+    (Policy-agnostic, random actions only)
+    """
 
     metadata: dict[str, Any] = {"render_modes": ["rgb_array"]}
 
@@ -53,8 +47,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         # Remove policy initialization
 
-        # Initialize reward calculator
-        from prbench.envs.tidybot_rewards import create_reward_calculator
         self._reward_calculator = create_reward_calculator(
             self.scene_type, self.num_objects
         )
@@ -75,7 +67,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             }
         )
 
-    def _create_tidybot_env(self) -> MujocoEnv:
+    def _create_tidybot_env(self) -> "MujocoEnv":
         """Create the underlying TidyBot MuJoCo environment."""
         # Set model path to local models directory
         model_base_path = os.path.join(
@@ -106,49 +98,64 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             tree = ET.parse(absolute_model_path)
             root = tree.getroot()
             worldbody = root.find("worldbody")
-            # Remove all existing cube bodies
-            for body in list(worldbody):
-                if body.tag == "body" and body.attrib.get("name", "").startswith("cube"):
-                    worldbody.remove(body)
-            # Insert new cubes
-            for i in range(self.num_objects):
-                name = f"cube{i+1}"
-                if self.scene_type == "ground":
-                    # Randomize positions for ground
-                    x = round(random.uniform(0.4, 0.8), 3)
-                    y = round(random.uniform(-0.3, 0.3), 3)
-                    z = 0.02
-                    pos = f"{x} {y} {z}"
-                elif self.scene_type == "table":
-                    x = 0.5 - 0.05 * i
-                    y = 0.1 * ((i % 3) - 1)
-                    z = 0.44
-                    pos = f"{x} {y} {z}"
-                elif self.scene_type == "drawer":
-                    x = 0.7 - 0.05 * i
-                    y = -0.1 + 0.05 * (i % 3)
-                    z = 0.12
-                    pos = f"{x} {y} {z}"
-                elif self.scene_type == "cupboard":
-                    x = 1.0
-                    y = -0.4 + 0.1 * (i % 3)
-                    z = 0.33
-                    pos = f"{x} {y} {z}"
-                elif self.scene_type == "cabinet":
-                    x = 0.75
-                    y = -0.1 - 0.1 * (i % 3)
-                    z = 0.12
-                    pos = f"{x} {y} {z}"
-                else:
-                    pos = "0.6 0 0.02"
-                body = ET.Element("body", name=name, pos=pos)
-                ET.SubElement(body, "freejoint")
-                ET.SubElement(body, "geom", type="box", size="0.02 0.02 0.02", rgba=".5 .7 .5 1", mass="0.1")
-                worldbody.append(body)
-            # Write to a file in the models directory
-            dynamic_model_filename = f"auto_{self.scene_type}_{self.num_objects}_objs.xml"
-            dynamic_model_path = os.path.join(model_base_path, dynamic_model_filename)
-            tree.write(dynamic_model_path)
+            if worldbody is not None:
+                # Remove all existing cube bodies
+                for body in list(worldbody):
+                    if body.tag == "body" and body.attrib.get("name", "").startswith(
+                        "cube"
+                    ):
+                        worldbody.remove(body)
+                # Insert new cubes
+                for i in range(self.num_objects):
+                    name = f"cube{i+1}"
+                    if self.scene_type == "ground":
+                        x = round(random.uniform(0.4, 0.8), 3)
+                        y = round(random.uniform(-0.3, 0.3), 3)
+                        z = 0.02
+                        pos = f"{x} {y} {z}"
+                    elif self.scene_type == "table":
+                        x = 0.5 - 0.05 * i
+                        y = 0.1 * ((i % 3) - 1)
+                        z = 0.44
+                        pos = f"{x} {y} {z}"
+                    elif self.scene_type == "drawer":
+                        x = 0.7 - 0.05 * i
+                        y = -0.1 + 0.05 * (i % 3)
+                        z = 0.12
+                        pos = f"{x} {y} {z}"
+                    elif self.scene_type == "cupboard":
+                        x = 1.0
+                        y = -0.4 + 0.1 * (i % 3)
+                        z = 0.33
+                        pos = f"{x} {y} {z}"
+                    elif self.scene_type == "cabinet":
+                        x = 0.75
+                        y = -0.1 - 0.1 * (i % 3)
+                        z = 0.12
+                        pos = f"{x} {y} {z}"
+                    else:
+                        pos = "0.6 0 0.02"
+                    body = ET.Element("body", name=name, pos=pos)
+                    ET.SubElement(body, "freejoint")
+                    ET.SubElement(
+                        body,
+                        "geom",
+                        type="box",
+                        size="0.02 0.02 0.02",
+                        rgba=".5 .7 .5 1",
+                        mass="0.1",
+                    )
+                    worldbody.append(body)
+                # Write to a file in the models directory
+                dynamic_model_filename = (
+                    f"auto_{self.scene_type}_{self.num_objects}_objs.xml"
+                )
+                dynamic_model_path = os.path.join(
+                    model_base_path, dynamic_model_filename
+                )
+                tree.write(dynamic_model_path)
+            else:
+                dynamic_model_path = absolute_model_path
         else:
             dynamic_model_path = absolute_model_path
 
@@ -171,7 +178,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         elif self.scene_type == "cabinet":
             kwargs["cabinet_scene"] = True
 
-        return MujocoEnv(**kwargs)
+        return MujocoEnv(**kwargs)  # type: ignore
 
     # Remove _create_policy method
 
@@ -179,12 +186,12 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Create observation space based on TidyBot's observation
         structure."""
         # Get example observation to determine dimensions
-        self._tidybot_env.reset()
-        example_obs = self._tidybot_env.get_obs()
+        self._tidybot_env.reset()  # type: ignore[no-untyped-call]
+        example_obs = self._tidybot_env.get_obs()  # type: ignore[no-untyped-call]
 
         # Calculate total observation dimension
         obs_dim = 0
-        for key, value in example_obs.items():
+        for _, value in example_obs.items():
             if isinstance(value, np.ndarray):
                 obs_dim += value.size
             else:
@@ -205,7 +212,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def _vectorize_observation(self, obs: Dict[str, Any]) -> NDArray[np.float32]:
         """Convert TidyBot observation dict to vector."""
-        obs_vector = []
+        obs_vector: list[float] = []
         for key in sorted(obs.keys()):  # Sort for consistency
             value = obs[key]
             if isinstance(value, np.ndarray):
@@ -226,14 +233,12 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def reset(self, *args, **kwargs) -> Tuple[NDArray[np.float32], dict]:
         """Reset the environment."""
         super().reset(*args, **kwargs)
-        self._tidybot_env.reset()
+        self._tidybot_env.reset()  # type: ignore[no-untyped-call]
         # Remove policy reset
-        # Reset reward calculator
-        from prbench.envs.tidybot_rewards import create_reward_calculator
         self._reward_calculator = create_reward_calculator(
             self.scene_type, self.num_objects
         )
-        obs = self._tidybot_env.get_obs()
+        obs = self._tidybot_env.get_obs()  # type: ignore[no-untyped-call]
         vec_obs = self._vectorize_observation(obs)
         return vec_obs, {}
 
@@ -242,10 +247,10 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     ) -> Tuple[NDArray[np.float32], float, bool, bool, dict]:
         """Execute action and return next observation."""
         action_dict = self._dict_to_action(action)
-        self._tidybot_env.step(action_dict)
+        self._tidybot_env.step(action_dict)  # type: ignore[no-untyped-call]
 
         # Get observation
-        obs = self._tidybot_env.get_obs()
+        obs = self._tidybot_env.get_obs()  # type: ignore[no-untyped-call]
         vec_obs = self._vectorize_observation(obs)
 
         # Calculate reward and termination
@@ -264,8 +269,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def _is_terminated(self, obs: Dict[str, Any]) -> bool:
         """Check if episode should terminate."""
         return self._reward_calculator.is_terminated(obs)
-        
-        
 
     def render(self):
         """Render the environment."""
@@ -326,9 +329,11 @@ Currently returns a small negative reward (-0.01) per timestep to encourage expl
 
     def _create_references_markdown_description(self) -> str:
         """Create references description."""
-        return """TidyBot++: An Open-Source Holonomic Mobile Manipulator for Robot Learning
-Jimmy Wu, William Chong, Robert Holmberg, Aaditya Prasad, Yihuai Gao, Oussama Khatib, Shuran Song, Szymon Rusinkiewicz, Jeannette Bohg
-Conference on Robot Learning (CoRL), 2024
+        return """TidyBot++: An Open-Source Holonomic Mobile Manipulator
+- for Robot Learning
+- Jimmy Wu, William Chong, Robert Holmberg, Aaditya Prasad, Yihuai Gao, 
+  Oussama Khatib, Shuran Song, Szymon Rusinkiewicz, Jeannette Bohg
+- Conference on Robot Learning (CoRL), 2024
 
 https://github.com/tidybot2/tidybot2
 """
@@ -345,7 +350,5 @@ https://github.com/tidybot2/tidybot2
         env_ids = []
         for scene_type, object_counts in scene_configs:
             for num_objects in object_counts:
-                env_ids.append(
-                    f"prbench/TidyBot3D-{scene_type}-o{num_objects}-v0"
-                )
+                env_ids.append(f"prbench/TidyBot3D-{scene_type}-o{num_objects}-v0")
         return env_ids

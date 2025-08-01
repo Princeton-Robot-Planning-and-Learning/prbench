@@ -1,10 +1,21 @@
+"""Inverse kinematics solver for robotic arm control.
+
+This module provides an inverse kinematics solver that uses the MuJoCo physics
+engine to compute joint configurations that achieve desired end-effector poses.
+The solver implements a damped least squares approach with nullspace optimization
+to maintain joint limits and preferred configurations.
+
+References:
+- https://github.com/bulletphysics/bullet3/
+  blob/master/examples/ThirdPartyLibs/BussIK/Jacobian.cpp
+- https://github.com/kevinzakka/mjctrl/blob/main/diffik_nullspace.py
+- https://github.com/google-deepmind/dm_control/
+  blob/main/dm_control/utils/inverse_kinematics.py
+"""
+
+# pylint: disable=no-member
 # Author: Jimmy Wu
 # Date: October 2024
-#
-# References:
-# - https://github.com/bulletphysics/bullet3/blob/master/examples/ThirdPartyLibs/BussIK/Jacobian.cpp
-# - https://github.com/kevinzakka/mjctrl/blob/main/diffik_nullspace.py
-# - https://github.com/google-deepmind/dm_control/blob/main/dm_control/utils/inverse_kinematics.py
 
 import mujoco
 import numpy as np
@@ -14,6 +25,14 @@ MAX_ANGLE_CHANGE = np.deg2rad(45)
 
 
 class IKSolver:
+    """Inverse kinematics solver for robotic arm control.
+
+    This class provides methods to solve inverse kinematics problems
+    using MuJoCo physics engine. It implements a damped least squares
+    approach with nullspace optimization to maintain joint limits and
+    preferred configurations.
+    """
+
     def __init__(self, ee_offset=0.0):
         # Load arm without gripper
         self.model = mujoco.MjModel.from_xml_path(
@@ -45,6 +64,18 @@ class IKSolver:
         self.eye = np.eye(self.model.nv)
 
     def solve(self, pos, quat, curr_qpos, max_iters=20, err_thresh=1e-4):
+        """Solve inverse kinematics to achieve desired end-effector pose.
+
+        Args:
+            pos: Target position (x, y, z) in meters
+            quat: Target orientation as quaternion (x, y, z, w)
+            curr_qpos: Current joint positions
+            max_iters: Maximum number of iterations (default: 20)
+            err_thresh: Error threshold for convergence (default: 1e-4)
+
+        Returns:
+            Joint positions that achieve the target pose
+        """
         quat = quat[[3, 0, 1, 2]]  # (x, y, z, w) -> (w, x, y, z)
 
         # Set arm to initial joint configuration
@@ -94,7 +125,7 @@ class IKSolver:
 
 
 if __name__ == "__main__":
-    ik_solver = IKSolver()
+    ik_solver = IKSolver()  # type: ignore[no-untyped-call]
     home_pos, home_quat = np.array([0.456, 0.0, 0.434]), np.array([0.5, 0.5, 0.5, 0.5])
     retract_qpos = np.deg2rad([0, -20, 180, -146, 0, -50, 90])
 
@@ -102,9 +133,14 @@ if __name__ == "__main__":
 
     start_time = time.time()
     for _ in range(1000):
-        qpos = ik_solver.solve(home_pos, home_quat, retract_qpos)
+        qpos = ik_solver.solve(  # type: ignore[no-untyped-call]
+            home_pos, home_quat, retract_qpos
+        )
     elapsed_time = time.time() - start_time
     print(f"Time per call: {elapsed_time:.3f} ms")  # 0.59 ms
 
     # Home: 0, 15, 180, -130, 0, 55, 90
-    print(np.rad2deg(ik_solver.solve(home_pos, home_quat, retract_qpos)).round())
+    result = ik_solver.solve(  # type: ignore[no-untyped-call]
+        home_pos, home_quat, retract_qpos
+    )
+    print(np.rad2deg(result).round())
