@@ -435,14 +435,17 @@ class MujocoSim:
             if re.match(r"cube\d+", body_name):
                 self.object_names.append(body_name)
 
-        # Sort by name to ensure consistent ordering
         self.object_names.sort()
         self.num_objects = len(self.object_names)
 
         print(f"Detected {self.num_objects} objects: {self.object_names}")
 
-    def reset(self):
+    def reset(self, seed=None):
         """Reset the simulation and randomize object positions."""
+        # Set the random seed if provided
+        if seed is not None:
+            np.random.seed(seed)
+
         # Reset simulation
         mujoco.mj_resetData(self.model, self.data)
 
@@ -450,19 +453,21 @@ class MujocoSim:
         for _, (object_name, cube_qpos) in enumerate(
             zip(self.object_names, self.qpos_objects)
         ):
+
             # Randomize position within a reasonable range around the table
             if not self.cupboard_scene and not self.cabinet_scene:
                 if not self.table_scene:
-                    cube_qpos[:2] += np.random.uniform(-0.3, 0.3, 2)  # X and Y position
+                    random_offset = np.random.uniform(-0.3, 0.3, 2)
+                    cube_qpos[:2] += random_offset  # X and Y position
                 else:
-                    cube_qpos[:2] += np.random.uniform(
-                        -0.05, 0.05, 2
-                    )  # X and Y position
+                    random_offset = np.random.uniform(-0.05, 0.05, 2)
+                    cube_qpos[:2] += random_offset  # X and Y position
             # Keep Z position at table height (don't randomize vertical position)
 
             # Randomize orientation around Z-axis (yaw)
             theta = np.random.uniform(-math.pi, math.pi)
-            cube_qpos[3:7] = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
+            cube_quat = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
+            cube_qpos[3:7] = cube_quat
 
             print(
                 f"{object_name} reset to position: "
@@ -480,8 +485,18 @@ class MujocoSim:
         """Process control commands and update simulation state."""
         # Check for new command
         command = None if self.command_queue.empty() else self.command_queue.get()
-        if command == "reset":
-            self.reset()
+
+        # Handle different command types
+        if command is not None:
+            if isinstance(command, dict) and command.get("action") == "reset":
+                # Handle reset command with seed
+                seed = command.get("seed")
+                self.reset(seed=seed)
+                command = None  # Clear command after processing reset
+            elif command == "reset":
+                # Handle legacy reset command
+                self.reset()
+                command = None  # Clear command after processing reset
 
         # Control callbacks
         self.base_controller.control_callback(command)
@@ -693,10 +708,12 @@ class MujocoEnv:
                 cv.moveWindow(shm_image.camera_name, 640 * i, -100)
             cv.waitKey(1)
 
-    def reset(self):
+    def reset(self, seed: int | None = None) -> None:
         """Reset the environment and wait for initialization."""
         self.shm_state.initialized[:] = 0.0
-        self.command_queue.put("reset")
+        # Pass seed along with reset command
+        reset_command = {"action": "reset", "seed": seed}
+        self.command_queue.put(reset_command)
 
         # Wait for state publishing to initialize
         while self.shm_state.initialized == 0.0:

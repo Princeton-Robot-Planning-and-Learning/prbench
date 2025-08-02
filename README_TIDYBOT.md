@@ -43,18 +43,29 @@ prbench.register_all_environments()
 
 # Create a TidyBot environment (no policy_type)
 env = prbench.make(
-    "prbench/TidyBot3D-table-o3-v0",
+    "prbench/TidyBot3D-table-o5-v0",
     show_viewer=True,
     show_images=True
     )
 
 # Standard Gymnasium interface
-obs, info = env.reset()
+obs, info = env.reset(seed=123)
 action = env.action_space.sample()
 obs, reward, terminated, truncated, info = env.step(action)
 img = env.render()
 env.close()
 ```
+
+check_env 
+
+'''
+import gymnasium
+from gymnasium.utils.env_checker import check_env
+import prbench
+prbench.register_all_environments()
+env = prbench.make("prbench/TidyBot3D-cabinet-o3-v0",render_mode="rgb_array")
+check_env(env.unwrapped)
+'''
 
 ### Environment Naming Convention
 

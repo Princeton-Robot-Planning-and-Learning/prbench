@@ -1,7 +1,6 @@
 """TidyBot 3D environment wrapper for PRBench."""
 
 import os
-import random
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Tuple
 
@@ -111,12 +110,12 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 for i in range(self.num_objects):
                     name = f"cube{i+1}"
                     if self.scene_type == "ground":
-                        x = round(random.uniform(0.4, 0.8), 3)
-                        y = round(random.uniform(-0.3, 0.3), 3)
+                        x = round(np.random.uniform(0.4, 0.8), 3)
+                        y = round(np.random.uniform(-0.3, 0.3), 3)
                         z = 0.02
                         pos = f"{x} {y} {z}"
                     elif self.scene_type == "table":
-                        x = 0.5 - 0.05 * i
+                        x = 0.6 - 0.05 * i
                         y = 0.1 * ((i % 3) - 1)
                         z = 0.44
                         pos = f"{x} {y} {z}"
@@ -234,8 +233,14 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def reset(self, *args, **kwargs) -> Tuple[NDArray[np.float32], dict]:
         """Reset the environment."""
+        # Capture seed from kwargs if provided
+        seed = kwargs.get("seed", None)
+
         super().reset(*args, **kwargs)
-        self._tidybot_env.reset()  # type: ignore[no-untyped-call]
+
+        # Pass the seed to the TidyBot environment
+        self._tidybot_env.reset(seed=seed)
+
         # Remove policy reset
         self._reward_calculator = create_reward_calculator(
             self.scene_type, self.num_objects

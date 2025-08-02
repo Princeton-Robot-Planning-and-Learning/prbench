@@ -33,7 +33,7 @@ class IKSolver:
     preferred configurations.
     """
 
-    def __init__(self, ee_offset=0.0):
+    def __init__(self, ee_offset: float = 0.0) -> None:
         # Load arm without gripper
         self.model = mujoco.MjModel.from_xml_path(
             "/home/yixuan/prbench_dir/tidybot_planner/models/kinova_gen3/gen3.xml"
@@ -63,7 +63,14 @@ class IKSolver:
         self.damping = DAMPING_COEFF * np.eye(6)
         self.eye = np.eye(self.model.nv)
 
-    def solve(self, pos, quat, curr_qpos, max_iters=20, err_thresh=1e-4):
+    def solve(
+        self,
+        pos: np.ndarray,
+        quat: np.ndarray,
+        curr_qpos: np.ndarray,
+        max_iters: int = 20,
+        err_thresh: float = 1e-4,
+    ) -> np.ndarray:
         """Solve inverse kinematics to achieve desired end-effector pose.
 
         Args:
@@ -122,25 +129,3 @@ class IKSolver:
             mujoco.mj_integratePos(self.model, self.data.qpos, update, 1.0)
 
         return self.data.qpos.copy()
-
-
-if __name__ == "__main__":
-    ik_solver = IKSolver()  # type: ignore[no-untyped-call]
-    home_pos, home_quat = np.array([0.456, 0.0, 0.434]), np.array([0.5, 0.5, 0.5, 0.5])
-    retract_qpos = np.deg2rad([0, -20, 180, -146, 0, -50, 90])
-
-    import time
-
-    start_time = time.time()
-    for _ in range(1000):
-        qpos = ik_solver.solve(  # type: ignore[no-untyped-call]
-            home_pos, home_quat, retract_qpos
-        )
-    elapsed_time = time.time() - start_time
-    print(f"Time per call: {elapsed_time:.3f} ms")  # 0.59 ms
-
-    # Home: 0, 15, 180, -130, 0, 55, 90
-    result = ik_solver.solve(  # type: ignore[no-untyped-call]
-        home_pos, home_quat, retract_qpos
-    )
-    print(np.rad2deg(result).round())

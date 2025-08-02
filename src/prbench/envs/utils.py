@@ -1,9 +1,25 @@
+"""Utility functions for process management in PRBench environments.
+
+This module provides helpers for creating and cleaning up PID files to
+ensure that only one instance of a process is running at a time.
+"""
+
 import atexit
 import os
 from pathlib import Path
 
 
 def create_pid_file(name):
+    """Create a PID file in /tmp to prevent multiple instances of the same
+    process.
+
+    If a PID file already exists and the process is still running, raises an Exception.
+    If the PID file is stale, it is removed. The PID file is automatically cleaned up
+    on process exit.
+
+    Args:
+        name (str): Name of the process (used for the PID file name).
+    """
     # Check if PID file already exists
     pid_file_path = Path(f"/tmp/{name}.pid")
     if pid_file_path.exists():
@@ -34,6 +50,11 @@ def create_pid_file(name):
 
 
 def remove_pid_file(pid_file_path):
+    """Remove the PID file if it corresponds to the current process.
+
+    Args:
+        pid_file_path (Path): Path to the PID file to remove.
+    """
     # Remove PID file if it corresponds to the current process
     if pid_file_path.exists():
         with open(pid_file_path, "r", encoding="utf-8") as f:

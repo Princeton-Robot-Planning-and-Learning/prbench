@@ -66,6 +66,7 @@ def register_all_environments() -> None:
             register(
                 id=f"prbench/TidyBot3D-{scene_type}-o{num_objects}-v0",
                 entry_point="prbench.envs.tidybot3d:TidyBot3DEnv",
+                nondeterministic=True,
                 kwargs={
                     "scene_type": scene_type,
                     "num_objects": num_objects,
