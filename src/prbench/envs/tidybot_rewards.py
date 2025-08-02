@@ -32,7 +32,8 @@ class TidyBotRewardCalculator:
 
         Override in subclasses.
         """
-        return 0.0
+        _ = obs  # Unused in base class, overridden in subclasses
+        return 0
 
     def is_terminated(self, obs: Dict[str, Any]) -> bool:
         """Check if episode should terminate."""
@@ -43,6 +44,7 @@ class TidyBotRewardCalculator:
 
         Override in subclasses.
         """
+        _ = obs  # Unused in base class, overridden in subclasses
         return False
 
 
@@ -258,16 +260,15 @@ class MotionPlanningReward(TidyBotRewardCalculator):
         """Get target locations based on scene type."""
         if self.scene_type == "table":
             return [np.array([0.6, 0.4, 0.1]) for _ in range(self.num_objects)]
-        elif self.scene_type == "cupboard":
+        if self.scene_type == "cupboard":
             return [
                 np.array([0.8, 0.08, 0.38]),  # Center position
                 np.array([0.8, -0.08, 0.38]),  # Left position
                 np.array([0.73, 0, 0.38]),  # Right position
             ][: self.num_objects]
-        elif self.scene_type == "cabinet":
+        if self.scene_type == "cabinet":
             return [np.array([0.1, 0.0, 0.25]) for _ in range(self.num_objects)]
-        else:
-            return [np.array([0.5, 0.0, 0.2]) for _ in range(self.num_objects)]
+        return [np.array([0.5, 0.0, 0.2]) for _ in range(self.num_objects)]
 
     def _calculate_task_reward(self, obs: Dict[str, Any]) -> float:
         reward = 0.0
@@ -305,12 +306,11 @@ def create_reward_calculator(
     """Factory function to create appropriate reward calculator."""
     if scene_type == "table":
         return TableStackingReward(num_objects)
-    elif scene_type == "drawer":
+    if scene_type == "drawer":
         return DrawerReward(num_objects)
-    elif scene_type == "cupboard":
+    if scene_type == "cupboard":
         return CupboardReward(num_objects)
-    elif scene_type == "cabinet":
+    if scene_type == "cabinet":
         return CabinetReward(num_objects)
-    else:
-        # Default to motion planning reward
-        return MotionPlanningReward(scene_type, num_objects)
+    # Default to motion planning reward
+    return MotionPlanningReward(scene_type, num_objects)

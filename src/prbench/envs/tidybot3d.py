@@ -9,10 +9,12 @@ import gymnasium
 import numpy as np
 from gymnasium import spaces
 from numpy.typing import NDArray
+
 from prbench.envs.tidybot_rewards import create_reward_calculator
 
 # Import TidyBot components from local files
 from .mujoco_env import MujocoEnv
+
 
 class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     """TidyBot 3D environment with mobile manipulation tasks.
