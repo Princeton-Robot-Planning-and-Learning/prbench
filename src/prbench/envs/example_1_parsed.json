@@ -1,0 +1,118 @@
+{
+    "problem_name": "mimiclabs_lab2_tabletop_manipulation",
+    "fixtures": {
+        "table": [
+            "table"
+        ],
+        "wooden_cabinet": [
+            "wooden_cabinet_1"
+        ]
+    },
+    "regions": {
+        "table_wooden_cabinet_init_region": {
+            "target": "table",
+            "ranges": [
+                [
+                    -0.01,
+                    0.39,
+                    0.01,
+                    0.41
+                ]
+            ],
+            "extra": [],
+            "yaw_rotation": [
+                0.0,
+                0.0
+            ],
+            "rgba": [
+                0,
+                0,
+                1,
+                0
+            ]
+        },
+        "wooden_cabinet_1_top_region": {
+            "target": "wooden_cabinet_1",
+            "ranges": [],
+            "extra": [],
+            "yaw_rotation": [
+                0,
+                0
+            ],
+            "rgba": [
+                0,
+                0,
+                1,
+                0
+            ]
+        },
+        "table_object_init_region": {
+            "target": "table",
+            "ranges": [
+                [
+                    -0.2,
+                    -0.1,
+                    0.0,
+                    0.1
+                ]
+            ],
+            "extra": [],
+            "yaw_rotation": [
+                0.0,
+                0.0
+            ],
+            "rgba": [
+                0,
+                0,
+                1,
+                0
+            ]
+        }
+    },
+    "objects": {
+        "white_bowl": [
+            "object_1"
+        ]
+    },
+    "scene_properties": {},
+    "initial_state": [
+        [
+            "on",
+            "object_1",
+            "table_object_init_region"
+        ],
+        [
+            "on",
+            "wooden_cabinet_1",
+            "table_wooden_cabinet_init_region"
+        ],
+        [
+            "open",
+            "wooden_cabinet_1_top_region"
+        ]
+    ],
+    "goal_state": [
+        "and",
+        [
+            "in",
+            "object_1",
+            "wooden_cabinet_1_top_region"
+        ]
+    ],
+    "language_instruction": [
+        "put",
+        "the",
+        "bowl",
+        "in",
+        "the",
+        "top",
+        "drawer",
+        "of",
+        "the",
+        "cabinet"
+    ],
+    "obj_of_interest": [
+        "object_1",
+        "wooden_cabinet_1"
+    ]
+}

@@ -1,0 +1,69 @@
+(define (problem MimicLabs_Lab2_Tabletop_Manipulation)
+  (:domain prbench)
+  (:language put the bowl in the top drawer of the cabinet)
+    (:regions
+      (wooden_cabinet_init_region
+          (:target table)
+          (:ranges (
+              (-0.01 0.39 0.01 0.41)
+            )
+          )
+          (:yaw_rotation (
+              (0.0 0.0)
+            )
+          )
+      )
+      (top_region
+          (:target wooden_cabinet_1)
+      )
+      (object_init_region
+          (:target table)
+          (:ranges (
+              (-0.2 -0.1 0 0.1)
+            )
+          )
+          (:yaw_rotation (
+              (0.0 0.0)
+            )
+          )
+      )
+    )
+
+  (:camera
+    (:ranges (
+        (1.2 0.78539816339 -0.26179938779 1.4 1.0471975512 0.26179938779)
+      )
+    )
+    (:jitter_mode normal)
+  )
+
+  (:fixtures
+    table - table
+    wooden_cabinet_1 - wooden_cabinet
+  )
+
+  (:objects
+    object_1 - white_bowl
+  )
+
+  (:obj_of_interest
+    object_1
+    wooden_cabinet_1
+  )
+
+  (:init
+    (On object_1 table_object_init_region)
+    (On wooden_cabinet_1 table_wooden_cabinet_init_region)
+    (Open wooden_cabinet_1_top_region)
+  )
+
+  (:goal
+    (In object_1 wooden_cabinet_1_top_region)
+  )
+
+  (:demonstration
+    (Grasp object_1)
+    (In object_1 wooden_cabinet_1_top_region)
+  )
+
+)

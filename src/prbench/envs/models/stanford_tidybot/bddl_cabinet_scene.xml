@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco model="bddl_cabinet_scene">
+    <include file="tidybot.xml"/>
+    <compiler angle="radian"/>
+    <size njmax="500" nconmax="100" />
+    
+    <statistic center="0.25 0 0.6" extent="1.0" meansize="0.05"/>
+    
+    <visual>
+        <quality offsamples="0"/>
+        <headlight diffuse="0.6 0.6 0.6" ambient="0.1 0.1 0.1" specular="0 0 0"/>
+        <rgba haze="0.15 0.25 0.35 1"/>
+        <global azimuth="120" elevation="-20"/>
+    </visual>
+    
+    <asset>
+        <!-- Skybox and ground -->
+        <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+        <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
+          markrgb="0.8 0.8 0.8" width="300" height="300"/>
+        <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+        
+        <!-- Table -->
+        <texture name="tex-table" file="../libero_assets/textures/wood.png" type="2d"/>
+        <material name="table_mat" reflectance="0.3" texrepeat="1 1" texture="tex-table"/>
+       
+       <!-- Cabinet assets -->
+       <texture file="../libero_assets/articulated_objects/wooden_cabinet/dark_fine_wood.png" name="tex-wooden_cabinet" type="2d"/>
+       <material name="wooden_cabinet_top" reflectance="0.5" texrepeat="1 1" texture="tex-wooden_cabinet" texuniform="false"/>      
+       <mesh file="../libero_assets/articulated_objects/wooden_cabinet/wooden_cabinet_top/visual/wooden_cabinet_top_vis.msh" name="wooden_cabinet_top_vis" scale="0.05 0.05 0.05"/>
+       <texture file="../libero_assets/articulated_objects/wooden_cabinet/dark_fine_wood.png" name="tex-wooden_cabinet_base" type="2d"/>
+       <material name="wooden_cabinet_base" reflectance="0.5" texrepeat="1 1" texture="tex-wooden_cabinet_base" texuniform="false"/>
+       <mesh file="../libero_assets/articulated_objects/wooden_cabinet/wooden_cabinet_base/visual/wooden_cabinet_base_vis.msh" name="wooden_cabinet_base_vis" scale="0.05 0.05 0.05"/>
+       <texture file="../libero_assets/articulated_objects/wooden_cabinet/metal.png" name="tex-wooden_cabinet_handle" type="2d"/>
+       <material name="wooden_cabinet_top_handle" reflectance="0.5" texrepeat="1 1" texture="tex-wooden_cabinet_handle" texuniform="false"/>
+       <mesh file="../libero_assets/articulated_objects/wooden_cabinet/wooden_cabinet_top_handle/visual/wooden_cabinet_top_handle_vis.msh" name="wooden_cabinet_top_handle_vis" scale="0.05 0.05 0.05"/>
+       
+       <!-- Bowl assets -->
+       <texture file="../libero_assets/stable_scanned_objects/white_bowl/texture.png" name="tex-bowl" type="2d" />
+       <material name="bowl_mat" reflectance="0.5" texrepeat="1 1" texture="tex-bowl" texuniform="false" />
+       <mesh file="../libero_assets/stable_scanned_objects/white_bowl/visual/model_vis.msh" name="bowl_vis" scale="0.5 0.5 0.5" />
+   </asset>
+
+    <worldbody>
+        <!-- Lighting and ground -->
+        <light pos="0 0 1.5" directional="true"/>
+        <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+       
+       <!-- Table (based on BDDL regions) -->
+       <body name="table" pos="0.2 0.0 0.4">
+           <geom name="table_top" type="box" size="0.4 0.3 0.02" rgba="0.8 0.6 0.4 1" material="table_mat"/>
+           <geom name="table_leg1" type="box" pos="0.35 0.25 -0.2" size="0.02 0.02 0.2" rgba="0.8 0.6 0.4 1"/>
+           <geom name="table_leg2" type="box" pos="0.35 -0.25 -0.2" size="0.02 0.02 0.2" rgba="0.8 0.6 0.4 1"/>
+           <geom name="table_leg3" type="box" pos="-0.35 0.25 -0.2" size="0.02 0.02 0.2" rgba="0.8 0.6 0.4 1"/>
+           <geom name="table_leg4" type="box" pos="-0.35 -0.25 -0.2" size="0.02 0.02 0.2" rgba="0.8 0.6 0.4 1"/>
+       </body>
+       
+       <!-- Wooden Cabinet (positioned based on BDDL wooden_cabinet_init_region) -->
+       <body name="wooden_cabinet_1" pos="0.4 0.0 0.0">
+           <body name="cabinet_base" pos="0 0 0.0">
+               <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" 
+                     type="mesh" mesh="wooden_cabinet_base_vis" conaffinity="0" contype="0" group="1" 
+                     material="wooden_cabinet_base"/>
+               <!-- Simplified collision geometry for cabinet base -->
+               <geom type="box" pos="0.0 0.0 0.11" size="0.12 0.09 0.11" rgba="0.8 0.8 0.8 0.3"/>
+               
+               <!-- Top drawer (openable) -->
+               <body name="cabinet_top" pos="0 0.0 0">
+                   <inertial pos="0 0 0" mass="3" diaginertia="1 1 1" />
+                   <joint name="top_level" type="slide" pos="0 0 0" axis="0 1 0"
+                          limited="true" range="-0.16 0.01" damping="50"/>
+                   
+                   <!-- Top region site for goal detection -->
+                   <site type="box" pos="0.00328 0.01128 0.18563"
+                         quat="0.70711 0.00000 0.70711 0.00000"
+                         size="0.02993 0.07561 0.10224" group="0"
+                         rgba="0.8 0.8 0.8 0" name="top_region"/>
+                   
+                   <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" 
+                         type="mesh" mesh="wooden_cabinet_top_vis" conaffinity="0" contype="0" group="1" 
+                         material="wooden_cabinet_top"/>
+                   <!-- Simplified collision for drawer -->
+                   <geom type="box" pos="0.0 -0.07 0.18" size="0.11 0.03 0.10" rgba="0.8 0.8 0.8 0.3"/>
+               </body>
+           </body>
+       </body>
+       
+       <!-- White Bowl (object_1, initially on table in object_init_region) -->
+       <body name="object_1" pos="0.1 0.05 0.44">
+           <freejoint/>
+           <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" 
+                 type="mesh" mesh="bowl_vis" conaffinity="0" contype="0" group="1" material="bowl_mat"/>
+           <!-- Simplified collision for bowl -->
+           <!-- <geom type="sphere" radius="0.03" rgba="0.8 0.8 0.8 0.3"/> -->
+           
+           <site rgba="0 0 0 0" size="0.005" pos="0 0 -0.03" name="bowl_bottom_site" />
+           <site rgba="0 0 0 0" size="0.005" pos="0 0 0.02" name="bowl_top_site" />
+       </body>
+   </worldbody>
+</mujoco>

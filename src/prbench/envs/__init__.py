@@ -1,12 +1,6 @@
 """PRBench environments package."""
 
-from . import constants, ik_solver, mujoco_env, tidybot3d, tidybot_rewards, utils
+from .bddl_cabinet_env import BDDLCabinetEnv
+from .tidybot3d import TidyBot3DEnv
 
-__all__ = [
-    "tidybot3d",
-    "tidybot_rewards",
-    "mujoco_env",
-    "ik_solver",
-    "utils",
-    "constants",
-]
+__all__ = ["BDDLCabinetEnv", "TidyBot3DEnv"]
