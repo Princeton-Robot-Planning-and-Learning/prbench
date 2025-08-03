@@ -1,8 +1,6 @@
 """Unit tests for the TidyBot3D environment and its inverse kinematics solver.
 
 This module tests:
-- The validity of the observation space
-- The validity of the action space
 - The basic functionality of the IKSolver
 - The performance and accuracy of the IKSolver for a known pose
 """

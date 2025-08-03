@@ -17,6 +17,8 @@ References:
 # Author: Jimmy Wu
 # Date: October 2024
 
+import os
+
 import mujoco
 import numpy as np
 
@@ -35,9 +37,10 @@ class IKSolver:
 
     def __init__(self, ee_offset: float = 0.0) -> None:
         # Load arm without gripper
-        self.model = mujoco.MjModel.from_xml_path(
-            "/home/yixuan/prbench_dir/tidybot_planner/models/kinova_gen3/gen3.xml"
+        model_path = os.path.join(
+            os.path.dirname(__file__), "models", "kinova_gen3", "gen3.xml"
         )
+        self.model = mujoco.MjModel.from_xml_path(model_path)
         self.data = mujoco.MjData(self.model)
         self.model.body_gravcomp[:] = 1.0
 
