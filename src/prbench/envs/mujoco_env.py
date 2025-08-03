@@ -7,17 +7,8 @@ for state management, image handling, rendering, and various controllers
 for base and arm control.
 """
 
-# pylint: disable=no-member
-# pylint: disable=no-name-in-module
-# Author: Jimmy Wu
-# Date: October 2024
-#
-# Note: This is a basic simulation environment for sanity checking the
-# real-world pipeline for teleop and imitation learning. Performance metrics,
-# reward signals, and termination signals are not implemented.
-#
-# This environment supports custom grasping policies from agent/mp_policy.py
-# Use --mp_policy, --custom_grasp, or --mp_policy_three flags in main.py
+import os
+import sys
 
 import math
 import multiprocessing as mp
@@ -35,6 +26,7 @@ from ruckig import InputParameter, OutputParameter, Result, Ruckig
 
 from .constants import POLICY_CONTROL_PERIOD
 from .ik_solver import IKSolver
+
 
 
 class ShmState:
@@ -443,13 +435,7 @@ class MujocoSim:
         ):
 
             # Randomize position within a reasonable range around the table
-            # if not self.cupboard_scene and not self.cabinet_scene:
-            #     if not self.table_scene:
-            #         random_offset = np.random.uniform(-0.3, 0.3, 2)
-            #         cube_qpos[:2] += random_offset  # X and Y position
-            #     else:
-            #         random_offset = np.random.uniform(-0.05, 0.05, 2)
-            #         cube_qpos[:2] += random_offset  # X and Y position
+            cube_qpos[:2] += np.random.uniform(-0.3, 0.3, 2)
             # Keep Z position at table height (don't randomize vertical position)
 
             # Randomize orientation around Z-axis (yaw)

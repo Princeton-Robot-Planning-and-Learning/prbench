@@ -186,6 +186,7 @@ def _main() -> None:
             regenerated_envs += 1
         else:
             print(f"  Skipping {env_id} (no changes detected)")
+        env.close()
 
     print("Finished generating environment docs.")
 

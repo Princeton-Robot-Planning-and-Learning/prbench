@@ -37,8 +37,8 @@ The TidyBot model files are automatically included in the PRBench installation. 
 
 ```python
 import os
-os.environ['MUJOCO_GL'] = 'egl'
-os.environ['PYOPENGL_PLATFORM'] = 'egl'
+os.environ['MUJOCO_GL'] = 'osmesa'
+os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
 import prbench
 
 # Register all environments (including TidyBot)
