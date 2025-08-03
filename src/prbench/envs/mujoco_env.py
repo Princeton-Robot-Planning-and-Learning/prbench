@@ -7,8 +7,8 @@ for state management, image handling, rendering, and various controllers
 for base and arm control.
 """
 
-import os
-import sys
+# pylint: disable=no-member
+# pylint: disable=no-name-in-module
 
 import math
 import multiprocessing as mp
@@ -26,7 +26,6 @@ from ruckig import InputParameter, OutputParameter, Result, Ruckig
 
 from .constants import POLICY_CONTROL_PERIOD
 from .ik_solver import IKSolver
-
 
 
 class ShmState:
@@ -82,7 +81,7 @@ class ShmState:
 
         self.initialized[:] = 0.0
 
-    def close(self):
+    def close(self) -> None:
         """Close the shared memory segment."""
         self.shm.close()
 
@@ -109,7 +108,7 @@ class ShmImage:
         self.data = np.ndarray(arr.shape, dtype=np.uint8, buffer=self.shm.buf)
         self.data.fill(0)
 
-    def close(self):
+    def close(self) -> None:
         """Close the shared memory segment."""
         self.shm.close()
 
@@ -172,7 +171,7 @@ class Renderer:
         mujoco.mjr_readPixels(self.image, None, self.rect, self.mjr_context)
         self.shm_image.data[:] = np.flipud(self.image)
 
-    def close(self):
+    def close(self) -> None:
         """Free OpenGL and MuJoCo rendering resources."""
         self.gl_context.free()
         self.gl_context = None
@@ -411,6 +410,13 @@ class MujocoSim:
         mujoco.set_mjcb_control(self.control_callback)
 
     def detect_objects(self):
+        """Detects all object bodies in the MuJoCo model whose names match the
+        pattern 'cube+'.
+
+        Populates self.object_names with the sorted list of detected
+        object names and sets self.num_objects accordingly. Prints the
+        number and names of detected objects for debugging purposes.
+        """
         self.body_names = {self.model.body(i).name for i in range(self.model.nbody)}
         self.object_names = []
         for body_name in self.body_names:
@@ -718,7 +724,7 @@ class MujocoEnv:
         # from using outdated data
         self.command_queue.put(action)
 
-    def close(self):
+    def close(self) -> None:
         """Close the environment and clean up shared memory resources."""
         self.shm_state.close()
         self.shm_state.shm.unlink()

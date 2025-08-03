@@ -25,7 +25,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def __init__(
         self,
-        scene_type: str = "ground",  
+        scene_type: str = "ground",
         num_objects: int = 3,
         render_mode: str | None = None,
         custom_grasp: bool = False,
@@ -79,8 +79,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         # Remove table, cabinet, and cupboard from scene_type options
         # Only keep 'ground' (if present)
-        if self.scene_type == "ground":
-            model_file = "scene.xml"
+        model_file = "scene.xml"
 
         # Construct absolute path to model file
         absolute_model_path = os.path.join(model_base_path, model_file)
@@ -248,7 +247,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             return np.zeros((480, 640, 3), dtype=np.uint8)
         return None
 
-    def close(self):
+    def close(self) -> None:
         """Close the environment."""
         self._tidybot_env.close()
 
