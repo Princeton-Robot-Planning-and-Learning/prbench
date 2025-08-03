@@ -36,6 +36,9 @@ The TidyBot model files are automatically included in the PRBench installation. 
 ### Basic Usage
 
 ```python
+import os
+os.environ['MUJOCO_GL'] = 'egl'
+os.environ['PYOPENGL_PLATFORM'] = 'egl'
 import prbench
 
 # Register all environments (including TidyBot)
@@ -44,8 +47,9 @@ prbench.register_all_environments()
 # Create a TidyBot environment (no policy_type)
 env = prbench.make(
     "prbench/TidyBot3D-ground-o5-v0",
-    show_viewer=True,
-    show_images=True
+    render_images=True,
+    show_viewer=False,
+    show_images=False
     )
 
 # Standard Gymnasium interface
@@ -54,9 +58,7 @@ action = env.action_space.sample()
 obs, reward, terminated, truncated, info = env.step(action)
 img = env.render()
 env.close()
-```
-
-check_env 
+``` 
 
 '''
 import gymnasium

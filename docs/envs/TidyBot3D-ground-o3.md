@@ -45,8 +45,10 @@ Currently returns a small negative reward (-0.01) per timestep to encourage expl
 
 
 ### References
-TidyBot++: An Open-Source Holonomic Mobile Manipulator for Robot Learning
-Jimmy Wu, William Chong, Robert Holmberg, Aaditya Prasad, Yihuai Gao, Oussama Khatib, Shuran Song, Szymon Rusinkiewicz, Jeannette Bohg
-Conference on Robot Learning (CoRL), 2024
+TidyBot++: An Open-Source Holonomic Mobile Manipulator
+- for Robot Learning
+- Jimmy Wu, William Chong, Robert Holmberg, Aaditya Prasad, Yihuai Gao, 
+  Oussama Khatib, Shuran Song, Szymon Rusinkiewicz, Jeannette Bohg
+- Conference on Robot Learning (CoRL), 2024
 
 https://github.com/tidybot2/tidybot2

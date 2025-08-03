@@ -29,6 +29,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         num_objects: int = 3,
         render_mode: str | None = None,
         custom_grasp: bool = False,
+        render_images: bool = True,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -37,9 +38,10 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.num_objects = num_objects
         self.render_mode = render_mode
         self.custom_grasp = custom_grasp
-        # Allow show_viewer/show_images to be set via kwargs
+        # Allow show_viewer/show_images/render_images to be set via kwargs or directly
         self.show_viewer = kwargs.pop("show_viewer", False)
         self.show_images = kwargs.pop("show_images", False)
+        self.render_images = kwargs.pop("render_images", render_images)
         # Store any other kwargs for future use
         self._extra_kwargs = kwargs
 
@@ -129,7 +131,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             dynamic_model_path = absolute_model_path
 
         kwargs = {
-            "render_images": True,
+            "render_images": self.render_images,
             "show_viewer": self.show_viewer,
             "show_images": self.show_images,
             "mjcf_path": dynamic_model_path,
