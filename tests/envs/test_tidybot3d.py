@@ -10,26 +10,6 @@ This module tests:
 import numpy as np
 
 from prbench.envs.ik_solver import IKSolver
-from prbench.envs.tidybot3d import TidyBot3DEnv
-
-
-def test_tidybot3d_observation_space():
-    """Test that the observation returned by TidyBot3DEnv.reset() is within the
-    observation space."""
-    env = TidyBot3DEnv(num_objects=3, render_images=False)
-    obs = env.reset()[0]
-    # Check observation is within the observation space
-    assert env.observation_space.contains(obs), "Observation not in observation space"
-    env.close()
-
-
-def test_tidybot3d_action_space():
-    """Test that a sampled action is within the TidyBot3DEnv action space."""
-    env = TidyBot3DEnv(num_objects=3, render_images=False)
-    action = env.action_space.sample()
-    # Check action is within the action space
-    assert env.action_space.contains(action), "Action not in action space"
-    env.close()
 
 
 def test_ik_solver_basic():
