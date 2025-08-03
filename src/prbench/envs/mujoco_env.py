@@ -345,17 +345,11 @@ class MujocoSim:
         command_queue,
         shm_state,
         show_viewer=True,
-        table_scene=False,
-        cupboard_scene=False,
-        cabinet_scene=False,
     ):
         self.model = mujoco.MjModel.from_xml_path(mjcf_path)
         self.data = mujoco.MjData(self.model)
         self.command_queue = command_queue
         self.show_viewer = show_viewer
-        self.table_scene = table_scene
-        self.cupboard_scene = cupboard_scene
-        self.cabinet_scene = cabinet_scene
 
         # Dynamically detect objects from the model
         self.detect_objects()
@@ -425,19 +419,13 @@ class MujocoSim:
         mujoco.set_mjcb_control(self.control_callback)
 
     def detect_objects(self):
-        """Dynamically detect objects from the MuJoCo model."""
         self.body_names = {self.model.body(i).name for i in range(self.model.nbody)}
-
-        # Find all objects that match the pattern 'cube' + number
-
         self.object_names = []
         for body_name in self.body_names:
             if re.match(r"cube\d+", body_name):
                 self.object_names.append(body_name)
-
         self.object_names.sort()
         self.num_objects = len(self.object_names)
-
         print(f"Detected {self.num_objects} objects: {self.object_names}")
 
     def reset(self, seed=None):
@@ -455,13 +443,13 @@ class MujocoSim:
         ):
 
             # Randomize position within a reasonable range around the table
-            if not self.cupboard_scene and not self.cabinet_scene:
-                if not self.table_scene:
-                    random_offset = np.random.uniform(-0.3, 0.3, 2)
-                    cube_qpos[:2] += random_offset  # X and Y position
-                else:
-                    random_offset = np.random.uniform(-0.05, 0.05, 2)
-                    cube_qpos[:2] += random_offset  # X and Y position
+            # if not self.cupboard_scene and not self.cabinet_scene:
+            #     if not self.table_scene:
+            #         random_offset = np.random.uniform(-0.3, 0.3, 2)
+            #         cube_qpos[:2] += random_offset  # X and Y position
+            #     else:
+            #         random_offset = np.random.uniform(-0.05, 0.05, 2)
+            #         cube_qpos[:2] += random_offset  # X and Y position
             # Keep Z position at table height (don't randomize vertical position)
 
             # Randomize orientation around Z-axis (yaw)
@@ -539,14 +527,14 @@ class MujocoSim:
             ]  # Next 4 elements are quaternion
 
         # Update handle positions if cabinet_scene
-        if self.cabinet_scene:
-            try:
-                left_id = self.model.site("leftdoor_site").id
-                right_id = self.model.site("rightdoor_site").id
-                self.shm_state.left_handle_pos[:] = self.data.site(left_id).xpos
-                self.shm_state.right_handle_pos[:] = self.data.site(right_id).xpos
-            except Exception as e:
-                print(f"Warning: Could not update handle positions: {e}")
+        # if self.cabinet_scene:
+        #     try:
+        #         left_id = self.model.site("leftdoor_site").id
+        #         right_id = self.model.site("rightdoor_site").id
+        #         self.shm_state.left_handle_pos[:] = self.data.site(left_id).xpos
+        #         self.shm_state.right_handle_pos[:] = self.data.site(right_id).xpos
+        #     except Exception as e:
+        #         print(f"Warning: Could not update handle positions: {e}")
 
         # Notify reset() function that state has been initialized
         self.shm_state.initialized[:] = 1.0
@@ -582,39 +570,16 @@ class MujocoEnv:
         render_images=True,
         show_viewer=True,
         show_images=False,
-        table_scene=False,
-        drawer_scene=False,
-        cupboard_scene=False,
-        cabinet_scene=False,
-        custom_grasp=False,
         mjcf_path=None,
     ):
         if mjcf_path is not None:
             self.mjcf_path = mjcf_path
-        elif drawer_scene:
-            self.mjcf_path = "models/stanford_tidybot/drawer_scene.xml"
-        elif table_scene:
-            self.mjcf_path = "models/stanford_tidybot/blocks_table_scene.xml"
-        elif cupboard_scene:
-            if custom_grasp:
-                self.mjcf_path = (
-                    "models/stanford_tidybot/cupboard_scene_objects_inside.xml"
-                )
-            else:
-                self.mjcf_path = "models/stanford_tidybot/cupboard_scene.xml"
-        elif cabinet_scene:
-            self.mjcf_path = "models/stanford_tidybot/cabinet.xml"
         else:
             self.mjcf_path = "models/stanford_tidybot/scene.xml"
         self.render_images = render_images
         self.show_viewer = show_viewer
         self.show_images = show_images
         self.command_queue = mp.Queue(1)
-        self.table_scene = table_scene
-        self.drawer_scene = drawer_scene
-        self.cupboard_scene = cupboard_scene
-        self.cabinet_scene = cabinet_scene
-        self.custom_grasp = custom_grasp
 
         # Detect objects from the model to determine shared memory size
         model = mujoco.MjModel.from_xml_path(self.mjcf_path)
@@ -655,9 +620,6 @@ class MujocoEnv:
                 self.command_queue,
                 self.shm_state,
                 show_viewer=self.show_viewer,
-                table_scene=self.table_scene,
-                cupboard_scene=self.cupboard_scene,
-                cabinet_scene=self.cabinet_scene,
             )
 
             # Start render loop
@@ -752,9 +714,9 @@ class MujocoEnv:
                 obs[f"{object_name}_pos"] = obj_pos
                 obs[f"{object_name}_quat"] = obj_quat_converted
 
-        if self.cabinet_scene:
-            obs["left_handle_pos"] = self.shm_state.left_handle_pos.copy()
-            obs["right_handle_pos"] = self.shm_state.right_handle_pos.copy()
+        # if self.cabinet_scene:
+        #     obs["left_handle_pos"] = self.shm_state.left_handle_pos.copy()
+        #     obs["right_handle_pos"] = self.shm_state.right_handle_pos.copy()
         if self.render_images:
             for shm_image in self.shm_images:
                 obs[f"{shm_image.camera_name}_image"] = shm_image.data.copy()

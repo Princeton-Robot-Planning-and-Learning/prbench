@@ -55,9 +55,6 @@ def register_all_environments() -> None:
 
     # TidyBot3D environments with different scenes and object counts (no policy_type)
     scene_configs = [
-        ("table", [3, 5, 7]),  # Table stacking with different object counts
-        ("cupboard", [8]),  # Cupboard organization with different object counts
-        ("cabinet", [3]),  # Cabinet manipulation with different object counts
         ("ground", [3, 5, 7]),  # Ground/scene.xml with different object counts
     ]
 

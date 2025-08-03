@@ -25,7 +25,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def __init__(
         self,
-        scene_type: str = "table",  # "table", "drawer", "cupboard", "cabinet"
+        scene_type: str = "ground",  
         num_objects: int = 3,
         render_mode: str | None = None,
         custom_grasp: bool = False,
@@ -75,26 +75,16 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             os.path.dirname(__file__), "models", "stanford_tidybot"
         )
 
-        # Determine the correct model file based on scene type
-        if self.scene_type == "table":
-            model_file = "blocks_table_scene.xml"
-        elif self.scene_type == "drawer":
-            model_file = "drawer_scene.xml"
-        elif self.scene_type == "cupboard":
-            if self.custom_grasp:
-                model_file = "cupboard_scene_objects_inside.xml"
-            else:
-                model_file = "cupboard_scene.xml"
-        elif self.scene_type == "cabinet":
-            model_file = "cabinet.xml"
-        else:
+        # Remove table, cabinet, and cupboard from scene_type options
+        # Only keep 'ground' (if present)
+        if self.scene_type == "ground":
             model_file = "scene.xml"
 
         # Construct absolute path to model file
         absolute_model_path = os.path.join(model_base_path, model_file)
 
         # --- Dynamic object insertion logic ---
-        needs_dynamic_objects = self.scene_type in ["ground", "table"]
+        needs_dynamic_objects = self.scene_type in ["ground"]
         if needs_dynamic_objects:
             tree = ET.parse(absolute_model_path)
             root = tree.getroot()
@@ -109,33 +99,11 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 # Insert new cubes
                 for i in range(self.num_objects):
                     name = f"cube{i+1}"
-                    if self.scene_type == "ground":
-                        x = round(np.random.uniform(0.4, 0.8), 3)
-                        y = round(np.random.uniform(-0.3, 0.3), 3)
-                        z = 0.02
-                        pos = f"{x} {y} {z}"
-                    elif self.scene_type == "table":
-                        x = 0.6 - 0.05 * i
-                        y = 0.1 * ((i % 3) - 1)
-                        z = 0.44
-                        pos = f"{x} {y} {z}"
-                    elif self.scene_type == "drawer":
-                        x = 0.7 - 0.05 * i
-                        y = -0.1 + 0.05 * (i % 3)
-                        z = 0.12
-                        pos = f"{x} {y} {z}"
-                    elif self.scene_type == "cupboard":
-                        x = 1.0
-                        y = -0.4 + 0.1 * (i % 3)
-                        z = 0.33
-                        pos = f"{x} {y} {z}"
-                    elif self.scene_type == "cabinet":
-                        x = 0.75
-                        y = -0.1 - 0.1 * (i % 3)
-                        z = 0.12
-                        pos = f"{x} {y} {z}"
-                    else:
-                        pos = "0.6 0 0.02"
+                    # Only support ground scene
+                    x = round(np.random.uniform(0.4, 0.8), 3)
+                    y = round(np.random.uniform(-0.3, 0.3), 3)
+                    z = 0.02
+                    pos = f"{x} {y} {z}"
                     body = ET.Element("body", name=name, pos=pos)
                     ET.SubElement(body, "freejoint")
                     ET.SubElement(
@@ -164,20 +132,10 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             "render_images": True,
             "show_viewer": self.show_viewer,
             "show_images": self.show_images,
-            "custom_grasp": self.custom_grasp,
             "mjcf_path": dynamic_model_path,
         }
         # Allow any extra kwargs to override
         kwargs.update(self._extra_kwargs)
-
-        if self.scene_type == "table":
-            kwargs["table_scene"] = True
-        elif self.scene_type == "drawer":
-            kwargs["drawer_scene"] = True
-        elif self.scene_type == "cupboard":
-            kwargs["cupboard_scene"] = True
-        elif self.scene_type == "cabinet":
-            kwargs["cabinet_scene"] = True
 
         return MujocoEnv(**kwargs)  # type: ignore
 
@@ -349,10 +307,7 @@ https://github.com/tidybot2/tidybot2
     def get_available_environments(cls) -> List[str]:
         """Get list of available TidyBot environment IDs (policy-agnostic)."""
         scene_configs = [
-            ("table", [3, 5, 7]),
-            ("drawer", [2, 4, 6]),
-            ("cupboard", [3, 5, 8]),
-            ("cabinet", [2, 4, 6]),
+            ("ground", [3, 5, 7]),
         ]
         env_ids = []
         for scene_type, object_counts in scene_configs:
