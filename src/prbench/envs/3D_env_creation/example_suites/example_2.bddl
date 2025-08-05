@@ -1,0 +1,80 @@
+(define (problem MimicLabs_Lab2_Tabletop_Manipulation)
+  (:domain prbench)
+  (:language put one bowl on top of the ketchup)
+    (:regions
+      (object_1_init_region
+          (:target table)
+          (:ranges (
+              (-0.6 -0.1 -0.2 0)
+            )
+          )
+          (:yaw_rotation (
+              (0.0 0.0)
+            )
+          )
+      )
+      (object_2_init_region
+          (:target table)
+          (:ranges (
+              (0 -0.2 0.3 -0.1)
+            )
+          )
+          (:yaw_rotation (
+              (0.0 0.0)
+            )
+          )
+      )
+      (object_3_init_region
+          (:target table)
+          (:ranges (
+              (0.4 0 0.6 0.1)
+            )
+          )
+          (:yaw_rotation (
+              (0.0 0.0)
+            )
+          )
+      )
+    )
+
+  (:camera
+    (:ranges (
+        (1.2 0.78539816339 -0.26179938779 1.4 1.0471975512 0.26179938779)
+      )
+    )
+    (:jitter_mode normal)
+  )
+
+  (:fixtures
+    table - table
+  )
+
+  (:objects
+    object_1 object_2 - white_bowl
+    object_3 object_4 - ketchup
+  )
+
+  (:obj_of_interest
+    object_1
+    object_2
+    object_3
+    object_4
+  )
+
+  (:init
+    (On object_1 table_object_1_init_region)
+    (On object_2 table_object_2_init_region)
+    (On object_3 table_object_3_init_region)
+    (On object_4 table_object_3_init_region)
+  )
+
+  (:goal
+    (On object_1 ketchup)
+  )
+
+  (:demonstration
+    (Grasp object_1)
+    (On object_1 ketchup)
+  )
+
+)
