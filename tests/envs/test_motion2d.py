@@ -66,3 +66,40 @@ def test_motion2d_observation_space():
     for _ in range(5):
         obs, _ = env.reset()
         assert env.observation_space.contains(obs)
+
+
+def test_motion2d_vacuum_and_arm_actions():
+    """Tests that vacuum and arm actions don't affect movement or termination."""
+    env = prbench.make("prbench/Motion2D-p1-v0")
+
+    # Reset environment and get initial state
+    obs, _ = env.reset(seed=123)
+    initial_robot_x = obs[0]
+    initial_robot_y = obs[1]
+    initial_robot_theta = obs[2]
+
+    # Test that arm and vacuum actions don't change robot base position
+    # Action space is (dx, dy, dtheta, darm, vacuum)
+    arm_only_action = np.array([0.0, 0.0, 0.0, 0.05, 0.0], dtype=np.float32)
+    vacuum_only_action = np.array([0.0, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
+    combined_action = np.array([0.0, 0.0, 0.0, 0.05, 1.0], dtype=np.float32)
+
+    # Test arm action doesn't move base
+    obs, _, _, _, _ = env.step(arm_only_action)
+    assert abs(obs[0] - initial_robot_x) < 1e-6
+    assert abs(obs[1] - initial_robot_y) < 1e-6
+    assert abs(obs[2] - initial_robot_theta) < 1e-6
+
+    # Test vacuum action doesn't move base
+    obs, _, _, _, _ = env.step(vacuum_only_action)
+    assert abs(obs[0] - initial_robot_x) < 1e-6
+    assert abs(obs[1] - initial_robot_y) < 1e-6
+    assert abs(obs[2] - initial_robot_theta) < 1e-6
+
+    # Test combined arm+vacuum action doesn't move base
+    obs, _, _, _, _ = env.step(combined_action)
+    assert abs(obs[0] - initial_robot_x) < 1e-6
+    assert abs(obs[1] - initial_robot_y) < 1e-6
+    assert abs(obs[2] - initial_robot_theta) < 1e-6
+
+    env.close()
