@@ -53,6 +53,7 @@ def test_stickbutton2d_action_space():
         assert isinstance(info, dict)
     env.close()
 
+
 def test_stickbutton2d_termination():
     """Tests that the environment terminates when all buttons are pressed."""
 
