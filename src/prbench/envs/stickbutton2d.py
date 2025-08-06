@@ -129,10 +129,14 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
             "render_modes": ["rgb_array"],
             "render_fps": self._spec.render_fps,
         }
+        initial_state_dict = self._create_constant_initial_state_dict()
+        self._initial_constant_state = create_state_from_dict(
+            initial_state_dict, Geom2DRobotEnvTypeFeatures
+        )
 
     def _sample_initial_state(self) -> ObjectCentricState:
-        initial_state_dict = self._create_constant_initial_state_dict()
         # Sample initial robot pose.
+        assert self._initial_constant_state is not None
         robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
         # Sample stick pose.
         for _ in range(self._spec.max_init_sampling_attempts):
@@ -140,14 +144,15 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
                 self._spec.stick_init_pose_bounds, self.np_random
             )
             state = self._create_initial_state(
-                initial_state_dict,
                 robot_pose,
                 stick_pose=stick_pose,
                 button_positions=[],
             )
             obj_name_to_obj = {o.name: o for o in state}
             stick = obj_name_to_obj["stick"]
-            if not state_has_collision(state, {stick}, set(state), {}):
+            full_state = state.copy()
+            full_state.data.update(self._initial_constant_state.data)
+            if not state_has_collision(full_state, {stick}, set(full_state), {}):
                 break
         else:
             raise RuntimeError("Failed to sample target pose.")
@@ -162,7 +167,6 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
                 )
                 new_button_positions = button_positions + [button_position]
                 state = self._create_initial_state(
-                    initial_state_dict,
                     robot_pose,
                     stick_pose=stick_pose,
                     button_positions=new_button_positions,
@@ -170,13 +174,16 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
                 )
                 obj_name_to_obj = {o.name: o for o in state}
                 new_button = obj_name_to_obj[f"button{len(button_positions)}"]
-                if not state_has_collision(state, {new_button}, set(state), {}):
+                full_state = state.copy()
+                full_state.data.update(self._initial_constant_state.data)
+                if not state_has_collision(
+                    full_state, {new_button}, set(full_state), {}
+                ):
                     button_positions.append(button_position)
                     break
 
         # Recreate state now with no-collision buttons.
         state = self._create_initial_state(
-            initial_state_dict,
             robot_pose,
             stick_pose=stick_pose,
             button_positions=button_positions,
@@ -222,7 +229,6 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
 
     def _create_initial_state(
         self,
-        constant_initial_state_dict: dict[Object, dict[str, float]],
         robot_pose: SE2Pose,
         stick_pose: SE2Pose,
         button_positions: list[tuple[float, float]],
@@ -231,7 +237,8 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
 
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
-        init_state_dict = constant_initial_state_dict.copy()
+        assert self._initial_constant_state is not None
+        init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.
         robot = Object("robot", CRVRobotType)
@@ -295,13 +302,16 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         # color to pressed.
         super().step(action)
         assert self._current_state is not None
+        assert self._initial_constant_state is not None
         newly_pressed_buttons: set[Object] = set()
         obj_name_to_obj = {o.name: o for o in self._current_state}
         robot = obj_name_to_obj["robot"]
         stick = obj_name_to_obj["stick"]
+        full_state = self._current_state.copy()
+        full_state.data.update(self._initial_constant_state.data)
         for button in self._current_state.get_objects(CircleType):
             if state_has_collision(
-                self._current_state,
+                full_state,
                 {button},
                 {robot, stick},
                 self._static_object_body_cache,
