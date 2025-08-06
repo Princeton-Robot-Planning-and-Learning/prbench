@@ -628,6 +628,7 @@ class MujocoEnv:
 
             # Start render loop
             if self.render_images:
+                print("Starting thread with render loop", flush=True)
                 Thread(
                     target=self.render_loop, args=(sim.model, sim.data), daemon=True
                 ).start()
@@ -648,6 +649,7 @@ class MujocoEnv:
 
         # Render camera images continuously
         while True:
+            print("In rendering loop", flush=True)
             start_time = time.time()
             for renderer in renderers:
                 renderer.render()
