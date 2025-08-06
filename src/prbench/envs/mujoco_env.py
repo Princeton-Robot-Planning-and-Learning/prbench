@@ -645,7 +645,12 @@ class MujocoEnv:
     def render_loop(self, model, data):
         """Run the rendering loop for camera images in a separate process."""
         # Set up renderers
-        renderers = [Renderer(model, data, shm_image) for shm_image in self.shm_images]
+        print("Attempting to create renderers, I wonder if this will crash silently...", flush=True)
+        try:
+            renderers = [Renderer(model, data, shm_image) for shm_image in self.shm_images]
+            print("Nope it didn't crash", flush=True)
+        except:
+            print("YES IT CRASHED :SCREAMFACE:", flush=True)
 
         # Render camera images continuously
         while True:
