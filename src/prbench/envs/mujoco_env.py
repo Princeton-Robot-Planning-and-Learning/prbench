@@ -21,8 +21,6 @@ from threading import Thread
 import cv2 as cv
 import mujoco
 import mujoco.viewer
-from mujoco.osmesa import GLContext as OsmesaMJGLContext
-from mujoco.glfw import GLContext as GLFWMJGLContext
 import numpy as np
 import os
 from ruckig import InputParameter, OutputParameter, Result, Ruckig
@@ -124,6 +122,8 @@ class Renderer:
     This class provides offscreen rendering capabilities for MuJoCo
     simulations, generating camera images and storing them in shared
     memory for access by other processes.
+
+    Huh?
     """
 
     def __init__(self, model, data, shm_image):
@@ -147,10 +147,10 @@ class Renderer:
         self.rect = mujoco.MjrRect(0, 0, width, height)
 
         if os.environ.get("MUJOCO_GL", "") == "osmesa":
-            self.gl_context = OsmesaMJGLContext(width, height)
+            from mujoco.osmesa import GLContext
         else:
-            self.gl_context = GLFWMJGLContext(width, height)
-        
+            from mujoco.gl_context import GLContext
+        self.gl_context = GLContext(width, height)
         self.gl_context.make_current()
 
         self.mjr_context = mujoco.MjrContext(
