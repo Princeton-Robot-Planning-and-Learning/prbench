@@ -32,5 +32,8 @@
       <freejoint/>
       <geom type="box" size="0.02 0.02 0.02" rgba=".5 .5 .7 1" mass="0.1"/>
     </body>
+
+    <!-- Third-person overview camera for complete scene view -->
+    <camera name="overview" pos="0.8 -2.0 1.7" euler="1.0 0.0 0" fovy="42" resolution="640 480"/>
   </worldbody>
 </mujoco>

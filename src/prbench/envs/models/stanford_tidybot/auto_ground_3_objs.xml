@@ -19,5 +19,6 @@
   <worldbody>
     <light pos="0 0 1.5" directional="true" />
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane" />
-    <body name="cube1" pos="0.657 0.173 0.02"><freejoint /><geom type="box" size="0.02 0.02 0.02" rgba=".5 .7 .5 1" mass="0.1" /></body><body name="cube2" pos="0.72 -0.164 0.02"><freejoint /><geom type="box" size="0.02 0.02 0.02" rgba=".5 .7 .5 1" mass="0.1" /></body><body name="cube3" pos="0.41 -0.149 0.02"><freejoint /><geom type="box" size="0.02 0.02 0.02" rgba=".5 .7 .5 1" mass="0.1" /></body></worldbody>
+    <camera name="overview" pos="0.8 -2.0 1.7" euler="1.0 0.0 0" fovy="42" resolution="640 480" />
+  <body name="cube1" pos="0.739 -0.06 0.02"><freejoint /><geom type="box" size="0.02 0.02 0.02" rgba=".5 .7 .5 1" mass="0.1" /></body><body name="cube2" pos="0.404 -0.292 0.02"><freejoint /><geom type="box" size="0.02 0.02 0.02" rgba=".5 .7 .5 1" mass="0.1" /></body><body name="cube3" pos="0.739 0.163 0.02"><freejoint /><geom type="box" size="0.02 0.02 0.02" rgba=".5 .7 .5 1" mass="0.1" /></body></worldbody>
 </mujoco>

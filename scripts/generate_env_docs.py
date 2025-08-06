@@ -93,13 +93,17 @@ def create_random_action_gif(
     imgs: list = []
     env.reset(seed=seed)
     env.action_space.seed(seed)
-    imgs.append(env.render())
+    if "TidyBot" in env_id:
+        env.unwrapped.set_render_camera("overview")  # type: ignore
+    imgs.append(env.unwrapped.render())
     for _ in range(num_actions):
         action = env.action_space.sample()
         _, _, terminated, truncated, _ = env.step(action)
-        imgs.append(env.render())
+        imgs.append(env.unwrapped.render())
         if terminated or truncated:
             break
+    if "TidyBot" in env_id:
+        env.unwrapped.set_render_camera(None)  # type: ignore
     env_filename = sanitize_env_id(env_id)
     outfile = OUTPUT_DIR / "assets" / "random_action_gifs" / f"{env_filename}.gif"
     fps = env.metadata.get("render_fps", default_fps)
@@ -115,9 +119,13 @@ def create_initial_state_gif(
 ) -> None:
     """Create a GIF of different initial states by calling reset()."""
     imgs: list = []
+    if "TidyBot" in env_id:
+        env.unwrapped.set_render_camera("overview")  # type: ignore
     for i in range(num_resets):
         env.reset(seed=seed + i)
-        imgs.append(env.render())
+        imgs.append(env.unwrapped.render())
+    if "TidyBot" in env_id:
+        env.unwrapped.set_render_camera(None)  # type: ignore
     env_filename = sanitize_env_id(env_id)
     outfile = OUTPUT_DIR / "assets" / "initial_state_gifs" / f"{env_filename}.gif"
     iio.mimsave(outfile, imgs, fps=fps, loop=0)
@@ -186,7 +194,7 @@ def _main() -> None:
             regenerated_envs += 1
         else:
             print(f"  Skipping {env_id} (no changes detected)")
-        env.close()  # type: ignore[no-untyped-call]
+        env.close() # type: ignore[no-untyped-call]
 
     print("Finished generating environment docs.")
 

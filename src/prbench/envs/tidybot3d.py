@@ -44,6 +44,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.render_images = kwargs.pop("render_images", render_images)
         # Store any other kwargs for future use
         self._extra_kwargs = kwargs
+        self._render_camera_name: str | None = None
 
         # Initialize TidyBot environment
         self._tidybot_env = self._create_tidybot_env()
@@ -146,8 +147,8 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Create observation space based on TidyBot's observation
         structure."""
         # Get example observation to determine dimensions
-        self._tidybot_env.reset()  # type: ignore[no-untyped-call]
-        example_obs = self._tidybot_env.get_obs()  # type: ignore[no-untyped-call]
+        self._tidybot_env.reset()
+        example_obs = self._tidybot_env.get_obs()
 
         # Calculate total observation dimension
         obs_dim = 0
@@ -204,7 +205,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self._reward_calculator = create_reward_calculator(
             self.scene_type, self.num_objects
         )
-        obs = self._tidybot_env.get_obs()  # type: ignore[no-untyped-call]
+        obs = self._tidybot_env.get_obs()
         vec_obs = self._vectorize_observation(obs)
         return vec_obs, {}
 
@@ -213,10 +214,10 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     ) -> Tuple[NDArray[np.float32], float, bool, bool, dict]:
         """Execute action and return next observation."""
         action_dict = self._dict_to_action(action)
-        self._tidybot_env.step(action_dict)  # type: ignore[no-untyped-call]
+        self._tidybot_env.step(action_dict)
 
         # Get observation
-        obs = self._tidybot_env.get_obs()  # type: ignore[no-untyped-call]
+        obs = self._tidybot_env.get_obs()
         vec_obs = self._vectorize_observation(obs)
 
         # Calculate reward and termination
@@ -239,8 +240,13 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def render(self):
         """Render the environment."""
         if self.render_mode == "rgb_array":
-            # Return camera images if available
             obs = self._tidybot_env.get_obs()
+            # If a specific camera is requested, use it.
+            if self._render_camera_name:
+                key = f"{self._render_camera_name}_image"
+                if key in obs and isinstance(obs[key], np.ndarray):
+                    return obs[key]
+            # Otherwise, fall back to the first available image.
             for key, value in obs.items():
                 if key.endswith("_image") and isinstance(value, np.ndarray):
                     return value
@@ -251,12 +257,21 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Close the environment."""
         self._tidybot_env.close()
 
+    def set_render_camera(self, camera_name: str | None) -> None:
+        """Set the camera to use for rendering."""
+        self._render_camera_name = camera_name
+
     def _create_env_markdown_description(self) -> str:
         """Create environment description (policy-agnostic)."""
+        scene_description = ""
+        if self.scene_type == "ground":
+            scene_description = """ In the 'ground' scene,
+objects are placed randomly on a flat ground plane."""
+
         return f"""A 3D mobile manipulation environment using the TidyBot platform.
         
 The robot has a holonomic mobile base with powered casters and a Kinova Gen3 arm.
-Scene type: {self.scene_type} with {self.num_objects} objects.
+Scene type: {self.scene_type} with {self.num_objects} objects.{scene_description}
 
 The robot can control:
 - Base pose (x, y, theta)
@@ -285,6 +300,14 @@ The robot can control:
 
     def _create_reward_markdown_description(self) -> str:
         """Create reward description."""
+        if self.scene_type == "ground":
+            return """The primary reward is for successfully placing objects
+at their target locations.
+- A reward of +1.0 is given for each object placed within a 5cm tolerance of its target.
+- A smaller positive reward is given for objects within a 10cm tolerance to guide the robot.
+- A small negative reward (-0.01) is applied at each timestep to encourage efficiency.
+The episode terminates when all objects are placed at their respective targets.
+"""
         return """Reward function depends on the specific task:
 - Object stacking: Reward for successfully stacking objects
 - Drawer/cabinet tasks: Reward for opening/closing and placing objects
@@ -296,7 +319,7 @@ Currently returns a small negative reward (-0.01) per timestep to encourage expl
     def _create_references_markdown_description(self) -> str:
         """Create references description."""
         return """TidyBot++: An Open-Source Holonomic Mobile Manipulator
-- for Robot Learning
+for Robot Learning
 - Jimmy Wu, William Chong, Robert Holmberg, Aaditya Prasad, Yihuai Gao, 
   Oussama Khatib, Shuran Song, Szymon Rusinkiewicz, Jeannette Bohg
 - Conference on Robot Learning (CoRL), 2024

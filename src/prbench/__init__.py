@@ -60,7 +60,7 @@ def register_all_environments() -> None:
             kwargs={"num_buttons": num_button},
         )
 
-    # TidyBot3D environments with different scenes and object counts (no policy_type)
+    # TidyBot3D environments with different scenes and object counts
     scene_configs = [
         ("ground", [3, 5, 7]),  # Ground/scene.xml with different object counts
     ]
@@ -70,7 +70,7 @@ def register_all_environments() -> None:
             register(
                 id=f"prbench/TidyBot3D-{scene_type}-o{num_objects}-v0",
                 entry_point="prbench.envs.tidybot3d:TidyBot3DEnv",
-                nondeterministic=True,
+                nondeterministic=True,  # mujoco renderer is nondeterministic. 
                 kwargs={
                     "scene_type": scene_type,
                     "num_objects": num_objects,
@@ -81,17 +81,6 @@ def register_all_environments() -> None:
 def make(*args, **kwargs) -> gymnasium.Env:
     """Create a registered environment from its name."""
     return gymnasium.make(*args, **kwargs)
-
-
-def make_unwrapped(*args, **kwargs) -> gymnasium.Env:
-    """Create a registered environment and return the unwrapped version.
-
-    This allows access to custom methods like step_with_policy.
-    """
-    env = gymnasium.make(*args, **kwargs)
-    while hasattr(env, "env"):
-        env = env.env
-    return env
 
 
 def get_all_env_ids() -> set[str]:

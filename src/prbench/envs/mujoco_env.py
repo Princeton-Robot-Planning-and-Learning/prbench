@@ -679,7 +679,7 @@ class MujocoEnv:
             while any(np.all(shm_image.data == 0) for shm_image in self.shm_images):
                 time.sleep(0.01)
 
-    def get_obs(self):
+    def get_obs(self) -> dict[str, object]:
         """Get the current observation from the environment."""
         arm_quat = self.shm_state.arm_quat[[1, 2, 3, 0]]  # (w, x, y, z) -> (x, y, z, w)
         if arm_quat[3] < 0.0:  # Enforce quaternion uniqueness
