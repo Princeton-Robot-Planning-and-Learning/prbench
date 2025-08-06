@@ -429,7 +429,7 @@ class MujocoSim:
     def reset(self, seed=None):
         """Reset the simulation and randomize object positions."""
 
-        print("RESET CALLED IN MUJOCO ENV", flush=True)
+        print("RESET CALLED IN MUJOCO SIM", flush=True)
 
         # Set the random seed if provided
         if seed is not None:
@@ -475,10 +475,12 @@ class MujocoSim:
             if isinstance(command, dict) and command.get("action") == "reset":
                 # Handle reset command with seed
                 seed = command.get("seed")
+                print("RESET CALLED IN CONTROL CALLBACK (v1)", flush=True)
                 self.reset(seed=seed)
                 command = None  # Clear command after processing reset
             elif command == "reset":
                 # Handle legacy reset command
+                print("RESET CALLED IN CONTROL CALLBACK (v2)", flush=True)
                 self.reset()
                 command = None  # Clear command after processing reset
 
@@ -615,6 +617,7 @@ class MujocoEnv:
         """Run the physics simulation loop in a separate process."""
         try:
             # Create sim
+            print("Creating mujoco sim", flush=True)
             sim = MujocoSim(
                 self.mjcf_path,
                 self.command_queue,
@@ -629,7 +632,9 @@ class MujocoEnv:
                 ).start()
 
             # Launch sim
+            print("Launching mujoco sim", flush=True)
             sim.launch()  # Launch in same thread as creation to avoid segfault
+            print("Done launching mujoco sim", flush=True)
         except Exception as e:
 
             print("Physics process crashed:", e, flush=True)
@@ -673,20 +678,27 @@ class MujocoEnv:
 
     def reset(self, seed: int | None = None) -> None:
         """Reset the environment and wait for initialization."""
+        print("RESET CALLED IN MUJOCO ENV", flush=True)
         self.shm_state.initialized[:] = 0.0
         # Pass seed along with reset command
         reset_command = {"action": "reset", "seed": seed}
         self.command_queue.put(reset_command)
 
+        print("L687", flush=True)
+
         # Wait for state publishing to initialize
         while self.shm_state.initialized == 0.0:
             time.sleep(0.01)
+
+        print("L693", flush=True)
 
         # Wait for image rendering to initialize
         # (Note: Assumes all zeros is not a valid image)
         if self.render_images:
             while any(np.all(shm_image.data == 0) for shm_image in self.shm_images):
                 time.sleep(0.01)
+
+        print("L701", flush=True)
 
     def get_obs(self):
         """Get the current observation from the environment."""
