@@ -9,9 +9,12 @@ for base and arm control.
 
 # pylint: disable=no-member
 # pylint: disable=no-name-in-module
+# pylint: disable=relative-beyond-top-level, import-outside-toplevel
+# for GL context import
 
 import math
 import multiprocessing as mp
+import os
 import re
 import time
 import traceback
@@ -22,7 +25,6 @@ import cv2 as cv
 import mujoco
 import mujoco.viewer
 import numpy as np
-import os
 from ruckig import InputParameter, OutputParameter, Result, Ruckig
 
 from .constants import POLICY_CONTROL_PERIOD
@@ -156,7 +158,9 @@ class Renderer:
         self.mjr_context = mujoco.MjrContext(
             model, mujoco.mjtFontScale.mjFONTSCALE_150.value
         )
-        mujoco.mjr_setBuffer(mujoco.mjtFramebuffer.mjFB_OFFSCREEN.value, self.mjr_context)
+        mujoco.mjr_setBuffer(
+            mujoco.mjtFramebuffer.mjFB_OFFSCREEN.value, self.mjr_context
+        )
 
         # Set up scene
         self.scene_option = mujoco.MjvOption()
@@ -723,7 +727,7 @@ class MujocoEnv:
                 obs[f"{shm_image.camera_name}_image"] = shm_image.data.copy()
         return obs
 
-    def step(self, action):
+    def step(self, action) -> None:
         """Execute an action in the environment.
 
         Args:
