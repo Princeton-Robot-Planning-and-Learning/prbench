@@ -5,6 +5,9 @@ simulating robotic systems with shared memory communication, real-time
 control, and multi-process rendering capabilities. It includes classes
 for state management, image handling, rendering, and various controllers
 for base and arm control.
+
+Adapted from
+https://github.com/jimmyyhwu/tidybot2
 """
 
 # pylint: disable=no-member
@@ -22,13 +25,14 @@ from multiprocessing import shared_memory
 from threading import Thread
 
 import cv2 as cv
+import gymnasium
 import mujoco
 import mujoco.viewer
 import numpy as np
 from ruckig import InputParameter, OutputParameter, Result, Ruckig
 
-from .constants import POLICY_CONTROL_PERIOD
 from .ik_solver import IKSolver
+from .motion3d import Motion3DEnvSpec
 
 
 class ShmState:
@@ -240,7 +244,10 @@ class BaseController:
                 self.otg_res = Result.Working
 
         # Maintain current pose if command stream is disrupted
-        if time.time() - self.last_command_time > 2.5 * POLICY_CONTROL_PERIOD:
+        if (
+            time.time() - self.last_command_time
+            > 2.5 * Motion3DEnvSpec().policy_control_period
+        ):
             self.otg_inp.target_position = self.qpos
             self.otg_res = Result.Working
 
@@ -323,7 +330,10 @@ class ArmController:
                 )  # fingers_actuator, ctrlrange [0, 255]
 
         # Maintain current pose if command stream is disrupted
-        if time.time() - self.last_command_time > 2.5 * POLICY_CONTROL_PERIOD:
+        if (
+            time.time() - self.last_command_time
+            > 2.5 * Motion3DEnvSpec().policy_control_period
+        ):
             self.otg_inp.target_position = self.otg_out.new_position
             self.otg_res = Result.Working
 
@@ -349,11 +359,18 @@ class MujocoSim:
         command_queue,
         shm_state,
         show_viewer=True,
+        seed=None,
     ):
         self.model = mujoco.MjModel.from_xml_path(mjcf_path)
         self.data = mujoco.MjData(self.model)
         self.command_queue = command_queue
         self.show_viewer = show_viewer
+
+        # Initialize random number generator
+        if hasattr(gymnasium.utils, "seeding"):
+            self.np_random, _ = gymnasium.utils.seeding.np_random(seed)
+        else:
+            self.np_random = np.random.default_rng(seed)
 
         # Dynamically detect objects from the model
         self.detect_objects()
@@ -443,7 +460,10 @@ class MujocoSim:
         """Reset the simulation and randomize object positions."""
         # Set the random seed if provided
         if seed is not None:
-            np.random.seed(seed)
+            if hasattr(gymnasium.utils, "seeding"):
+                self.np_random, _ = gymnasium.utils.seeding.np_random(seed)
+            else:
+                self.np_random = np.random.default_rng(seed)
 
         # Reset simulation
         mujoco.mj_resetData(self.model, self.data)
@@ -454,11 +474,11 @@ class MujocoSim:
         ):
 
             # Randomize position within a reasonable range around the table
-            cube_qpos[:2] += np.random.uniform(-0.3, 0.3, 2)
+            cube_qpos[:2] += self.np_random.uniform(-0.3, 0.3, 2)
             # Keep Z position at table height (don't randomize vertical position)
 
             # Randomize orientation around Z-axis (yaw)
-            theta = np.random.uniform(-math.pi, math.pi)
+            theta = self.np_random.uniform(-math.pi, math.pi)
             cube_quat = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
             cube_qpos[3:7] = cube_quat
 
@@ -499,7 +519,6 @@ class MujocoSim:
         self.shm_state.base_pose[:] = self.qpos_base
 
         # Update arm pos
-        # self.shm_state.arm_pos[:] = self.site_xpos
         site_xpos = self.site_xpos.copy()
         site_xpos[2] -= self.base_height  # Base height offset
         site_xpos[:2] -= self.qpos_base[:2]  # Base position inverse
@@ -512,7 +531,6 @@ class MujocoSim:
 
         # Update arm quat
         mujoco.mju_mat2Quat(self.site_quat, self.site_xmat)
-        # self.shm_state.arm_quat[:] = self.site_quat
         mujoco.mju_mulQuat(
             self.shm_state.arm_quat, self.base_quat_inv, self.site_quat
         )  # Arm quat in local frame
@@ -530,16 +548,6 @@ class MujocoSim:
             self.shm_state.object_quaternions[i][:] = qpos_obj[
                 3:7
             ]  # Next 4 elements are quaternion
-
-        # Update handle positions if cabinet_scene
-        # if self.cabinet_scene:
-        #     try:
-        #         left_id = self.model.site("leftdoor_site").id
-        #         right_id = self.model.site("rightdoor_site").id
-        #         self.shm_state.left_handle_pos[:] = self.data.site(left_id).xpos
-        #         self.shm_state.right_handle_pos[:] = self.data.site(right_id).xpos
-        #     except Exception as e:
-        #         print(f"Warning: Could not update handle positions: {e}")
 
         # Notify reset() function that state has been initialized
         self.shm_state.initialized[:] = 1.0
@@ -570,6 +578,8 @@ class MujocoEnv:
     physics simulation.
     """
 
+    suppress_render_warning: bool = True  # Class-level default
+
     def __init__(
         self,
         render_images=True,
@@ -585,6 +595,7 @@ class MujocoEnv:
         self.show_viewer = show_viewer
         self.show_images = show_images
         self.command_queue = mp.Queue(1)
+        self.suppress_render_warning = True  # Instance-level default
 
         # Detect objects from the model to determine shared memory size
         model = mujoco.MjModel.from_xml_path(self.mjcf_path)
@@ -651,7 +662,7 @@ class MujocoEnv:
             for renderer in renderers:
                 renderer.render()
             render_time = time.time() - start_time
-            if render_time > 0.1:  # 10 fps
+            if render_time > 0.1 and not self.suppress_render_warning:
                 print(
                     f"Warning: Offscreen rendering took {1000 * render_time:.1f} ms, "
                     f"try making the Mujoco viewer window smaller to speed up "

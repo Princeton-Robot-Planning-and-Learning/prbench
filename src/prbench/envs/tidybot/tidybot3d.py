@@ -15,10 +15,10 @@ import numpy as np
 from gymnasium import spaces
 from numpy.typing import NDArray
 
-from prbench.envs.tidybot_rewards import create_reward_calculator
+from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
 
 # Import TidyBot components from local files
-from .mujoco_env import MujocoEnv
+from .tidybot_mujoco_env import MujocoEnv
 
 
 class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
@@ -36,6 +36,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         render_mode: str | None = None,
         custom_grasp: bool = False,
         render_images: bool = True,
+        seed: int | None = None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -51,6 +52,12 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # Store any other kwargs for future use
         self._extra_kwargs = kwargs
         self._render_camera_name: str | None = None
+
+        # Initialize random number generator
+        if hasattr(gymnasium.utils, "seeding"):
+            self.np_random, _ = gymnasium.utils.seeding.np_random(seed)
+        else:
+            self.np_random = np.random.default_rng(seed)
 
         # Initialize TidyBot environment
         self._tidybot_env = self._create_tidybot_env()
@@ -108,8 +115,8 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 for i in range(self.num_objects):
                     name = f"cube{i+1}"
                     # Only support ground scene
-                    x = round(np.random.uniform(0.4, 0.8), 3)
-                    y = round(np.random.uniform(-0.3, 0.3), 3)
+                    x = round(self.np_random.uniform(0.4, 0.8), 3)
+                    y = round(self.np_random.uniform(-0.3, 0.3), 3)
                     z = 0.02
                     pos = f"{x} {y} {z}"
                     body = ET.Element("body", name=name, pos=pos)
@@ -146,8 +153,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         kwargs.update(self._extra_kwargs)
 
         return MujocoEnv(**kwargs)  # type: ignore
-
-    # Remove _create_policy method
 
     def _create_observation_space(self) -> spaces.Box:
         """Create observation space based on TidyBot's observation
@@ -232,8 +237,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         truncated = False
 
         return vec_obs, reward, terminated, truncated, {}
-
-    # Remove step_with_policy method
 
     def _calculate_reward(self, obs: Dict[str, Any]) -> float:
         """Calculate reward based on task completion."""

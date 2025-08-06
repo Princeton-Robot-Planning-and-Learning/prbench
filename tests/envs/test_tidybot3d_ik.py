@@ -1,27 +1,19 @@
-"""Unit tests for the TidyBot3D environment and its inverse kinematics solver.
-
-This module tests:
-- The basic functionality of the IKSolver
-- The performance and accuracy of the IKSolver for a known pose
-"""
+"""Tests for the TidyBot3D inverse kinematics solver (IKSolver)."""
 
 import numpy as np
 
-from prbench.envs.ik_solver import IKSolver
+from prbench.envs.tidybot.ik_solver import IKSolver
 
 
 def test_ik_solver_basic():
     """Test that the IKSolver returns a valid joint configuration for a simple
     target pose."""
     ik = IKSolver(ee_offset=0.12)
-    # Use the retract configuration as a test target
     target_pos = ik.site_pos.copy()
     target_quat = np.array([0, 0, 0, 1])  # Identity quaternion (x, y, z, w)
     curr_qpos = ik.qpos0.copy()
     result_qpos = ik.solve(target_pos, target_quat, curr_qpos)
-    # Should return a joint configuration of correct shape
     assert result_qpos.shape == curr_qpos.shape
-    # Should not produce NaNs
     assert np.all(np.isfinite(result_qpos))
 
 
@@ -36,11 +28,9 @@ def test_ik_solver_performance_and_accuracy():
     for _ in range(1000):
         qpos = ik_solver.solve(home_pos, home_quat, retract_qpos)
 
-    # Check that the output is finite and has correct shape
     assert qpos.shape == retract_qpos.shape
     assert np.all(np.isfinite(qpos))
 
-    # Check that the solution is close to the expected home configuration
     expected_home_deg = np.array([0, 15, 180, -130, 0, 55, 90])
     qpos_deg = np.rad2deg(qpos)
     assert np.allclose(
