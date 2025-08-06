@@ -123,7 +123,7 @@ class Renderer:
     memory for access by other processes.
     """
 
-    def __init__(self, model, data, shm_image):
+    def __init__(self, model, data, shm_image, backend="osmesa"):
         self.model = model
         self.data = data
         self.image = np.empty_like(shm_image.data)
@@ -140,16 +140,23 @@ class Renderer:
         self.camera.fixedcamid = camera_id
         self.camera.type = mujoco.mjtCamera.mjCAMERA_FIXED
 
-        # Set up context
+        # Set up context depending on backend
         self.rect = mujoco.MjrRect(0, 0, width, height)
-        self.gl_context = mujoco.gl_context.GLContext(width, height)
+
+        if backend == "osmesa":
+            from mujoco.osmesa import GLContext as MJGLContext
+        elif backend == "glfw":
+            from mujoco.glfw import GLContext as MJGLContext
+        else:
+            raise ValueError(f"Unsupported rendering backend: {backend}")
+
+        self.gl_context = MJGLContext(width, height)
         self.gl_context.make_current()
+
         self.mjr_context = mujoco.MjrContext(
             model, mujoco.mjtFontScale.mjFONTSCALE_150.value
         )
-        mujoco.mjr_setBuffer(
-            mujoco.mjtFramebuffer.mjFB_OFFSCREEN.value, self.mjr_context
-        )
+        mujoco.mjr_setBuffer(mujoco.mjtFramebuffer.mjFB_OFFSCREEN.value, self.mjr_context)
 
         # Set up scene
         self.scene_option = mujoco.MjvOption()
@@ -173,10 +180,12 @@ class Renderer:
 
     def close(self) -> None:
         """Free OpenGL and MuJoCo rendering resources."""
-        self.gl_context.free()
-        self.gl_context = None
-        self.mjr_context.free()
-        self.mjr_context = None
+        if self.gl_context is not None:
+            self.gl_context.free()
+            self.gl_context = None
+        if self.mjr_context is not None:
+            self.mjr_context.free()
+            self.mjr_context = None
 
 
 class BaseController:

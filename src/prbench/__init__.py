@@ -12,11 +12,15 @@ def register_all_environments() -> None:
     # NOTE: ids must start with "prbench/" to be properly registered.
 
     # Detect headless mode (no DISPLAY) and set OSMesa if needed
+    print("REGISTERING ALL ENVS", flush=True)
+    print(os.environ.get("DISPLAY"), flush=True)
     if not os.environ.get("DISPLAY"):
+        print("HERE I AM", flush=True)
         if sys.platform == "darwin":
             os.environ["MUJOCO_GL"] = "glfw"
             os.environ["PYOPENGL_PLATFORM"] = "glfw"
         else:
+            print("HERE I AM 2", flush=True)
             os.environ["MUJOCO_GL"] = "osmesa"
             os.environ["PYOPENGL_PLATFORM"] = "osmesa"
 
