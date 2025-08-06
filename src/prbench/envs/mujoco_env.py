@@ -428,6 +428,9 @@ class MujocoSim:
 
     def reset(self, seed=None):
         """Reset the simulation and randomize object positions."""
+
+        print("RESET CALLED IN MUJOCO ENV")
+
         # Set the random seed if provided
         if seed is not None:
             np.random.seed(seed)
