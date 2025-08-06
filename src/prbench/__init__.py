@@ -1,7 +1,5 @@
 """Register environments and expose them through make()."""
 
-import os
-
 import gymnasium
 from gymnasium.envs.registration import register
 
@@ -9,11 +7,6 @@ from gymnasium.envs.registration import register
 def register_all_environments() -> None:
     """Add all benchmark environments to the gymnasium registry."""
     # NOTE: ids must start with "prbench/" to be properly registered.
-
-    # Detect headless mode (no DISPLAY) and set OSMesa if needed
-    if not os.environ.get("DISPLAY"):
-        os.environ["MUJOCO_GL"] = "osmesa"
-        os.environ["PYOPENGL_PLATFORM"] = "osmesa"
 
     # Obstructions2D environment with different numbers of obstructions.
     num_obstructions = [0, 1, 2, 3, 4]
