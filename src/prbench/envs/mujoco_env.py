@@ -597,6 +597,7 @@ class MujocoEnv:
         # Shared memory for image observations
         if self.render_images:
             self.shm_images = []
+            print("model.ncam:", model.ncam, flush=True)
             for camera_id in range(model.ncam):
                 camera_name = model.camera(camera_id).name
                 width, height = model.cam_resolution[camera_id]
@@ -695,6 +696,7 @@ class MujocoEnv:
         # Wait for image rendering to initialize
         # (Note: Assumes all zeros is not a valid image)
         if self.render_images:
+            print("LEN(self.shm_images):", self.shm_images, flush=True)
             while any(np.all(shm_image.data == 0) for shm_image in self.shm_images):
                 time.sleep(0.01)
 
