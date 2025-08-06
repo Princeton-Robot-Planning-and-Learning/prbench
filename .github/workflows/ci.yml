@@ -74,4 +74,4 @@ jobs:
       run: uv sync --all-extras --dev
     - name: Pytest
       run: |
-       uv run pytest tests/
+       uv run pytest -s -o log_cli=true --log-cli-level=INFO tests/
