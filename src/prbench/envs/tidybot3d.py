@@ -34,7 +34,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     ) -> None:
         super().__init__()
 
-        print("__INIT__ CALLED IN TIDYBOT3D")
+        print("__INIT__ CALLED IN TIDYBOT3D", flush=True)
 
         self.scene_type = scene_type
         self.num_objects = num_objects
@@ -74,7 +74,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def _create_tidybot_env(self) -> "MujocoEnv":
         """Create the underlying TidyBot MuJoCo environment."""
-        print("_create_tidybot_env CALLED IN TIDYBOT3D")
+        print("_create_tidybot_env CALLED IN TIDYBOT3D", flush=True)
         # Set model path to local models directory
         model_base_path = os.path.join(
             os.path.dirname(__file__), "models", "stanford_tidybot"
@@ -141,7 +141,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # Allow any extra kwargs to override
         kwargs.update(self._extra_kwargs)
 
-        print("FINISHING _create_tidybot_env")
+        print("FINISHING _create_tidybot_env", flush=True)
 
         return MujocoEnv(**kwargs)  # type: ignore
 
@@ -197,7 +197,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def reset(self, *args, **kwargs) -> Tuple[NDArray[np.float32], dict]:
         """Reset the environment."""
-        print("RESET CALLED IN TIDYBOT 3D")
+        print("RESET CALLED IN TIDYBOT 3D", flush=True)
 
         # Capture seed from kwargs if provided
         seed = kwargs.get("seed", None)

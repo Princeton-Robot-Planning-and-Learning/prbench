@@ -424,12 +424,12 @@ class MujocoSim:
                 self.object_names.append(body_name)
         self.object_names.sort()
         self.num_objects = len(self.object_names)
-        print(f"Detected {self.num_objects} objects: {self.object_names}")
+        print(f"Detected {self.num_objects} objects: {self.object_names}", flush=True)
 
     def reset(self, seed=None):
         """Reset the simulation and randomize object positions."""
 
-        print("RESET CALLED IN MUJOCO ENV")
+        print("RESET CALLED IN MUJOCO ENV", flush=True)
 
         # Set the random seed if provided
         if seed is not None:
@@ -455,7 +455,8 @@ class MujocoSim:
             print(
                 f"{object_name} reset to position: "
                 f"[{cube_qpos[0]:.3f}, {cube_qpos[1]:.3f}, {cube_qpos[2]:.3f}], "
-                f"theta: {theta:.3f}"
+                f"theta: {theta:.3f}",
+                flush=True
             )
 
         mujoco.mj_forward(self.model, self.data)
@@ -586,7 +587,7 @@ class MujocoEnv:
                 object_names.append(body_name)
         object_names.sort()
         num_objects = len(object_names)
-        print(f"Detected {num_objects} objects in scene: {object_names}")
+        print(f"Detected {num_objects} objects in scene: {object_names}", flush=True)
 
         # Shared memory for state observations
         self.shm_state = ShmState(num_objects=num_objects, object_names=object_names)
@@ -627,7 +628,7 @@ class MujocoEnv:
             sim.launch()  # Launch in same thread as creation to avoid segfault
         except Exception as e:
 
-            print("Physics process crashed:", e)
+            print("Physics process crashed:", e, flush=True)
             traceback.print_exc()
 
     def render_loop(self, model, data):
@@ -645,7 +646,8 @@ class MujocoEnv:
                 print(
                     f"Warning: Offscreen rendering took {1000 * render_time:.1f} ms, "
                     f"try making the Mujoco viewer window smaller to speed up "
-                    f"offscreen rendering"
+                    f"offscreen rendering",
+                    flush=True,
                 )
 
     def visualizer_loop(self):
