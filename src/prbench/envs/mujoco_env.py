@@ -649,8 +649,9 @@ class MujocoEnv:
         try:
             renderers = [Renderer(model, data, shm_image) for shm_image in self.shm_images]
             print("Nope it didn't crash", flush=True)
-        except:
+        except Exception as e:
             print("YES IT CRASHED :SCREAMFACE:", flush=True)
+            print(str(e), flush=True)
 
         # Render camera images continuously
         while True:
