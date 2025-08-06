@@ -167,10 +167,14 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
             "render_modes": ["rgb_array"],
             "render_fps": self._spec.render_fps,
         }
+        initial_state_dict = self._create_constant_initial_state_dict()
+        self._initial_constant_state = create_state_from_dict(
+            initial_state_dict, Geom2DRobotEnvTypeFeatures
+        )
 
     def _sample_initial_state(self) -> ObjectCentricState:
-        initial_state_dict = self._create_constant_initial_state_dict()
-        static_objects = set(initial_state_dict)
+        assert self._initial_constant_state is not None
+        static_objects = set(self._initial_constant_state)
         # Sample robot pose.
         robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
         # Sample shelf pose.
@@ -184,10 +188,12 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
             size=self._num_init_shelf_blocks,
         ).tolist()
         state = self._create_initial_state(
-            initial_state_dict, robot_pose, shelf_pose, shelf_target_block_rotations
+            robot_pose, shelf_pose, shelf_target_block_rotations
         )
         robot = state.get_objects(CRVRobotType)[0]
-        assert not state_has_collision(state, {robot}, static_objects, {})
+        full_state = state.copy()
+        full_state.data.update(self._initial_constant_state.data)
+        assert not state_has_collision(full_state, {robot}, static_objects, {})
         # Sample target block poses for those outside the shelf.
         target_block_outside_poses: list[SE2Pose] = []
         for _ in range(self._num_init_outside_blocks):
@@ -203,7 +209,6 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
                     continue
                 # Check for collisions.
                 state = self._create_initial_state(
-                    initial_state_dict,
                     robot_pose,
                     shelf_pose,
                     shelf_target_block_rotations,
@@ -212,7 +217,11 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
                 obj_name_to_obj = {o.name: o for o in state}
                 num_blocks = sum(b.startswith("block") for b in obj_name_to_obj)
                 new_block = obj_name_to_obj[f"block{num_blocks-1}"]
-                if not state_has_collision(state, {new_block}, set(state), {}):
+                full_state = state.copy()
+                full_state.data.update(self._initial_constant_state.data)
+                if not state_has_collision(
+                    full_state, {new_block}, set(full_state), {}
+                ):
                     break
             else:
                 raise RuntimeError("Failed to sample obstruction pose.")
@@ -244,7 +253,6 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
 
     def _create_initial_state(
         self,
-        constant_initial_state_dict: dict[Object, dict[str, float]],
         robot_pose: SE2Pose,
         shelf_pose: SE2Pose,
         shelf_target_block_rotations: list[float],
@@ -253,7 +261,8 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
 
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
-        init_state_dict = constant_initial_state_dict.copy()
+        assert self._initial_constant_state is not None
+        init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.
         robot = Object("robot", CRVRobotType)

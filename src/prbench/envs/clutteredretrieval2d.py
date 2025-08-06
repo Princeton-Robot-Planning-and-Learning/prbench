@@ -132,27 +132,35 @@ class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
             "render_modes": ["rgb_array"],
             "render_fps": self._spec.render_fps,
         }
+        initial_state_dict = self._create_constant_initial_state_dict()
+        self._initial_constant_state = create_state_from_dict(
+            initial_state_dict, Geom2DRobotEnvTypeFeatures
+        )
 
     def _sample_initial_state(self) -> ObjectCentricState:
-        initial_state_dict = self._create_constant_initial_state_dict()
-        static_objects = set(initial_state_dict)
+        assert self._initial_constant_state is not None
+        static_objects = set(self._initial_constant_state)
         robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
-        state = self._create_initial_state(initial_state_dict, robot_pose)
+        state = self._create_initial_state(robot_pose)
         robot = state.get_objects(CRVRobotType)[0]
-        assert not state_has_collision(state, {robot}, static_objects, {})
+        # Check for collisions with the robot and static objects.
+        full_state = state.copy()
+        full_state.data.update(self._initial_constant_state.data)
+        assert not state_has_collision(full_state, {robot}, static_objects, {})
         # Sample target pose and check for collisions with robot and static objects.
         for _ in range(self._spec.max_init_sampling_attempts):
             target_pose = sample_se2_pose(
                 self._spec.target_block_init_bounds, self.np_random
             )
             state = self._create_initial_state(
-                initial_state_dict,
                 robot_pose,
                 target_pose=target_pose,
             )
             target_block = state.get_objects(TargetBlockType)[0]
+            full_state = state.copy()
+            full_state.data.update(self._initial_constant_state.data)
             if not state_has_collision(
-                state, {target_block}, {robot} | static_objects, {}
+                full_state, {target_block}, {robot} | static_objects, {}
             ):
                 break
         else:
@@ -187,15 +195,18 @@ class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
                     (obstruction_pose, obstruction_shape)
                 ]
                 state = self._create_initial_state(
-                    initial_state_dict,
                     robot_pose,
                     target_pose=target_pose,
                     obstructions=possible_obstructions,
                 )
                 obj_name_to_obj = {o.name: o for o in state}
+                full_state = state.copy()
+                full_state.data.update(self._initial_constant_state.data)
                 new_obstruction = obj_name_to_obj[f"obstruction{len(obstructions)}"]
                 assert new_obstruction.name.startswith("obstruction")
-                if not state_has_collision(state, {new_obstruction}, set(state), {}):
+                if not state_has_collision(
+                    full_state, {new_obstruction}, set(full_state), {}
+                ):
                     break
             else:
                 raise RuntimeError("Failed to sample obstruction pose.")
@@ -227,7 +238,6 @@ class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
 
     def _create_initial_state(
         self,
-        constant_initial_state_dict: dict[Object, dict[str, float]],
         robot_pose: SE2Pose,
         target_pose: SE2Pose | None = None,
         obstructions: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
@@ -235,7 +245,8 @@ class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
 
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
-        init_state_dict = constant_initial_state_dict.copy()
+        assert self._initial_constant_state is not None
+        init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.
         robot = Object("robot", CRVRobotType)
