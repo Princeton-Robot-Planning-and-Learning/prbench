@@ -601,11 +601,15 @@ class MujocoEnv:
                 self.shm_images.append(ShmImage(camera_name, width, height))
 
         # Start physics loop
+        print("Starting physics loop", flush=True)
         mp.Process(target=self.physics_loop, daemon=True).start()
 
         if self.render_images and self.show_images:
+            print("Starting visualizer loop", flush=True)
             # Start visualizer loop
             mp.Process(target=self.visualizer_loop, daemon=True).start()
+        
+        print("Finished __init__ for mujoco env", flush=True)
 
     def physics_loop(self):
         """Run the physics simulation loop in a separate process."""
