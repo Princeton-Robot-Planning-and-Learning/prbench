@@ -6,9 +6,9 @@ Test.
 # pylint: disable=relative-beyond-top-level, import-outside-toplevel
 # for GL context import
 
-import os
 import xml.etree.ElementTree as ET
-from typing import Any, Dict, List, Tuple
+from pathlib import Path
+from typing import Any
 
 import gymnasium
 import numpy as np
@@ -87,21 +87,18 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def _create_tidybot_env(self) -> "MujocoEnv":
         """Create the underlying TidyBot MuJoCo environment."""
         # Set model path to local models directory
-        model_base_path = os.path.join(
-            os.path.dirname(__file__), "models", "stanford_tidybot"
-        )
+        model_base_path = Path(__file__).parent / "models" / "stanford_tidybot"
 
         # Remove table, cabinet, and cupboard from scene_type options
         # Only keep 'ground' (if present)
         model_file = "scene.xml"
-
         # Construct absolute path to model file
-        absolute_model_path = os.path.join(model_base_path, model_file)
+        absolute_model_path = model_base_path / model_file
 
         # --- Dynamic object insertion logic ---
         needs_dynamic_objects = self.scene_type in ["ground"]
         if needs_dynamic_objects:
-            tree = ET.parse(absolute_model_path)
+            tree = ET.parse(str(absolute_model_path))
             root = tree.getroot()
             worldbody = root.find("worldbody")
             if worldbody is not None:
@@ -134,10 +131,8 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 dynamic_model_filename = (
                     f"auto_{self.scene_type}_{self.num_objects}_objs.xml"
                 )
-                dynamic_model_path = os.path.join(
-                    model_base_path, dynamic_model_filename
-                )
-                tree.write(dynamic_model_path)
+                dynamic_model_path = model_base_path / dynamic_model_filename
+                tree.write(str(dynamic_model_path))
             else:
                 dynamic_model_path = absolute_model_path
         else:
@@ -147,7 +142,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             "render_images": self.render_images,
             "show_viewer": self.show_viewer,
             "show_images": self.show_images,
-            "mjcf_path": dynamic_model_path,
+            "mjcf_path": str(dynamic_model_path),
         }
         # Allow any extra kwargs to override
         kwargs.update(self._extra_kwargs)
@@ -182,7 +177,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             dtype=np.float32,
         )
 
-    def _vectorize_observation(self, obs: Dict[str, Any]) -> NDArray[np.float32]:
+    def _vectorize_observation(self, obs: dict[str, Any]) -> NDArray[np.float32]:
         """Convert TidyBot observation dict to vector."""
         obs_vector: list[float] = []
         for key in sorted(obs.keys()):  # Sort for consistency
@@ -193,7 +188,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 obs_vector.append(float(value))
         return np.array(obs_vector, dtype=np.float32)
 
-    def _dict_to_action(self, action_vector: NDArray[np.float32]) -> Dict[str, Any]:
+    def _dict_to_action(self, action_vector: NDArray[np.float32]) -> dict[str, Any]:
         """Convert action vector to TidyBot action dict."""
         return {
             "base_pose": action_vector[:3],
@@ -202,7 +197,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             "gripper_pos": action_vector[10:11],
         }
 
-    def reset(self, *args, **kwargs) -> Tuple[NDArray[np.float32], dict]:
+    def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
         """Reset the environment."""
         # Capture seed from kwargs if provided
         seed = kwargs.get("seed", None)
@@ -222,7 +217,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def step(
         self, action: NDArray[np.float32]
-    ) -> Tuple[NDArray[np.float32], float, bool, bool, dict]:
+    ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
         """Execute action and return next observation."""
         action_dict = self._dict_to_action(action)
         self._tidybot_env.step(action_dict)
@@ -238,11 +233,11 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         return vec_obs, reward, terminated, truncated, {}
 
-    def _calculate_reward(self, obs: Dict[str, Any]) -> float:
+    def _calculate_reward(self, obs: dict[str, Any]) -> float:
         """Calculate reward based on task completion."""
         return self._reward_calculator.calculate_reward(obs)
 
-    def _is_terminated(self, obs: Dict[str, Any]) -> bool:
+    def _is_terminated(self, obs: dict[str, Any]) -> bool:
         """Check if episode should terminate."""
         return self._reward_calculator.is_terminated(obs)
 
@@ -337,7 +332,7 @@ https://github.com/tidybot2/tidybot2
 """
 
     @classmethod
-    def get_available_environments(cls) -> List[str]:
+    def get_available_environments(cls) -> list[str]:
         """Get list of available TidyBot environment IDs (policy-agnostic)."""
         scene_configs = [
             ("ground", [3, 5, 7]),

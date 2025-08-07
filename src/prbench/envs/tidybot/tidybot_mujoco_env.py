@@ -29,10 +29,9 @@ import gymnasium
 import mujoco
 import mujoco.viewer
 import numpy as np
-from ruckig import InputParameter, OutputParameter, Result, Ruckig
 
-from .ik_solver import IKSolver
-from .motion3d import Motion3DEnvSpec
+from .arm_controller import ArmController
+from .base_controller import BaseController
 
 
 class ShmState:
@@ -196,154 +195,6 @@ class Renderer:
             self.mjr_context = None
 
 
-class BaseController:
-    """Controller for mobile base movement using online trajectory generation.
-
-    This class implements a controller for the mobile base using
-    Ruckig's online trajectory generation to ensure smooth, constrained
-    motion with velocity and acceleration limits.
-    """
-
-    def __init__(self, qpos, qvel, ctrl, timestep):
-        self.qpos = qpos
-        self.qvel = qvel
-        self.ctrl = ctrl
-
-        # OTG (online trajectory generation)
-        num_dofs = 3
-        self.last_command_time = None
-        self.otg = Ruckig(num_dofs, timestep)
-        self.otg_inp = InputParameter(num_dofs)
-        self.otg_out = OutputParameter(num_dofs)
-        self.otg_inp.max_velocity = [0.5, 0.5, 3.14]
-        self.otg_inp.max_acceleration = [0.5, 0.5, 2.36]
-        # self.otg_inp.max_velocity = [0.2, 0.2, 0.5]  # [x, y, theta] velocities
-        # self.otg_inp.max_acceleration = [0.2, 0.2, 0.5]  # [x, y, theta] accelerations
-        self.otg_res = None
-
-    def reset(self):
-        """Reset the base controller to origin position."""
-        # Initialize base at origin
-        self.qpos[:] = np.zeros(3)
-        self.ctrl[:] = self.qpos
-
-        # Initialize OTG
-        self.last_command_time = time.time()
-        self.otg_inp.current_position = self.qpos
-        self.otg_inp.current_velocity = self.qvel
-        self.otg_inp.target_position = self.qpos
-        self.otg_res = Result.Finished
-
-    def control_callback(self, command):
-        """Process control commands and update base trajectory."""
-        if command is not None:
-            self.last_command_time = time.time()
-            if "base_pose" in command:
-                # Set target base qpos
-                self.otg_inp.target_position = command["base_pose"]
-                self.otg_res = Result.Working
-
-        # Maintain current pose if command stream is disrupted
-        if (
-            time.time() - self.last_command_time
-            > 2.5 * Motion3DEnvSpec().policy_control_period
-        ):
-            self.otg_inp.target_position = self.qpos
-            self.otg_res = Result.Working
-
-        # Update OTG
-        if self.otg_res == Result.Working:
-            self.otg_res = self.otg.update(self.otg_inp, self.otg_out)
-            self.otg_out.pass_to_input(self.otg_inp)
-            self.ctrl[:] = self.otg_out.new_position
-
-
-class ArmController:
-    """Controller for robotic arm movement using inverse kinematics and
-    trajectory generation.
-
-    This class implements a controller for the robotic arm using inverse
-    kinematics to convert end-effector poses to joint configurations,
-    and Ruckig's online trajectory generation for smooth motion control.
-    """
-
-    def __init__(self, qpos, qvel, ctrl, qpos_gripper, ctrl_gripper, timestep):
-        self.qpos = qpos
-        self.qvel = qvel
-        self.ctrl = ctrl
-        self.qpos_gripper = qpos_gripper
-        self.ctrl_gripper = ctrl_gripper
-
-        # IK solver
-        self.ik_solver = IKSolver(ee_offset=0.12)
-
-        # OTG (online trajectory generation)
-        num_dofs = 7
-        self.last_command_time = None
-        self.otg = Ruckig(num_dofs, timestep)
-        self.otg_inp = InputParameter(num_dofs)
-        self.otg_out = OutputParameter(num_dofs)
-        self.otg_inp.max_velocity = 4 * [math.radians(80)] + 3 * [math.radians(140)]
-        self.otg_inp.max_acceleration = 4 * [math.radians(240)] + 3 * [
-            math.radians(450)
-        ]
-        self.otg_res = None
-
-    def reset(self):
-        """Reset the arm controller to retract configuration."""
-        # Initialize arm in "retract" configuration
-        self.qpos[:] = np.array(
-            [0.0, -0.34906585, 3.14159265, -2.54818071, 0.0, -0.87266463, 1.57079633]
-        )
-        self.ctrl[:] = self.qpos
-        self.ctrl_gripper[:] = 0.0
-
-        # Initialize OTG
-        self.last_command_time = time.time()
-        self.otg_inp.current_position = self.qpos
-        self.otg_inp.current_velocity = self.qvel
-        self.otg_inp.target_position = self.qpos
-        self.otg_res = Result.Finished
-
-    def control_callback(self, command):
-        """Process control commands and update arm trajectory."""
-        if command is not None:
-            self.last_command_time = time.time()
-
-            if "arm_pos" in command:
-                # Run inverse kinematics on new target pose
-                qpos = self.ik_solver.solve(
-                    command["arm_pos"], command["arm_quat"], self.qpos
-                )
-                qpos = (
-                    self.qpos + np.mod((qpos - self.qpos) + np.pi, 2 * np.pi) - np.pi
-                )  # Unwrapped joint angles
-
-                # Set target arm qpos
-                self.otg_inp.target_position = qpos
-                self.otg_res = Result.Working
-
-            if "gripper_pos" in command:
-                # Set target gripper pos
-                self.ctrl_gripper[:] = (
-                    255.0 * command["gripper_pos"]
-                )  # fingers_actuator, ctrlrange [0, 255]
-
-        # Maintain current pose if command stream is disrupted
-        if (
-            time.time() - self.last_command_time
-            > 2.5 * Motion3DEnvSpec().policy_control_period
-        ):
-            self.otg_inp.target_position = self.otg_out.new_position
-            self.otg_res = Result.Working
-
-        # Update OTG
-        if self.otg_res == Result.Working:
-            self.otg_res = self.otg.update(self.otg_inp, self.otg_out)
-            self.otg_out.pass_to_input(self.otg_inp)
-            self.ctrl[:] = self.otg_out.new_position
-
-
 class MujocoSim:
     """MuJoCo simulation environment with shared memory communication.
 
@@ -372,8 +223,8 @@ class MujocoSim:
         else:
             self.np_random = np.random.default_rng(seed)
 
-        # Dynamically detect objects from the model
-        self.detect_objects()
+        # Dynamically extract objects from the model
+        self.extract_objects()
 
         # Enable gravity compensation for everything except objects
         self.model.body_gravcomp[:] = 1.0
@@ -439,7 +290,7 @@ class MujocoSim:
         # Set control callback
         mujoco.set_mjcb_control(self.control_callback)
 
-    def detect_objects(self):
+    def extract_objects(self):
         """Detects all object bodies in the MuJoCo model whose names match the
         pattern 'cube+'.
 
