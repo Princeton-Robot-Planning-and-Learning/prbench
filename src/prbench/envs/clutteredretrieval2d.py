@@ -115,8 +115,8 @@ class ClutteredRetrieval2DEnvSpec(Geom2DRobotEnvSpec):
 class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
     """Environment where a block must be retrieved amidst clutter.
 
-    This is an object-centric environment. The vectorized version with Box spaces is
-    defined below.
+    This is an object-centric environment. The vectorized version with
+    Box spaces is defined below.
     """
 
     def __init__(

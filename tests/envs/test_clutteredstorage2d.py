@@ -41,7 +41,8 @@ def test_clutteredstorage2d_observation_space():
 
 
 def test_clutteredstorage2d_termination():
-    """Tests that the environment terminates when all blocks are on the shelf."""
+    """Tests that the environment terminates when all blocks are on the
+    shelf."""
     env = ObjectCentricClutteredStorage2DEnv(num_blocks=3)
     state, _ = env.reset(seed=0)
     # Manually move the block into the shelf.
