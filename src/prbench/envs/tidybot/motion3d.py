@@ -11,11 +11,11 @@ class Motion3DEnvSpec:
     """Spec for 3D motion planning/manipulation environments."""
 
     # Mobile base parameters (from constants.py)
-    h_x: np.ndarray = 0.190150 * np.array(
-        [1.0, 1.0, -1.0, -1.0]
+    h_x: np.ndarray = field(
+        default_factory=lambda: 0.190150 * np.array([1.0, 1.0, -1.0, -1.0])
     )  # Vehicle center to steer axis (x)
-    h_y: np.ndarray = 0.170150 * np.array(
-        [-1.0, 1.0, 1.0, -1.0]
+    h_y: np.ndarray = field(
+        default_factory=lambda: 0.170150 * np.array([-1.0, 1.0, 1.0, -1.0])
     )  # Vehicle center to steer axis (y)
     # Encoder magnet offsets
     encoder_magnet_offsets: list[float] = field(
