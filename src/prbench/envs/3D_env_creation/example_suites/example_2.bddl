@@ -48,14 +48,6 @@
       )
     )
 
-  (:camera
-    (:ranges (
-        (1.2 0.78539816339 -0.26179938779 1.4 1.0471975512 0.26179938779)
-      )
-    )
-    (:jitter_mode normal)
-  )
-
   (:fixtures
     table - table
   )

@@ -5,6 +5,7 @@ import mujoco.viewer
 import os
 import time
 from pathlib import Path
+from typing import Optional, Tuple, Dict
 from bddl_utils.bddl_utils import prbench_parse_problem
 
 def find_available_objects(assets_path: str) -> dict:
@@ -144,6 +145,131 @@ def _update_element_references(element, rename_map):
     for child in element:
         _update_element_references(child, rename_map)
 
+
+def merge_additional_model_into_scene(scene_xml_path: str, additional_model_xml_path: str, output_filename: str, body_pos: Optional[Tuple[float, float, float]] = None, name_prefix: Optional[str] = None) -> str:
+    """
+    Merge another MuJoCo model XML (e.g., tidybot) into an existing scene XML by:
+    - Merging <default> classes
+    - Merging <asset> entries while prefixing names to avoid collisions and rewriting file paths relative to the scene
+    - Appending the top-level body from the additional model's <worldbody> into the scene's <worldbody>
+    - Merging <contact>, <tendon>, <equality>, and <actuator> sections
+
+    Returns absolute path to the newly written merged XML.
+    """
+    scene_tree = ET.parse(scene_xml_path)
+    scene_root = scene_tree.getroot()
+
+    scene_output_dir = Path(scene_xml_path).parent
+
+    # Ensure required roots exist in the scene
+    scene_default = scene_root.find('default')
+    if scene_default is None:
+        scene_default = ET.SubElement(scene_root, 'default')
+
+    scene_asset = scene_root.find('asset')
+    if scene_asset is None:
+        scene_asset = ET.SubElement(scene_root, 'asset')
+
+    scene_worldbody = scene_root.find('worldbody')
+    if scene_worldbody is None:
+        scene_worldbody = ET.SubElement(scene_root, 'worldbody')
+
+    # Parse the additional model
+    add_tree = ET.parse(additional_model_xml_path)
+    add_root = add_tree.getroot()
+
+    model_name = Path(additional_model_xml_path).stem
+    prefix = name_prefix if name_prefix is not None else model_name
+
+    # 1) Merge defaults (append all children of <default>)
+    add_default = add_root.find('default')
+    if add_default is not None:
+        for child in list(add_default):
+            scene_default.append(child)
+
+    # 2) Merge assets with name prefixing and file path rewriting
+    rename_map: Dict[str, str] = {}
+
+    add_asset = add_root.find('asset')
+    if add_asset is not None:
+        add_xml_dir = Path(additional_model_xml_path).parent
+        # Resolve meshdir if specified in additional model compiler
+        add_compiler = add_root.find('compiler')
+        meshdir = add_compiler.get('meshdir') if add_compiler is not None else None
+        base_asset_dir = (add_xml_dir / meshdir).resolve() if meshdir else add_xml_dir.resolve()
+        for asset_elem in list(add_asset):
+            # Determine original asset name
+            original_name = asset_elem.get('name')
+            inferred = False
+            if original_name is None:
+                # Infer from file basename if available
+                file_attr = asset_elem.get('file')
+                if file_attr:
+                    original_name = Path(file_attr).stem
+                    inferred = True
+            # If we still don't have a name, skip renaming for this asset
+            if original_name:
+                new_name = f"{prefix}_{original_name}"
+                rename_map[original_name] = new_name
+                asset_elem.set('name', new_name)
+            
+            # Rewrite file path to be relative to the scene output dir
+            if 'file' in asset_elem.attrib:
+                original_file = asset_elem.attrib['file']
+                abs_asset_file_path = (base_asset_dir / original_file).resolve()
+                # Always compute relative path from the scene output directory, without requiring Python 3.12's Path.is_relative_to
+                try:
+                    rel_path = abs_asset_file_path.relative_to(scene_output_dir.resolve())
+                except Exception:
+                    rel_path = Path(os.path.relpath(abs_asset_file_path, scene_output_dir))
+                asset_elem.set('file', str(rel_path))
+
+            # Update intra-asset references (e.g., texture/material/mesh) within the asset element itself
+            for attr_ref in ['texture', 'material', 'mesh']:
+                ref = asset_elem.get(attr_ref)
+                if ref and ref in rename_map:
+                    asset_elem.set(attr_ref, rename_map[ref])
+
+            scene_asset.append(asset_elem)
+
+    # 3) Merge worldbody: copy the first top-level body from additional model, update references, set pos
+    add_worldbody = add_root.find('worldbody')
+    if add_worldbody is not None:
+        add_top_body = add_worldbody.find('body')
+        if add_top_body is not None:
+            # Deep-copy the body
+            new_body = ET.fromstring(ET.tostring(add_top_body))
+            # Update material/mesh/texture references according to rename_map
+            _update_element_references(new_body, rename_map)
+            # Set position if provided
+            if body_pos is not None:
+                new_body.set('pos', f"{body_pos[0]} {body_pos[1]} {body_pos[2]}")
+            scene_worldbody.append(new_body)
+
+    # 4) Merge contact / tendon / equality / actuator sections
+    def _merge_section(tag_name: str):
+        scene_sec = scene_root.find(tag_name)
+        add_sec = add_root.find(tag_name)
+        if add_sec is None:
+            return
+        if scene_sec is None:
+            scene_sec = ET.SubElement(scene_root, tag_name)
+        for child in list(add_sec):
+            # These sections typically reference bodies/joints by name; no renaming needed
+            scene_sec.append(child)
+
+    for tag in ['contact', 'tendon', 'equality', 'actuator']:
+        _merge_section(tag)
+
+    # Write merged model
+    merged_output_path = scene_output_dir / output_filename
+    ET.indent(scene_tree, space="  ")
+    scene_tree.write(str(merged_output_path), encoding="utf-8", xml_declaration=True)
+
+    print(f"\nSuccessfully merged additional model into scene: {merged_output_path}")
+    return str(merged_output_path.resolve())
+
+
 def main():
     """Main function to run the script."""
     # Construct paths relative to the script's location
@@ -202,13 +328,19 @@ def main():
                 object_regions[region_name]["objects"].append(obj_instance)
 
 
-    # 6. Generate the new scene XML
+    # 6. Generate the new scene XML (objects on table)
     dynamic_xml_path = create_scene_with_objects(base_arena_xml, objects_to_add, object_regions, fixture_names, output_filename, libero_assets_path)
 
-    # 7. Load and render
-    print("\nLoading and rendering the generated scene...")
+    # 7. Merge tidybot into the generated scene and produce a second XML
+    tidybot_xml_path = str((script_dir / "../models/stanford_tidybot/tidybot.xml").resolve())
+    merged_output_filename = "generated_scene_with_tidybot.xml"
+    # Place the robot slightly behind the table along -x
+    final_xml_path = merge_additional_model_into_scene(dynamic_xml_path, tidybot_xml_path, merged_output_filename, body_pos=(-1.6, 0.0, 0.0), name_prefix="tidybot")
+
+    # 8. Load and render the merged scene
+    print("\nLoading and rendering the generated scene with tidybot...")
     try:
-        model = mujoco.MjModel.from_xml_path(dynamic_xml_path)
+        model = mujoco.MjModel.from_xml_path(final_xml_path)
         data = mujoco.MjData(model)
         
         with mujoco.viewer.launch_passive(model, data) as viewer:
@@ -227,6 +359,7 @@ def main():
         print(f"\nError loading/rendering dynamic scene: {e}")
     finally:
         pass
+
 
 if __name__ == "__main__":
     main() 
