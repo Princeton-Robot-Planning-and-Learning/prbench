@@ -1,4 +1,5 @@
-"""Environment where only 2D motion planning is needed to reach a goal region."""
+"""Environment where only 2D motion planning is needed to reach a goal
+region."""
 
 from dataclasses import dataclass
 
@@ -118,8 +119,8 @@ class Motion2DEnvSpec(Geom2DRobotEnvSpec):
 class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
     """Only 2D motion planning is needed to reach a goal region.
 
-    This is an object-centric environment. The vectorized version with Box spaces is
-    defined below.
+    This is an object-centric environment. The vectorized version with
+    Box spaces is defined below.
     """
 
     def __init__(
