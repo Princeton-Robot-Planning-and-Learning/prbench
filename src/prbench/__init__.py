@@ -53,6 +53,12 @@ def register_all_environments() -> None:
             kwargs={"num_buttons": num_button},
         )
 
+    # PushPullHook2D environment
+    register(
+        id="prbench/PushPullHook2D-v0",
+        entry_point="prbench.envs.pushpullhook2d:PushPullHook2DEnv",
+    )
+
 
 def make(*args, **kwargs) -> gymnasium.Env:
     """Create a registered environment from its name."""
