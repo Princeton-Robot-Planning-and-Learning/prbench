@@ -9,6 +9,7 @@ from geom2drobotenvs.object_types import (
     CRVRobotType,
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
+    LObjectType
 )
 from geom2drobotenvs.structs import ZOrder
 from geom2drobotenvs.utils import (
@@ -24,7 +25,6 @@ from relational_structs import Object, ObjectCentricState
 from relational_structs.utils import create_state_from_dict
 
 from prbench.envs.geom2d_utils import ConstantObjectGeom2DEnv
-from prbench.object_types import LObjectType
 
 
 @dataclass(frozen=True)
