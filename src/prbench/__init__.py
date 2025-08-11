@@ -2,6 +2,7 @@
 
 import gymnasium
 from gymnasium.envs.registration import register
+from pathlib import Path
 
 
 def register_all_environments() -> None:
@@ -71,6 +72,28 @@ def register_all_environments() -> None:
                     "num_objects": num_objects,
                 },
             )
+
+    # TidyBot3D BDDL-based environments discovered from example suites
+    try:
+        base_dir = Path(__file__).parent
+        bddl_dir = base_dir / "envs" / "3D_env_creation" / "example_suites"
+        if bddl_dir.exists():
+            for bddl_path in sorted(bddl_dir.glob("*.bddl")):
+                stem = bddl_path.stem
+                # Use a relative path that bddl_test.create_scene_from_bddl expects
+                rel_bddl = f"example_suites/{bddl_path.name}"
+                register(
+                    id=f"prbench/TidyBot3D-bddl-{stem}-v0",
+                    entry_point="prbench.envs.tidybot3d:TidyBot3DEnv",
+                    kwargs={
+                        "scene_type": "bddl",
+                        "num_objects": 0,  # num_objects determined by BDDL
+                        "bddl_file": rel_bddl,
+                    },
+                )
+    except Exception:
+        # Ignore dynamic BDDL registration failures
+        pass
 
 
 def make(*args, **kwargs) -> gymnasium.Env:

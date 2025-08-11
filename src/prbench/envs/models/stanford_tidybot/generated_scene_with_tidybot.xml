@@ -67,7 +67,7 @@
     <camera mode="fixed" name="birdview" pos="-0.2 0 3.0" quat="0.7071 0 0 0.7071" />
     <camera mode="fixed" name="agentview" pos="0.5 0 1.35" quat="0.653 0.271 0.271 0.653" />
     <camera mode="fixed" name="sideview" pos="-0.05651774593317116 1.2761224129427358 1.4879572214102434" quat="0.009905065491771751 0.006877963156909582 0.5912228352893879 0.806418094001364" />
-    <body name="object_1_instance" pos="-0.24352813423702963 -0.012341241348217749 0.44500000000000006">
+    <body name="object_1_instance" pos="-0.5008460274930173 -0.025743497362280918 0.44500000000000006">
       <freejoint />
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="mesh" mesh="object_1_model_vis" conaffinity="0" contype="0" group="1" material="object_1_model" />
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="box" pos="0.00000 0.00009 0.00240" quat="0.70711 0.00000 0.70711 0.00000" size="0.00184 0.01653 0.01728" group="0" rgba="0.8 0.8 0.8 0.3" />
@@ -107,7 +107,7 @@
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="box" pos="0.01569 0.03212 0.02264" quat="0.83995 -0.07579 0.12163 0.52340" size="0.00096 0.00709 0.01266" group="0" rgba="0.8 0.8 0.8 0.3" />
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="box" pos="0.00801 0.03484 0.02264" quat="0.08915 0.77490 0.61562 -0.11222" size="0.00094 0.00337 0.01264" group="0" rgba="0.8 0.8 0.8 0.3" />
     </body>
-    <body name="object_2_instance" pos="0.10078434384149909 -0.11375628385931483 0.44500000000000006">
+    <body name="object_2_instance" pos="0.27445589652834834 -0.15642902036864503 0.44500000000000006">
       <freejoint />
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="mesh" mesh="object_2_model_vis" conaffinity="0" contype="0" group="1" material="object_2_model" />
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="box" pos="0.00000 0.00009 0.00240" quat="0.70711 0.00000 0.70711 0.00000" size="0.00184 0.01653 0.01728" group="0" rgba="0.8 0.8 0.8 0.3" />
@@ -147,7 +147,7 @@
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="box" pos="0.01569 0.03212 0.02264" quat="0.83995 -0.07579 0.12163 0.52340" size="0.00096 0.00709 0.01266" group="0" rgba="0.8 0.8 0.8 0.3" />
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="box" pos="0.00801 0.03484 0.02264" quat="0.08915 0.77490 0.61562 -0.11222" size="0.00094 0.00337 0.01264" group="0" rgba="0.8 0.8 0.8 0.3" />
     </body>
-    <body name="object_3_instance" pos="0.5951147179514711 0.0069944504266992065 0.44500000000000006">
+    <body name="object_3_instance" pos="0.49247769598956026 0.020816559850205654 0.44500000000000006">
       <freejoint />
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="mesh" mesh="object_3_textured_vis" conaffinity="0" contype="0" group="1" material="object_3_textured" />
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="box" pos="0.00045 -0.03935 0.00079" quat="0.50000 0.50000 0.50000 -0.50000" size="0.01695 0.02811 0.03307" group="0" rgba="0.8 0.8 0.8 0.3" />
@@ -163,7 +163,7 @@
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="box" pos="-0.01254 0.05471 -0.00799" quat="0.00000 0.00000 0.70711 0.70711" size="0.00259 0.00405 0.01848" group="0" rgba="0.8 0.8 0.8 0.3" />
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="box" pos="-0.01259 0.05471 0.00929" quat="0.00000 0.00000 0.70711 0.70711" size="0.00259 0.00380 0.01848" group="0" rgba="0.8 0.8 0.8 0.3" />
     </body>
-    <body name="object_4_instance" pos="0.40015822184416044 0.061543138669134134 0.44500000000000006">
+    <body name="object_4_instance" pos="0.48158555389930063 0.07942052278306176 0.44500000000000006">
       <freejoint />
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="mesh" mesh="object_4_textured_vis" conaffinity="0" contype="0" group="1" material="object_4_textured" />
       <geom solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" type="box" pos="0.00045 -0.03935 0.00079" quat="0.50000 0.50000 0.50000 -0.50000" size="0.01695 0.02811 0.03307" group="0" rgba="0.8 0.8 0.8 0.3" />

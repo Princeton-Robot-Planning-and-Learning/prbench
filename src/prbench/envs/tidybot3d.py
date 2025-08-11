@@ -4,6 +4,7 @@ import os
 import random
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Tuple
+import importlib.util
 
 import gymnasium
 import numpy as np
@@ -26,10 +27,11 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def __init__(
         self,
-        scene_type: str = "table",  # "table", "drawer", "cupboard", "cabinet"
+        scene_type: str = "table",  # "table", "drawer", "cupboard", "cabinet", "bddl"
         num_objects: int = 3,
         render_mode: str | None = None,
         custom_grasp: bool = False,
+        bddl_file: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -45,7 +47,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self._extra_kwargs = kwargs
 
         # Initialize TidyBot environment
-        self._tidybot_env = self._create_tidybot_env()
+        self._tidybot_env = self._create_tidybot_env(bddl_file=bddl_file)
 
         # Remove policy initialization
 
@@ -69,7 +71,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             }
         )
 
-    def _create_tidybot_env(self) -> "MujocoEnv":
+    def _create_tidybot_env(self, bddl_file: str | None = None) -> "MujocoEnv":
         """Create the underlying TidyBot MuJoCo environment."""
         # Set model path to local models directory
         model_base_path = os.path.join(
@@ -88,13 +90,44 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 model_file = "cupboard_scene.xml"
         elif self.scene_type == "cabinet":
             model_file = "cabinet.xml"
+        elif self.scene_type == "bddl":
+            # Generate scene from BDDL using dynamic import from file path
+            bddl_module_path = os.path.join(
+                os.path.dirname(__file__), "3D_env_creation", "bddl_test.py"
+            )
+            spec = importlib.util.spec_from_file_location(
+                "prbench.envs.3D_env_creation.bddl_test", bddl_module_path
+            )
+            if spec is None or spec.loader is None:
+                xml_path = None
+            else:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                create_scene_from_bddl = getattr(module, "create_scene_from_bddl")
+                # If user didn't pass a bddl file, use default example
+                effective_bddl = bddl_file or "example_suites/example_2.bddl"
+                xml_path = create_scene_from_bddl(
+                    bddl_file=effective_bddl,
+                    output_filename="generated_scene_from_bddl.xml",
+                    libero_assets_path="../models/libero_assets",
+                    base_arena_xml="../models/stanford_tidybot/table_arena.xml",
+                    name_prefix="tidybot",
+                    render=False,
+                )
+            if xml_path is None:
+                # If generation failed, fall back to a safe default model
+                model_file = "scene.xml"
+                absolute_model_path = os.path.join(model_base_path, model_file)
+            else:
+                absolute_model_path = xml_path
         else:
             model_file = "scene.xml"
 
-        # Construct absolute path to model file
-        absolute_model_path = os.path.join(model_base_path, model_file)
+        # Construct absolute path to model file when not generated
+        if self.scene_type != "bddl":
+            absolute_model_path = os.path.join(model_base_path, model_file)
 
-        # --- Dynamic object insertion logic ---
+        # --- Dynamic object insertion logic --- (skip for bddl)
         needs_dynamic_objects = self.scene_type in ["ground", "table"]
         if needs_dynamic_objects:
             tree = ET.parse(absolute_model_path)
@@ -348,6 +381,7 @@ https://github.com/tidybot2/tidybot2
             ("drawer", [2, 4, 6]),
             ("cupboard", [3, 5, 8]),
             ("cabinet", [2, 4, 6]),
+            ("bddl", [3]),
         ]
         env_ids = []
         for scene_type, object_counts in scene_configs:

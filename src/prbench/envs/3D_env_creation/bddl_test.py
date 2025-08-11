@@ -6,7 +6,7 @@ import os
 import time
 from pathlib import Path
 from typing import Optional, Tuple, Dict
-from bddl_utils.bddl_utils import prbench_parse_problem
+from .bddl_utils.bddl_utils import prbench_parse_problem
 
 def find_available_objects(assets_path: str) -> dict:
     """Scans the asset directory to find all available objects and their XML paths."""
@@ -270,14 +270,17 @@ def merge_additional_model_into_scene(scene_xml_path: str, additional_model_xml_
     return str(merged_output_path.resolve())
 
 
-def main():
-    """Main function to run the script."""
+def create_scene_from_bddl(bddl_file: str = "example_suites/example_2.bddl", output_filename: str = "generated_scene_from_bddl.xml", libero_assets_path: str = "../models/libero_assets", base_arena_xml: str = "../models/stanford_tidybot/table_arena.xml", name_prefix: str = "tidybot", render: bool = False) -> Optional[str]:
+    """Create a scene from BDDL, merge TidyBot, write XML, and optionally render.
+
+    Returns absolute path to the merged XML, or None on error.
+    """
     # Construct paths relative to the script's location
     script_dir = Path(__file__).parent
-    libero_assets_path = str((script_dir / "../models/libero_assets").resolve())
-    base_arena_xml = str((script_dir / "../models/stanford_tidybot/table_arena.xml").resolve())
-    bddl_file = str((script_dir / "example_suites/example_2.bddl").resolve())
-    output_filename = "generated_scene_from_bddl.xml"
+    libero_assets_path = str((script_dir / libero_assets_path).resolve())
+    base_arena_xml = str((script_dir / base_arena_xml).resolve())
+    bddl_file = str((script_dir / bddl_file).resolve())
+    output_filename = output_filename
 
     # 1. Parse the BDDL file
     print(f"Parsing BDDL file: {bddl_file}")
@@ -285,13 +288,13 @@ def main():
         problem_data = prbench_parse_problem(bddl_file)
     except Exception as e:
         print(f"Error parsing BDDL file: {e}")
-        return
+        return None
 
     # 2. Find all available object assets
     available_objects = find_available_objects(libero_assets_path)
     if not available_objects:
         print("Error: No objects found. Please check the 'libero_assets' path.")
-        return
+        return None
 
     # 3. Determine which objects to add from the BDDL file
     objects_to_add = {}
@@ -307,7 +310,7 @@ def main():
 
     if not objects_to_add:
         print("No valid objects from BDDL could be added. Exiting.")
-        return
+        return None
 
     # 4. Extract fixture names
     bddl_fixtures = problem_data.get("fixtures", {})
@@ -338,28 +341,31 @@ def main():
     final_xml_path = merge_additional_model_into_scene(dynamic_xml_path, tidybot_xml_path, merged_output_filename, body_pos=(-1.6, 0.0, 0.0), name_prefix="tidybot")
 
     # 8. Load and render the merged scene
-    print("\nLoading and rendering the generated scene with tidybot...")
-    try:
-        model = mujoco.MjModel.from_xml_path(final_xml_path)
-        data = mujoco.MjData(model)
-        
-        with mujoco.viewer.launch_passive(model, data) as viewer:
-            print("Viewer launched. Running for 60 seconds...")
-            start_time = time.time()
-            while viewer.is_running() and time.time() - start_time < 60:
-                step_start = time.time()
-                mujoco.mj_step(model, data)
-                viewer.sync()
-                # Rudimentary time keeping to run sim close to real time
-                time_until_next_step = model.opt.timestep - (time.time() - step_start)
-                if time_until_next_step > 0:
-                    time.sleep(time_until_next_step)
-        
-    except Exception as e:
-        print(f"\nError loading/rendering dynamic scene: {e}")
-    finally:
-        pass
+    if render:
+        print("\nLoading and rendering the generated scene with tidybot...")
+        try:
+            model = mujoco.MjModel.from_xml_path(final_xml_path)
+            data = mujoco.MjData(model)
+            
+            with mujoco.viewer.launch_passive(model, data) as viewer:
+                print("Viewer launched. Running for 60 seconds...")
+                start_time = time.time()
+                while viewer.is_running() and time.time() - start_time < 60:
+                    step_start = time.time()
+                    mujoco.mj_step(model, data)
+                    viewer.sync()
+                    # Rudimentary time keeping to run sim close to real time
+                    time_until_next_step = model.opt.timestep - (time.time() - step_start)
+                    if time_until_next_step > 0:
+                        time.sleep(time_until_next_step)
+            
+        except Exception as e:
+            print(f"\nError loading/rendering dynamic scene: {e}")
+        finally:
+            pass
+
+    return final_xml_path
 
 
 if __name__ == "__main__":
-    main() 
+    create_scene_from_bddl(render=True) 

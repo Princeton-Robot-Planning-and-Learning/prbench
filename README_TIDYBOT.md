@@ -226,6 +226,24 @@ for _ in range(1000):
 env.close()
 ```
 
+### Example 4: Random actions in bddl
+```python
+import prbench
+
+prbench.register_all_environments()
+env = prbench.make_unwrapped(
+    "prbench/TidyBot3D-bddl-example_2-v0",
+    show_viewer=True,
+    show_images=True)
+
+obs, info = env.reset()
+action = env.action_space.sample()
+obs, reward, terminated, truncated, info = env.step(action)
+
+env.close()
+```
+
+
 ## Troubleshooting
 
 ### Common Issues
