@@ -122,8 +122,7 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
     def get_shelf_init_pose_bounds(
         self, num_init_shelf_blocks: int
     ) -> tuple[SE2Pose, SE2Pose]:
-        """Calculate the init pose bounds for the shelf based on block
-        number."""
+        """Calculate the init pose bounds for the shelf based on block number."""
         shelf_width = self.get_shelf_width(num_init_shelf_blocks)
         return (
             SE2Pose(self.world_min_x, self.shelf_y, 0),
@@ -149,8 +148,8 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
 class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
     """Cluttered environment where blocks must be stored on a shelf.
 
-    This is an object-centric environment. The vectorized version with
-    Box spaces is defined below.
+    This is an object-centric environment. The vectorized version with Box spaces is
+    defined below.
     """
 
     def __init__(

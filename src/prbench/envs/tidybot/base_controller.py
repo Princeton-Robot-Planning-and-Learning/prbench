@@ -4,6 +4,8 @@ This module defines the BaseController class, which provides control
 logic for the mobile base using online trajectory generation (Ruckig).
 It is designed to be used within the TidyBot simulation and control
 framework, and supports smooth, constrained motion for the robot base.
+
+The current controller is part of the environment.
 """
 
 # pylint: disable=no-member

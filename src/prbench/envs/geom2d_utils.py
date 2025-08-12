@@ -18,14 +18,12 @@ from prbench.utils import get_geom2d_crv_robot_action_from_gui_input
 
 
 class ConstantObjectGeom2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
-    """Defined by an object-centric Geom2D environment and a constant object
-    set.
+    """Defined by an object-centric Geom2D environment and a constant object set.
 
-    The point of this pattern is to allow implementing object-centric
-    environments with variable numbers of objects, but then also create
-    versions of the environment with a constant number of objects so it
-    is easy to apply, e.g., RL approaches that use fixed-dimensional
-    observation and action spaces.
+    The point of this pattern is to allow implementing object-centric environments with
+    variable numbers of objects, but then also create versions of the environment with a
+    constant number of objects so it is easy to apply, e.g., RL approaches that use
+    fixed-dimensional observation and action spaces.
     """
 
     # NOTE: we need to define render_modes in the class instead of the instance because
@@ -79,8 +77,7 @@ class ConstantObjectGeom2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.floa
     def _get_constant_object_names(
         self, exemplar_state: ObjectCentricState
     ) -> list[str]:
-        """The ordered names of the constant objects extracted from the
-        observations."""
+        """The ordered names of the constant objects extracted from the observations."""
 
     @abc.abstractmethod
     def _create_env_markdown_description(self) -> str:
@@ -92,8 +89,7 @@ class ConstantObjectGeom2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.floa
 
     @abc.abstractmethod
     def _create_references_markdown_description(self) -> str:
-        """Create a markdown description of the reference (e.g. papers) for
-        this env."""
+        """Create a markdown description of the reference (e.g. papers) for this env."""
 
     def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
         super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
