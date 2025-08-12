@@ -120,8 +120,6 @@ class Renderer:
     This class provides offscreen rendering capabilities for MuJoCo simulations,
     generating camera images and storing them in shared memory for access by other
     processes.
-
-    Huh?
     """
 
     def __init__(self, model, data, shm_image):
@@ -312,7 +310,6 @@ class MujocoSim:
                 self.object_names.append(body_name)
         self.object_names.sort()
         self.num_objects = len(self.object_names)
-        print(f"Detected {self.num_objects} objects: {self.object_names}")
 
     def reset(self, seed=None):
         """Reset the simulation and randomize object positions."""
@@ -327,9 +324,7 @@ class MujocoSim:
         mujoco.mj_resetData(self.model, self.data)  # pylint: disable=no-member
 
         # Randomize positions and orientations for all detected objects
-        for _, (object_name, cube_qpos) in enumerate(
-            zip(self.object_names, self.qpos_objects)
-        ):
+        for cube_qpos in self.qpos_objects:
 
             # Randomize position within a reasonable range around the table
             cube_qpos[:2] += self.np_random.uniform(-0.3, 0.3, 2)
@@ -339,12 +334,6 @@ class MujocoSim:
             theta = self.np_random.uniform(-math.pi, math.pi)
             cube_quat = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
             cube_qpos[3:7] = cube_quat
-
-            print(
-                f"{object_name} reset to position: "
-                f"[{cube_qpos[0]:.3f}, {cube_qpos[1]:.3f}, {cube_qpos[2]:.3f}], "
-                f"theta: {theta:.3f}"
-            )
 
         mujoco.mj_forward(self.model, self.data)  # pylint: disable=no-member
 
@@ -399,7 +388,7 @@ class MujocoSim:
         )  # right_driver_joint, joint range [0, 0.8]
 
         # Update all object positions and quaternions
-        for i, (_, qpos_obj) in enumerate(zip(self.object_names, self.qpos_objects)):
+        for i, qpos_obj in enumerate(self.qpos_objects):
             self.shm_state.object_positions[i][:] = qpos_obj[
                 :3
             ]  # First 3 elements are position
@@ -466,7 +455,6 @@ class MujocoEnv:
                 object_names.append(body_name)
         object_names.sort()
         num_objects = len(object_names)
-        print(f"Detected {num_objects} objects in scene: {object_names}")
 
         # Shared memory for state observations
         self.shm_state = ShmState(num_objects=num_objects, object_names=object_names)
@@ -594,9 +582,6 @@ class MujocoEnv:
                 obs[f"{object_name}_pos"] = obj_pos
                 obs[f"{object_name}_quat"] = obj_quat_converted
 
-        # if self.cabinet_scene:
-        #     obs["left_handle_pos"] = self.shm_state.left_handle_pos.copy()
-        #     obs["right_handle_pos"] = self.shm_state.right_handle_pos.copy()
         if self.render_images:
             for shm_image in self.shm_images:
                 obs[f"{shm_image.camera_name}_image"] = shm_image.data.copy()

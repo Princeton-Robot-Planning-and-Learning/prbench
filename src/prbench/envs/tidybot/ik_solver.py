@@ -5,7 +5,10 @@ engine to compute joint configurations that achieve desired end-effector poses.
 The solver implements a damped least squares approach with nullspace optimization
 to maintain joint limits and preferred configurations.
 
-References:
+Adapted from
+https://github.com/jimmyyhwu/tidybot2
+
+Other References:
 - https://github.com/bulletphysics/bullet3/
   blob/master/examples/ThirdPartyLibs/BussIK/Jacobian.cpp
 - https://github.com/kevinzakka/mjctrl/blob/main/diffik_nullspace.py
@@ -13,34 +16,35 @@ References:
   blob/main/dm_control/utils/inverse_kinematics.py
 """
 
-# pylint: disable=no-member
-# Author: Jimmy Wu
-# Date: October 2024
-
 import os
 
 import mujoco
 import numpy as np
 
-DAMPING_COEFF = 1e-12
-MAX_ANGLE_CHANGE = np.deg2rad(45)
 
-
-class IKSolver:
-    """Inverse kinematics solver for robotic arm control.
+class TidybotIKSolver:
+    """Inverse kinematics solver for Tidybot arm control.
 
     This class provides methods to solve inverse kinematics problems using MuJoCo
     physics engine. It implements a damped least squares approach with nullspace
     optimization to maintain joint limits and preferred configurations.
     """
 
-    def __init__(self, ee_offset: float = 0.0) -> None:
+    def __init__(
+        self,
+        ee_offset: float = 0.0,
+        *,
+        damping_coeff: float = 1e-12,
+        max_angle_change: float = np.deg2rad(45),
+    ) -> None:
         # Load arm without gripper
         model_path = os.path.join(
             os.path.dirname(__file__), "models", "kinova_gen3", "gen3.xml"
         )
-        self.model = mujoco.MjModel.from_xml_path(model_path)
-        self.data = mujoco.MjData(self.model)
+        self.model = mujoco.MjModel.from_xml_path(  # pylint: disable=no-member
+            model_path
+        )
+        self.data = mujoco.MjData(self.model)  # pylint: disable=no-member
         self.model.body_gravcomp[:] = 1.0
 
         # Cache references
@@ -62,8 +66,9 @@ class IKSolver:
         self.err_quat = np.empty(4)
         self.jac = np.empty((6, self.model.nv))
         self.jac_pos, self.jac_rot = self.jac[:3], self.jac[3:]
-        self.damping = DAMPING_COEFF * np.eye(6)
+        self.damping = damping_coeff * np.eye(6)
         self.eye = np.eye(self.model.nv)
+        self.max_angle_change = max_angle_change
 
     def solve(
         self,
@@ -92,24 +97,32 @@ class IKSolver:
 
         for _ in range(max_iters):
             # Update site pose
-            mujoco.mj_kinematics(self.model, self.data)
-            mujoco.mj_comPos(self.model, self.data)
+            mujoco.mj_kinematics(self.model, self.data)  # pylint: disable=no-member
+            mujoco.mj_comPos(self.model, self.data)  # pylint: disable=no-member
 
             # Translational error
             self.err_pos[:] = pos - self.site_pos
 
             # Rotational error
-            mujoco.mju_mat2Quat(self.site_quat, self.site_mat)
-            mujoco.mju_negQuat(self.site_quat_inv, self.site_quat)
-            mujoco.mju_mulQuat(self.err_quat, quat, self.site_quat_inv)
-            mujoco.mju_quat2Vel(self.err_rot, self.err_quat, 1.0)
+            mujoco.mju_mat2Quat(  # pylint: disable=no-member
+                self.site_quat, self.site_mat
+            )
+            mujoco.mju_negQuat(  # pylint: disable=no-member
+                self.site_quat_inv, self.site_quat
+            )
+            mujoco.mju_mulQuat(  # pylint: disable=no-member
+                self.err_quat, quat, self.site_quat_inv
+            )
+            mujoco.mju_quat2Vel(  # pylint: disable=no-member
+                self.err_rot, self.err_quat, 1.0
+            )
 
             # Check if target pose reached
             if np.linalg.norm(self.err) < err_thresh:
                 break
 
             # Calculate update
-            mujoco.mj_jacSite(
+            mujoco.mj_jacSite(  # pylint: disable=no-member
                 self.model, self.data, self.jac_pos, self.jac_rot, self.site_id
             )
             update = self.jac.T @ np.linalg.solve(
@@ -124,10 +137,12 @@ class IKSolver:
 
             # Enforce max angle change
             update_max = np.abs(update).max()
-            if update_max > MAX_ANGLE_CHANGE:
-                update *= MAX_ANGLE_CHANGE / update_max
+            if update_max > self.max_angle_change:
+                update *= self.max_angle_change / update_max
 
             # Apply update
-            mujoco.mj_integratePos(self.model, self.data.qpos, update, 1.0)
+            mujoco.mj_integratePos(  # pylint: disable=no-member
+                self.model, self.data.qpos, update, 1.0
+            )
 
         return self.data.qpos.copy()

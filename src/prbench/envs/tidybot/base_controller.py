@@ -9,8 +9,10 @@ The current controller is part of the environment.
 """
 
 import time
+from typing import Optional, Sequence
 
 import numpy as np
+from numpy.typing import NDArray
 from ruckig import (  # pylint: disable=no-name-in-module
     InputParameter,
     OutputParameter,
@@ -27,41 +29,62 @@ class BaseController:
     This class implements a controller for the mobile base using Ruckig's online
     trajectory generation to ensure smooth, constrained motion with velocity and
     acceleration limits.
+
+    Attributes:
+        qpos: Current base pose/state vector, typically ``[x, y, theta]``.
+        qvel: Current base velocity vector, typically ``[vx, vy, omega]``.
+        ctrl: Actuator target for the base state (same shape as ``qpos``).
+        last_command_time: Timestamp (seconds since epoch) of the last received
+            command.
+        otg: Ruckig trajectory generator instance for the base.
+        otg_inp: Ruckig input parameters buffer (contains target/current states and
+            motion limits such as ``max_velocity`` and ``max_acceleration``).
+        otg_out: Ruckig output parameters buffer (provides new positions for control).
+        otg_res: Latest Ruckig result status (e.g., Working/Finished).
+        motion3d_spec: Environment timing/specs (e.g., ``policy_control_period``).
+        command_timeout_factor: Multiplier applied to ``policy_control_period`` for
+            detecting command timeouts.
+        reset_qpos: Default pose used by ``reset()`` when initializing the base.
     """
 
-    qpos: np.ndarray
-    qvel: np.ndarray
-    ctrl: np.ndarray
-    otg: "Ruckig"
-    otg_inp: "InputParameter"
-    otg_out: "OutputParameter"
-    otg_res: int | None
-    motion3d_spec: "Motion3DEnvSpec"
-    last_command_time: float | None
-
     def __init__(
-        self, qpos: np.ndarray, qvel: np.ndarray, ctrl: np.ndarray, timestep: float
+        self,
+        qpos: NDArray[np.float64],
+        qvel: NDArray[np.float64],
+        ctrl: NDArray[np.float64],
+        timestep: float,
+        num_dofs: int = 3,
+        max_velocity: Optional[Sequence[float]] = None,
+        max_acceleration: Optional[Sequence[float]] = None,
+        command_timeout_factor: float = 2.5,
+        reset_qpos: Optional[NDArray[np.float64]] = None,
     ) -> None:
         self.qpos = qpos
         self.qvel = qvel
         self.ctrl = ctrl
-        # OTG (online trajectory generation)
-        num_dofs = 3
-        self.last_command_time = None
+        self.last_command_time: Optional[float] = None
         self.otg = Ruckig(num_dofs, timestep)
         self.otg_inp = InputParameter(num_dofs)
         self.otg_out = OutputParameter(num_dofs)
-        self.otg_inp.max_velocity = [0.5, 0.5, 3.14]
-        self.otg_inp.max_acceleration = [0.5, 0.5, 2.36]
-        # self.otg_inp.max_velocity = [0.2, 0.2, 0.5]  # [x, y, theta] velocities
-        # self.otg_inp.max_acceleration = [0.2, 0.2, 0.5]  # [x, y, theta] accelerations
+        if max_velocity is None:
+            max_velocity = [0.5, 0.5, 3.14]
+        if max_acceleration is None:
+            max_acceleration = [0.5, 0.5, 2.36]
+        self.otg_inp.max_velocity = list(max_velocity)
+        self.otg_inp.max_acceleration = list(max_acceleration)
         self.otg_res = None
         self.motion3d_spec = Motion3DEnvSpec()
+        self.command_timeout_factor = command_timeout_factor
+        self.reset_qpos = (
+            reset_qpos
+            if reset_qpos is not None
+            else np.zeros(num_dofs, dtype=np.float64)
+        )
 
     def reset(self) -> None:
         """Reset the base controller to origin position."""
         # Initialize base at origin
-        self.qpos[:] = np.zeros(3)
+        self.qpos[:] = self.reset_qpos
         self.ctrl[:] = self.qpos
         # Initialize OTG
         self.last_command_time = time.time()
@@ -81,7 +104,7 @@ class BaseController:
         # Maintain current pose if command stream is disrupted
         if (
             time.time() - self.last_command_time
-            > 2.5 * self.motion3d_spec.policy_control_period
+            > self.command_timeout_factor * self.motion3d_spec.policy_control_period
         ):
             self.otg_inp.target_position = self.qpos
             self.otg_res = Result.Working

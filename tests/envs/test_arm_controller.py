@@ -42,15 +42,15 @@ def test_reset(arm_controller):
 
 
 def test_control_callback_sets_target(arm_controller):
-    """Test that control_callback sets the target position using real IKSolver and
-    updates OTG state."""
+    """Test that control_callback sets the target position using real TidybotIKSolver
+    and updates OTG state."""
     arm_controller.reset()
     command = {
         "arm_pos": np.array([1.0, 2.0, 3.0]),
         "arm_quat": np.array([0.0, 0.0, 0.0, 1.0]),
     }
     arm_controller.control_callback(command)
-    # The target position should be set, but the exact value depends on IKSolver
+    # The target position should be set, but the exact value depends on TidybotIKSolver
     assert arm_controller.otg_inp.target_position is not None
     assert arm_controller.otg_res is not None
 

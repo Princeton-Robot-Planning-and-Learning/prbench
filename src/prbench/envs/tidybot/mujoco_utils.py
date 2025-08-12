@@ -16,8 +16,7 @@ SIMULATION_TIMESTEP = 0.002  # (in seconds)
 
 
 class MujocoEnv:
-    """This is the base class for environments that use MuJoCo for
-    simulation."""
+    """This is the base class for environments that use MuJoCo for simulation."""
 
     def __init__(self, xml_string, control_frequency, horizon=1000):
         """
