@@ -8,8 +8,8 @@ from geom2drobotenvs.object_types import (
     CircleType,
     CRVRobotType,
     Geom2DRobotEnvTypeFeatures,
+    LObjectType,
     RectangleType,
-    LObjectType
 )
 from geom2drobotenvs.structs import ZOrder
 from geom2drobotenvs.utils import (
@@ -94,8 +94,10 @@ class PushPullHook2DEnvSpec(Geom2DRobotEnvSpec):
         table_shape[1] / 2,
     )
     hook_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
-        SE2Pose(world_min_x, table_pose.y - hook_shape[1] / 10, 0),
-        SE2Pose(world_max_x - hook_shape[0], table_pose.y + hook_shape[1] / 2, 0),
+        SE2Pose(world_min_x, table_pose.y - hook_shape[1] / 4, np.pi / 4),
+        SE2Pose(
+            world_max_x - hook_shape[0], table_pose.y + hook_shape[1] / 4, 3 * np.pi / 4
+        ),
     )
 
     # Fixed Button hyperparameters.
@@ -179,16 +181,27 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
             movable_button = obj_name_to_obj["movable_button"]
             target_button = obj_name_to_obj["target_button"]
 
+            dist_movable_button = np.linalg.norm(
+                np.array(
+                    [
+                        state.get(target_button, "x") - state.get(movable_button, "x"),
+                        state.get(target_button, "y") - state.get(movable_button, "y"),
+                    ]
+                )
+            )
+
             full_state = state.copy()
             full_state.data.update(self._initial_constant_state.data)
             if (
-                not state_has_collision(full_state, {hook}, set(full_state), {})
-                and not state_has_collision(
-                    full_state, {movable_button}, set(full_state), {}
+                not state_has_collision(
+                    full_state,
+                    {hook, movable_button, target_button},
+                    set(full_state),
+                    {},
                 )
-                and not state_has_collision(
-                    full_state, {target_button}, set(full_state), {}
-                )
+                and 3 * self._spec.movable_button_radius
+                < dist_movable_button
+                < 6 * self._spec.movable_button_radius
             ):
                 break
         else:
@@ -292,7 +305,7 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
                 "y": movable_button_pose[1],
                 "theta": 0,
                 "radius": self._spec.movable_button_radius,
-                "static": True,
+                "static": False,
                 "color_r": self._spec.movable_button_unpressed_rgb[0],
                 "color_g": self._spec.movable_button_unpressed_rgb[1],
                 "color_b": self._spec.movable_button_unpressed_rgb[2],
@@ -365,42 +378,22 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
             self._current_state.set(
                 button, "color_b", self._spec.target_button_unpressed_rgb[2]
             )
-        del self._static_object_body_cache[button]
+            del self._static_object_body_cache[button]
         return self._current_state
 
-    def push_movable_button(self, hook_pose, button_pose, action):
+    def push_movable_button(self):
         """Utility function to push the movable button in the direction of travel of
         robot if the hook and button are in contact.
 
-        If robot travels in opposite direction,
-        button disconnects and does not move.
-        Args:
-            hook_pose: SE2Pose of hook
-            button_pose: SE2Pose of movable button
-            action: np.array([dx, dy, dtheta, ...])
-        Returns:
-            new_button_pose: SE2Pose or None if disconnected
+        If robot travels in opposite direction, button disconnects and does not move.
         """
-        hook_to_button = np.array(
-            [button_pose.x - hook_pose.x, button_pose.y - hook_pose.y]
-        )
-        hook_to_button_dist = np.linalg.norm(hook_to_button)
-        contact_threshold = self._spec.movable_button_radius + self._spec.hook_shape[0]
-        if hook_to_button_dist > contact_threshold:
-            return None  # Not in contact
-        travel_dir = np.array([action[0], action[1]])
-        travel_dir_norm = np.linalg.norm(travel_dir)
-        if travel_dir_norm < 1e-6:
-            return button_pose  # No movement
-        travel_dir_unit = travel_dir / travel_dir_norm
-        hook_to_button_unit = hook_to_button / (hook_to_button_dist + 1e-8)
-        dot = np.dot(travel_dir_unit, hook_to_button_unit)
-        if dot > 0.7:
-            new_x = button_pose.x + travel_dir_unit[0] * travel_dir_norm
-            new_y = button_pose.y + travel_dir_unit[1] * travel_dir_norm
-            return SE2Pose(new_x, new_y, button_pose.theta)
+        assert self._current_state is not None
+        assert self._initial_constant_state is not None
 
-        return None
+        hook = self._current_state.get("hook")
+        button = self._current_state.get("movable_button")
+        assert hook is not None
+        assert button is not None
 
     def step(
         self, action: NDArray[np.float32]
@@ -408,6 +401,7 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         # For any button in contact with either the robot or the stick, change
         # color to pressed.
         super().step(action)
+        # self.push_movable_button()
         assert self._current_state is not None
         assert self._initial_constant_state is not None
         obj_name_to_obj = {o.name: o for o in self._current_state}
