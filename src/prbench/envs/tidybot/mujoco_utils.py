@@ -1,3 +1,10 @@
+"""This module provides utilities for working with MuJoCo environments.
+
+It includes the `MujocoEnv` class, which serves as a base class for environments
+that use MuJoCo for simulation, and the `MjSim` class, which encapsulates the
+MuJoCo simulation logic.
+"""
+
 import xml.etree.ElementTree as ET
 
 import mujoco
@@ -52,12 +59,12 @@ class MujocoEnv:
             done (bool): Whether the episode is completed.
             info (dict): Additional information.
         """
-        reward = self.reward(action)
+        reward = self.reward(action=action)
         done = False  # Default to not done unless overridden
         info = {}
         return reward, done, info
 
-    def reward(self):
+    def reward(self, **kwargs):
         """Compute the reward for the current state and action.
 
         Returns:
