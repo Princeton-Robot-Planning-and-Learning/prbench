@@ -5,6 +5,8 @@ that use MuJoCo for simulation, and the `MjSim` class, which encapsulates the
 MuJoCo simulation logic.
 """
 
+# pylint: disable=no-member
+
 import xml.etree.ElementTree as ET
 
 import mujoco
