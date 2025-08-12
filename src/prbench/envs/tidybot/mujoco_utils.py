@@ -123,9 +123,9 @@ class MjSim:
 
         xml_string = self._set_simulation_timestep(xml_string)
 
-        self.model = mujoco.MjModel.from_xml_string(
+        self.model = mujoco.MjModel.from_xml_string(  # pylint: disable=no-member
             xml_string
-        )  # pylint: disable=no-member
+        )
         self.data = mujoco.MjData(self.model)  # pylint: disable=no-member
 
         # Offscreen render context object
