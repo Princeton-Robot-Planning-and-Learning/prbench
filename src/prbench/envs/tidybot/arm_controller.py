@@ -1,34 +1,35 @@
 """ArmController module for TidyBot.
 
-This module defines the ArmController class, which provides control
-logic for the robotic arm using inverse kinematics and online trajectory
-generation (Ruckig). It is designed to be used within the TidyBot
-simulation and control framework, and supports smooth, constrained
-motion for the arm and gripper. 
+This module defines the ArmController class, which provides control logic for the
+robotic arm using inverse kinematics and online trajectory generation (Ruckig). It is
+designed to be used within the TidyBot simulation and control framework, and supports
+smooth, constrained motion for the arm and gripper.
 
-The current controller is part of the environment. 
+The current controller is part of the environment.
 """
-
-# pylint: disable=no-member
-# pylint: disable=no-name-in-module
 
 import math
 import time
 
 import numpy as np
-from ruckig import InputParameter, OutputParameter, Result, Ruckig
+from ruckig import (  # pylint: disable=no-name-in-module
+    InputParameter,
+    OutputParameter,
+    Result,
+    Ruckig,
+)
 
 from prbench.envs.tidybot.ik_solver import IKSolver
 from prbench.envs.tidybot.motion3d import Motion3DEnvSpec
 
 
 class ArmController:
-    """Controller for robotic arm movement using inverse kinematics and
-    trajectory generation.
+    """Controller for robotic arm movement using inverse kinematics and trajectory
+    generation.
 
-    This class implements a controller for the robotic arm using inverse
-    kinematics to convert end-effector poses to joint configurations,
-    and Ruckig's online trajectory generation for smooth motion control.
+    This class implements a controller for the robotic arm using inverse kinematics to
+    convert end-effector poses to joint configurations, and Ruckig's online trajectory
+    generation for smooth motion control.
     """
 
     qpos: np.ndarray

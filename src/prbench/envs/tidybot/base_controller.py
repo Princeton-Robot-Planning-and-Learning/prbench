@@ -1,20 +1,22 @@
 """BaseController module for TidyBot.
 
-This module defines the BaseController class, which provides control
-logic for the mobile base using online trajectory generation (Ruckig).
-It is designed to be used within the TidyBot simulation and control
-framework, and supports smooth, constrained motion for the robot base.
+This module defines the BaseController class, which provides control logic for the
+mobile base using online trajectory generation (Ruckig). It is designed to be used
+within the TidyBot simulation and control framework, and supports smooth, constrained
+motion for the robot base.
 
 The current controller is part of the environment.
 """
 
-# pylint: disable=no-member
-# pylint: disable=no-name-in-module
-
 import time
 
 import numpy as np
-from ruckig import InputParameter, OutputParameter, Result, Ruckig
+from ruckig import (  # pylint: disable=no-name-in-module
+    InputParameter,
+    OutputParameter,
+    Result,
+    Ruckig,
+)
 
 from prbench.envs.tidybot.motion3d import Motion3DEnvSpec
 
@@ -22,9 +24,9 @@ from prbench.envs.tidybot.motion3d import Motion3DEnvSpec
 class BaseController:
     """Controller for mobile base movement using online trajectory generation.
 
-    This class implements a controller for the mobile base using
-    Ruckig's online trajectory generation to ensure smooth, constrained
-    motion with velocity and acceleration limits.
+    This class implements a controller for the mobile base using Ruckig's online
+    trajectory generation to ensure smooth, constrained motion with velocity and
+    acceleration limits.
     """
 
     qpos: np.ndarray

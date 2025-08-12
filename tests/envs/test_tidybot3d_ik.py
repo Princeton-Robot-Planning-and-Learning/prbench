@@ -6,8 +6,8 @@ from prbench.envs.tidybot.ik_solver import IKSolver
 
 
 def test_ik_solver_basic():
-    """Test that the IKSolver returns a valid joint configuration for a simple
-    target pose."""
+    """Test that the IKSolver returns a valid joint configuration for a simple target
+    pose."""
     ik = IKSolver(ee_offset=0.12)
     target_pos = ik.site_pos.copy()
     target_quat = np.array([0, 0, 0, 1])  # Identity quaternion (x, y, z, w)
@@ -18,8 +18,8 @@ def test_ik_solver_basic():
 
 
 def test_ik_solver_performance_and_accuracy():
-    """Test the performance and accuracy of the IKSolver for a known home pose
-    over 1000 iterations."""
+    """Test the performance and accuracy of the IKSolver for a known home pose over 1000
+    iterations."""
     ik_solver = IKSolver()
     home_pos = np.array([0.456, 0.0, 0.434])
     home_quat = np.array([0.5, 0.5, 0.5, 0.5])

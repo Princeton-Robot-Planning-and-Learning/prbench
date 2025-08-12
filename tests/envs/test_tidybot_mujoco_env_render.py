@@ -1,8 +1,8 @@
 """Integration tests for MujocoEnv image observation output in
 prbench.envs.tidybot.tidybot_mujoco_env.
 
-These tests verify that image keys in the observation are present and
-have the expected structure.
+These tests verify that image keys in the observation are present and have the expected
+structure.
 """
 
 import gc

@@ -1,19 +1,13 @@
 """MuJoCo environment for robotic simulation and control.
 
-This module provides a comprehensive MuJoCo-based environment for
-simulating robotic systems with shared memory communication, real-time
-control, and multi-process rendering capabilities. It includes classes
-for state management, image handling, rendering, and various controllers
-for base and arm control.
+This module provides a comprehensive MuJoCo-based environment for simulating robotic
+systems with shared memory communication, real-time control, and multi-process rendering
+capabilities. It includes classes for state management, image handling, rendering, and
+various controllers for base and arm control.
 
 Adapted from
 https://github.com/jimmyyhwu/tidybot2
 """
-
-# pylint: disable=no-member
-# pylint: disable=no-name-in-module
-# pylint: disable=relative-beyond-top-level, import-outside-toplevel
-# for GL context import
 
 import math
 import multiprocessing as mp
@@ -30,17 +24,16 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 
-from .arm_controller import ArmController
-from .base_controller import BaseController
+from prbench.envs.tidybot.arm_controller import ArmController
+from prbench.envs.tidybot.base_controller import BaseController
 
 
 class ShmState:
     """Shared memory state manager for robotic environment data.
 
-    This class manages shared memory for storing and accessing robot
-    state information including base pose, arm position/orientation,
-    gripper state, and object positions/orientations across multiple
-    processes.
+    This class manages shared memory for storing and accessing robot state information
+    including base pose, arm position/orientation, gripper state, and object
+    positions/orientations across multiple processes.
     """
 
     def __init__(self, existing_instance=None, num_objects=3, object_names=None):
@@ -95,9 +88,9 @@ class ShmState:
 class ShmImage:
     """Shared memory image manager for camera data.
 
-    This class manages shared memory for storing and accessing camera
-    image data across multiple processes, supporting both creation of
-    new shared memory segments and attachment to existing ones.
+    This class manages shared memory for storing and accessing camera image data across
+    multiple processes, supporting both creation of new shared memory segments and
+    attachment to existing ones.
     """
 
     def __init__(
@@ -124,9 +117,9 @@ class ShmImage:
 class Renderer:
     """MuJoCo renderer for offscreen image generation.
 
-    This class provides offscreen rendering capabilities for MuJoCo
-    simulations, generating camera images and storing them in shared
-    memory for access by other processes.
+    This class provides offscreen rendering capabilities for MuJoCo simulations,
+    generating camera images and storing them in shared memory for access by other
+    processes.
 
     Huh?
     """
@@ -140,49 +133,61 @@ class Renderer:
         self.shm_image = ShmImage(existing_instance=shm_image)
 
         # Set up camera
-        camera_id = mujoco.mj_name2id(
-            self.model, mujoco.mjtObj.mjOBJ_CAMERA.value, shm_image.camera_name
+        camera_id = mujoco.mj_name2id(  # pylint: disable=no-member
+            self.model,
+            mujoco.mjtObj.mjOBJ_CAMERA.value,  # pylint: disable=no-member
+            shm_image.camera_name,  # pylint: disable=no-member
         )
         width, height = model.cam_resolution[camera_id]
-        self.camera = mujoco.MjvCamera()
+        self.camera = mujoco.MjvCamera()  # pylint: disable=no-member
         self.camera.fixedcamid = camera_id
-        self.camera.type = mujoco.mjtCamera.mjCAMERA_FIXED
+        self.camera.type = mujoco.mjtCamera.mjCAMERA_FIXED  # pylint: disable=no-member
 
         # Set up context depending on backend
-        self.rect = mujoco.MjrRect(0, 0, width, height)
+        self.rect = mujoco.MjrRect(0, 0, width, height)  # pylint: disable=no-member
 
         if os.environ.get("MUJOCO_GL", "") == "osmesa":
-            from mujoco.osmesa import GLContext
+            from mujoco.osmesa import (  # pylint: disable=relative-beyond-top-level, import-outside-toplevel
+                GLContext,
+            )
         else:
-            from mujoco.gl_context import GLContext
+            from mujoco.gl_context import (  # pylint: disable=relative-beyond-top-level, import-outside-toplevel
+                GLContext,
+            )
         self.gl_context = GLContext(width, height)
         self.gl_context.make_current()
 
-        self.mjr_context = mujoco.MjrContext(
-            model, mujoco.mjtFontScale.mjFONTSCALE_150.value
+        self.mjr_context = mujoco.MjrContext(  # pylint: disable=no-member
+            model,
+            mujoco.mjtFontScale.mjFONTSCALE_150.value,  # pylint: disable=no-member
         )
-        mujoco.mjr_setBuffer(
-            mujoco.mjtFramebuffer.mjFB_OFFSCREEN.value, self.mjr_context
+        mujoco.mjr_setBuffer(  # pylint: disable=no-member
+            mujoco.mjtFramebuffer.mjFB_OFFSCREEN.value,  # pylint: disable=no-member
+            self.mjr_context,  #  pylint: disable=no-member
         )
 
         # Set up scene
-        self.scene_option = mujoco.MjvOption()
-        self.scene = mujoco.MjvScene(model, 10000)
+        self.scene_option = mujoco.MjvOption()  # pylint: disable=no-member
+        self.scene = mujoco.MjvScene(model, 10000)  # pylint: disable=no-member
 
     def render(self):
         """Render the current scene to shared memory image."""
         self.gl_context.make_current()
-        mujoco.mjv_updateScene(
+        mujoco.mjv_updateScene(  # pylint: disable=no-member
             self.model,
             self.data,
             self.scene_option,
             None,
             self.camera,
-            mujoco.mjtCatBit.mjCAT_ALL.value,
+            mujoco.mjtCatBit.mjCAT_ALL.value,  # pylint: disable=no-member
             self.scene,
         )
-        mujoco.mjr_render(self.rect, self.scene, self.mjr_context)
-        mujoco.mjr_readPixels(self.image, None, self.rect, self.mjr_context)
+        mujoco.mjr_render(  # pylint: disable=no-member
+            self.rect, self.scene, self.mjr_context
+        )
+        mujoco.mjr_readPixels(  # pylint: disable=no-member
+            self.image, None, self.rect, self.mjr_context
+        )
         self.shm_image.data[:] = np.flipud(self.image)
 
     def close(self) -> None:
@@ -198,10 +203,10 @@ class Renderer:
 class MujocoSim:
     """MuJoCo simulation environment with shared memory communication.
 
-    This class manages a MuJoCo simulation with real-time control,
-    object detection, state management, and multi-process rendering
-    capabilities. It provides the core simulation loop and handles
-    communication between different processes via shared memory.
+    This class manages a MuJoCo simulation with real-time control, object detection,
+    state management, and multi-process rendering capabilities. It provides the core
+    simulation loop and handles communication between different processes via shared
+    memory.
     """
 
     def __init__(
@@ -212,8 +217,10 @@ class MujocoSim:
         show_viewer=True,
         seed=None,
     ):
-        self.model = mujoco.MjModel.from_xml_path(mjcf_path)
-        self.data = mujoco.MjData(self.model)
+        self.model = mujoco.MjModel.from_xml_path(  # pylint: disable=no-member
+            mjcf_path
+        )
+        self.data = mujoco.MjData(self.model)  # pylint: disable=no-member
         self.command_queue = command_queue
         self.show_viewer = show_viewer
 
@@ -288,15 +295,15 @@ class MujocoSim:
         self.reset()
 
         # Set control callback
-        mujoco.set_mjcb_control(self.control_callback)
+        mujoco.set_mjcb_control(self.control_callback)  # pylint: disable=no-member
 
     def extract_objects(self):
-        """Detects all object bodies in the MuJoCo model whose names match the
-        pattern 'cube+'.
+        """Detects all object bodies in the MuJoCo model whose names match the pattern
+        'cube+'.
 
-        Populates self.object_names with the sorted list of detected
-        object names and sets self.num_objects accordingly. Prints the
-        number and names of detected objects for debugging purposes.
+        Populates self.object_names with the sorted list of detected object names and
+        sets self.num_objects accordingly. Prints the number and names of detected
+        objects for debugging purposes.
         """
         self.body_names = {self.model.body(i).name for i in range(self.model.nbody)}
         self.object_names = []
@@ -317,7 +324,7 @@ class MujocoSim:
                 self.np_random = np.random.default_rng(seed)
 
         # Reset simulation
-        mujoco.mj_resetData(self.model, self.data)
+        mujoco.mj_resetData(self.model, self.data)  # pylint: disable=no-member
 
         # Randomize positions and orientations for all detected objects
         for _, (object_name, cube_qpos) in enumerate(
@@ -339,7 +346,7 @@ class MujocoSim:
                 f"theta: {theta:.3f}"
             )
 
-        mujoco.mj_forward(self.model, self.data)
+        mujoco.mj_forward(self.model, self.data)  # pylint: disable=no-member
 
         # Reset controllers
         self.base_controller.reset()
@@ -373,16 +380,16 @@ class MujocoSim:
         site_xpos = self.site_xpos.copy()
         site_xpos[2] -= self.base_height  # Base height offset
         site_xpos[:2] -= self.qpos_base[:2]  # Base position inverse
-        mujoco.mju_axisAngle2Quat(
+        mujoco.mju_axisAngle2Quat(  # pylint: disable=no-member
             self.base_quat_inv, self.base_rot_axis, -self.qpos_base[2]
-        )  # Base orientation inverse
-        mujoco.mju_rotVecQuat(
+        )  # Base orientation inverse # pylint: disable=no-member
+        mujoco.mju_rotVecQuat(  # pylint: disable=no-member
             self.shm_state.arm_pos, site_xpos, self.base_quat_inv
-        )  # Arm pos in local frame
+        )  # Arm pos in local frame # pylint: disable=no-member
 
         # Update arm quat
-        mujoco.mju_mat2Quat(self.site_quat, self.site_xmat)
-        mujoco.mju_mulQuat(
+        mujoco.mju_mat2Quat(self.site_quat, self.site_xmat)  # pylint: disable=no-member
+        mujoco.mju_mulQuat(  # pylint: disable=no-member
             self.shm_state.arm_quat, self.base_quat_inv, self.site_quat
         )  # Arm quat in local frame
 
@@ -406,7 +413,7 @@ class MujocoSim:
     def launch(self):
         """Launch the MuJoCo viewer or run headless simulation."""
         if self.show_viewer:
-            mujoco.viewer.launch(
+            mujoco.viewer.launch(  # pylint: disable=no-member
                 self.model, self.data, show_left_ui=False, show_right_ui=False
             )
 
@@ -417,16 +424,15 @@ class MujocoSim:
                 while time.time() - last_step_time < self.model.opt.timestep:
                     time.sleep(0.0001)
                 last_step_time = time.time()
-                mujoco.mj_step(self.model, self.data)
+                mujoco.mj_step(self.model, self.data)  # pylint: disable=no-member
 
 
 class MujocoEnv:
     """Main MuJoCo environment interface for robotic control.
 
-    This class provides the main interface for interacting with the
-    MuJoCo simulation environment, including observation retrieval,
-    action execution, and multi-process management for rendering and
-    physics simulation.
+    This class provides the main interface for interacting with the MuJoCo simulation
+    environment, including observation retrieval, action execution, and multi-process
+    management for rendering and physics simulation.
     """
 
     suppress_render_warning: bool = True  # Class-level default
@@ -449,7 +455,9 @@ class MujocoEnv:
         self.suppress_render_warning = True  # Instance-level default
 
         # Detect objects from the model to determine shared memory size
-        model = mujoco.MjModel.from_xml_path(self.mjcf_path)
+        model = mujoco.MjModel.from_xml_path(  # pylint: disable=no-member
+            self.mjcf_path
+        )
         body_names = {model.body(i).name for i in range(model.nbody)}
 
         object_names = []
@@ -531,11 +539,16 @@ class MujocoEnv:
                 time.sleep(0.01)
             last_imshow_time = time.time()
             for i, shm_image in enumerate(shm_images):
-                cv.imshow(
-                    shm_image.camera_name, cv.cvtColor(shm_image.data, cv.COLOR_RGB2BGR)
+                cv.imshow(  # pylint: disable=no-member
+                    shm_image.camera_name,
+                    cv.cvtColor(  # pylint: disable=no-member
+                        shm_image.data, cv.COLOR_RGB2BGR  # pylint: disable=no-member
+                    ),
                 )
-                cv.moveWindow(shm_image.camera_name, 640 * i, -100)
-            cv.waitKey(1)
+                cv.moveWindow(  # pylint: disable=no-member
+                    shm_image.camera_name, 640 * i, -100
+                )
+            cv.waitKey(1)  # pylint: disable=no-member
 
     def reset(self, seed: int | None = None) -> None:
         """Reset the environment and wait for initialization."""

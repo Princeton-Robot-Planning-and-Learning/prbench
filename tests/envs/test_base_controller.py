@@ -1,8 +1,8 @@
 """Integration tests for the BaseController class in
 prbench.envs.tidybot.base_controller.
 
-These tests use the BaseController and its dependencies, assuming all
-required packages are installed.
+These tests use the BaseController and its dependencies, assuming all required packages
+are installed.
 """
 
 # pylint: disable=redefined-outer-name
@@ -25,8 +25,7 @@ def base_controller() -> BaseController:
 
 
 def test_reset(base_controller):
-    """Test that BaseController.reset() sets state to origin and OTG to
-    Finished."""
+    """Test that BaseController.reset() sets state to origin and OTG to Finished."""
     base_controller.reset()
     assert np.allclose(base_controller.qpos, 0)
     assert np.allclose(base_controller.ctrl, 0)
@@ -35,8 +34,7 @@ def test_reset(base_controller):
 
 
 def test_control_callback_sets_target(base_controller):
-    """Test that control_callback sets the target position and updates OTG
-    state."""
+    """Test that control_callback sets the target position and updates OTG state."""
     base_controller.reset()
     command = {"base_pose": np.array([1.0, 2.0, 3.0])}
     base_controller.control_callback(command)

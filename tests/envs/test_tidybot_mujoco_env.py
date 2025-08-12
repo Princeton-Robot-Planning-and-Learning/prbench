@@ -1,8 +1,6 @@
-"""Integration tests for the MujocoEnv class in
-prbench.envs.tidybot.tidybot_mujoco_env.
+"""Integration tests for the MujocoEnv class in prbench.envs.tidybot.tidybot_mujoco_env.
 
-These tests verify environment initialization, reset, and the structure
-of observations.
+These tests verify environment initialization, reset, and the structure of observations.
 """
 
 import os
@@ -15,8 +13,7 @@ from prbench.envs.tidybot.tidybot_mujoco_env import MujocoEnv
 
 
 def test_mujoco_env_init_and_obs():
-    """Test MujocoEnv initialization, reset, and get_obs with a minimal MJCF
-    file."""
+    """Test MujocoEnv initialization, reset, and get_obs with a minimal MJCF file."""
     # Detect headless mode (no DISPLAY) and set OSMesa if needed
     if not os.environ.get("DISPLAY"):
         if sys.platform == "darwin":

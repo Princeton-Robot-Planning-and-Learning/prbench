@@ -29,10 +29,9 @@ MAX_ANGLE_CHANGE = np.deg2rad(45)
 class IKSolver:
     """Inverse kinematics solver for robotic arm control.
 
-    This class provides methods to solve inverse kinematics problems
-    using MuJoCo physics engine. It implements a damped least squares
-    approach with nullspace optimization to maintain joint limits and
-    preferred configurations.
+    This class provides methods to solve inverse kinematics problems using MuJoCo
+    physics engine. It implements a damped least squares approach with nullspace
+    optimization to maintain joint limits and preferred configurations.
     """
 
     def __init__(self, ee_offset: float = 0.0) -> None:

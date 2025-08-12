@@ -1,8 +1,7 @@
-"""Integration tests for the MujocoSim class in
-prbench.envs.tidybot.tidybot_mujoco_env.
+"""Integration tests for the MujocoSim class in prbench.envs.tidybot.tidybot_mujoco_env.
 
-These tests verify simulation initialization, reset, and the presence of
-controller attributes.
+These tests verify simulation initialization, reset, and the presence of controller
+attributes.
 """
 
 import gc

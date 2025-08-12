@@ -1,8 +1,7 @@
-"""Integration tests for the ArmController class in
-prbench.envs.tidybot.arm_controller.
+"""Integration tests for the ArmController class in prbench.envs.tidybot.arm_controller.
 
-These tests use the ArmController and its dependencies, assuming all
-required packages are installed.
+These tests use the ArmController and its dependencies, assuming all required packages
+are installed.
 """
 
 import numpy as np
@@ -27,8 +26,8 @@ def arm_controller() -> ArmController:
 
 
 def test_reset(arm_controller):
-    """Test that ArmController.reset() sets state to retract configuration and
-    OTG to Finished."""
+    """Test that ArmController.reset() sets state to retract configuration and OTG to
+    Finished."""
     arm_controller.reset()
     assert np.allclose(
         arm_controller.qpos,
@@ -43,8 +42,8 @@ def test_reset(arm_controller):
 
 
 def test_control_callback_sets_target(arm_controller):
-    """Test that control_callback sets the target position using real IKSolver
-    and updates OTG state."""
+    """Test that control_callback sets the target position using real IKSolver and
+    updates OTG state."""
     arm_controller.reset()
     command = {
         "arm_pos": np.array([1.0, 2.0, 3.0]),
