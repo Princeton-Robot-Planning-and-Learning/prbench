@@ -5,8 +5,6 @@ that use MuJoCo for simulation, and the `MjSim` class, which encapsulates the
 MuJoCo simulation logic.
 """
 
-# pylint: disable=no-member
-
 import xml.etree.ElementTree as ET
 
 import mujoco
@@ -125,8 +123,10 @@ class MjSim:
 
         xml_string = self._set_simulation_timestep(xml_string)
 
-        self.model = mujoco.MjModel.from_xml_string(xml_string)
-        self.data = mujoco.MjData(self.model)
+        self.model = mujoco.MjModel.from_xml_string(
+            xml_string
+        )  # pylint: disable=no-member
+        self.data = mujoco.MjData(self.model)  # pylint: disable=no-member
 
         # Offscreen render context object
         self._render_context_offscreen = None
@@ -157,12 +157,12 @@ class MjSim:
 
     def reset(self):
         """Reset the simulation."""
-        mujoco.mj_resetData(self.model, self.data)
+        mujoco.mj_resetData(self.model, self.data)  # pylint: disable=no-member
 
     def forward(self):
         """Synchronize derived quantities."""
-        mujoco.mj_forward(self.model, self.data)
+        mujoco.mj_forward(self.model, self.data)  # pylint: disable=no-member
 
     def step(self):
         """Step the simulation."""
-        mujoco.mj_step(self.model, self.data)
+        mujoco.mj_step(self.model, self.data)  # pylint: disable=no-member
