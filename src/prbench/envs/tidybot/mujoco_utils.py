@@ -1,7 +1,7 @@
-import mujoco
-import numpy as np
 import xml.etree.ElementTree as ET
 
+import mujoco
+import numpy as np
 
 # This value is then used by the physics engine to determine how much time
 # to simulate for each step.
@@ -9,9 +9,8 @@ SIMULATION_TIMESTEP = 0.002  # (in seconds)
 
 
 class MujocoEnv:
-    """
-    This is the base class for environments that use MuJoCo for simulation.
-    """
+    """This is the base class for environments that use MuJoCo for
+    simulation."""
 
     def __init__(self, xml_string, control_frequency, horizon=1000):
         """
@@ -28,16 +27,13 @@ class MujocoEnv:
         self.done = False
 
     def reset(self):
-        """
-        Reset the environment.
-        """
+        """Reset the environment."""
         self.sim.reset()
         self.sim.forward()
         return self._get_obs()
 
     def _pre_action(self, action):
-        """
-        Do any preprocessing before taking an action.
+        """Do any preprocessing before taking an action.
 
         Args:
             action (np.array): Action to execute within the environment.
@@ -46,8 +42,7 @@ class MujocoEnv:
             self.sim.data.ctrl[:] = action
 
     def _post_action(self, action):
-        """
-        Do any housekeeping after taking an action.
+        """Do any housekeeping after taking an action.
 
         Args:
             action (np.array): Action to execute within the environment.
@@ -63,8 +58,7 @@ class MujocoEnv:
         return reward, done, info
 
     def reward(self, action):
-        """
-        Compute the reward for the current state and action.
+        """Compute the reward for the current state and action.
 
         Args:
             action (np.array): Action taken.
@@ -76,8 +70,7 @@ class MujocoEnv:
         return 0.0  # Placeholder reward, should be overridden in subclasses
 
     def step(self, action=None):
-        """
-        Step the environment.
+        """Step the environment.
 
         Args:
             action: Optional action to apply before stepping.
@@ -108,9 +101,7 @@ class MujocoEnv:
         return self._get_obs(), reward, self.done, info
 
     def _get_obs(self):
-        """
-        Get the current observation.
-        """
+        """Get the current observation."""
         # return a copy of qpos and qvel as observation
         return {
             "qpos": np.copy(self.sim.data.qpos),
@@ -119,9 +110,7 @@ class MujocoEnv:
 
 
 class MjSim:
-    """
-    A simplified MjSim class for MuJoCo simulation.
-    """
+    """A simplified MjSim class for MuJoCo simulation."""
 
     def __init__(self, xml_string):
         """
@@ -138,8 +127,7 @@ class MjSim:
         self._render_context_offscreen = None
 
     def _set_simulation_timestep(self, xml_string):
-        """
-        Set the simulation timestep in the XML string.
+        """Set the simulation timestep in the XML string.
 
         Args:
             xml_string: A string containing the MuJoCo XML model.
