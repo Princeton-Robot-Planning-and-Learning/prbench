@@ -57,17 +57,13 @@ class MujocoEnv:
         info = {}
         return reward, done, info
 
-    def reward(self, action):
+    def reward(self):
         """Compute the reward for the current state and action.
-
-        Args:
-            action (np.array): Action taken.
 
         Returns:
             reward (float): Computed reward.
         """
-        # raise NotImplementedError
-        return 0.0  # Placeholder reward, should be overridden in subclasses
+        raise NotImplementedError
 
     def step(self, action=None):
         """Step the environment.
