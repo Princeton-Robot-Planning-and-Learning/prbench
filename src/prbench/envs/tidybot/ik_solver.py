@@ -33,7 +33,6 @@ class TidybotIKSolver:
     def __init__(
         self,
         ee_offset: float = 0.0,
-        *,
         damping_coeff: float = 1e-12,
         max_angle_change: float = np.deg2rad(45),
     ) -> None:

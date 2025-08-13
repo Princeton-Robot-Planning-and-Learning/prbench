@@ -17,12 +17,14 @@ import time
 import traceback
 from multiprocessing import shared_memory
 from threading import Thread
+from typing import Any, Optional
 
 import cv2 as cv
 import gymnasium
 import mujoco
 import mujoco.viewer
 import numpy as np
+from numpy.typing import NDArray
 
 from prbench.envs.tidybot.arm_controller import ArmController
 from prbench.envs.tidybot.base_controller import BaseController
@@ -36,17 +38,27 @@ class ShmState:
     positions/orientations across multiple processes.
     """
 
-    def __init__(self, existing_instance=None, num_objects=3, object_names=None):
+    def __init__(
+        self,
+        existing_instance: Optional["ShmState"] = None,
+        num_objects: int = 3,
+        object_names: Optional[list[str]] = None,
+    ) -> None:
         # Calculate array size: 3 (base_pose) + 3 (arm_pos) + 4 (arm_quat) +
         # 1 (gripper_pos) + 1 (initialized) + num_objects * 7 (pos + quat for
-        # each object) + 6 (2 handle positions)
+        # each object)
+        # initialized Meaning: It’s a shared-memory readiness flag (float 0.0/1.0)
+        # indicating whether the producer process has populated the state
+        # since the last reset.
+        # It’s a synchronization barrier between processes to ensure
+        # observations are ready before continuing.
         arr_size = 3 + 3 + 4 + 1 + 1 + num_objects * 7 + 6
         arr = np.empty(arr_size)
         if existing_instance is None:
             self.shm = shared_memory.SharedMemory(create=True, size=arr.nbytes)
         else:
             self.shm = shared_memory.SharedMemory(name=existing_instance.shm.name)
-        self.data = np.ndarray(arr.shape, buffer=self.shm.buf)
+        self.data: NDArray = np.ndarray(arr.shape, buffer=self.shm.buf)
 
         # Fixed indices
         self.base_pose = self.data[:3]
@@ -73,11 +85,6 @@ class ShmState:
             self.object_positions.append(self.data[pos_start : pos_start + 3])
             self.object_quaternions.append(self.data[quat_start : quat_start + 4])
 
-        # Handle positions (after all objects)
-        handle_start_idx = obj_start_idx + num_objects * 7
-        self.left_handle_pos = self.data[handle_start_idx : handle_start_idx + 3]
-        self.right_handle_pos = self.data[handle_start_idx + 3 : handle_start_idx + 6]
-
         self.initialized[:] = 0.0
 
     def close(self) -> None:
@@ -94,17 +101,31 @@ class ShmImage:
     """
 
     def __init__(
-        self, camera_name=None, width=None, height=None, existing_instance=None
-    ):
+        self,
+        camera_name: Optional[str] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        existing_instance: Optional["ShmImage"] = None,
+    ) -> None:
         if existing_instance is None:
-            self.camera_name = camera_name
+            if camera_name is None or width is None or height is None:
+                raise ValueError(
+                    "ShmImage requires camera_name, width, and height when "
+                    "creating new shared memory"
+                )
+            self.camera_name: str = camera_name
             arr = np.empty((height, width, 3), dtype=np.uint8)
-            self.shm = shared_memory.SharedMemory(create=True, size=arr.nbytes)
+            self.shm = shared_memory.SharedMemory(
+                create=True,
+                size=arr.nbytes,
+            )
         else:
             self.camera_name = existing_instance.camera_name
             arr = existing_instance.data
-            self.shm = shared_memory.SharedMemory(name=existing_instance.shm.name)
-        self.data = np.ndarray(arr.shape, dtype=np.uint8, buffer=self.shm.buf)
+            self.shm = shared_memory.SharedMemory(
+                name=existing_instance.shm.name,
+            )
+        self.data: NDArray = np.ndarray(arr.shape, dtype=np.uint8, buffer=self.shm.buf)
         self.data.fill(0)
 
     def close(self) -> None:
@@ -122,7 +143,12 @@ class Renderer:
     processes.
     """
 
-    def __init__(self, model, data, shm_image):
+    def __init__(
+        self,
+        model: mujoco.MjModel,  # pylint: disable=no-member
+        data: mujoco.MjData,  # pylint: disable=no-member
+        shm_image: ShmImage,
+    ) -> None:
         self.model = model
         self.data = data
         self.image = np.empty_like(shm_image.data)
@@ -168,7 +194,7 @@ class Renderer:
         self.scene_option = mujoco.MjvOption()  # pylint: disable=no-member
         self.scene = mujoco.MjvScene(model, 10000)  # pylint: disable=no-member
 
-    def render(self):
+    def render(self) -> None:
         """Render the current scene to shared memory image."""
         self.gl_context.make_current()
         mujoco.mjv_updateScene(  # pylint: disable=no-member
@@ -198,7 +224,7 @@ class Renderer:
             self.mjr_context = None
 
 
-class MujocoSim:
+class TidybotMujocoSim:
     """MuJoCo simulation environment with shared memory communication.
 
     This class manages a MuJoCo simulation with real-time control, object detection,
@@ -209,12 +235,12 @@ class MujocoSim:
 
     def __init__(
         self,
-        mjcf_path,
-        command_queue,
-        shm_state,
-        show_viewer=True,
+        mjcf_path: str,
+        command_queue: mp.Queue,
+        shm_state: ShmState,
+        show_viewer: bool = True,
         seed=None,
-    ):
+    ) -> None:
         self.model = mujoco.MjModel.from_xml_path(  # pylint: disable=no-member
             mjcf_path
         )
@@ -223,10 +249,10 @@ class MujocoSim:
         self.show_viewer = show_viewer
 
         # Initialize random number generator
-        if hasattr(gymnasium.utils, "seeding"):
+        if seed is not None:
             self.np_random, _ = gymnasium.utils.seeding.np_random(seed)
         else:
-            self.np_random = np.random.default_rng(seed)
+            self.np_random = np.random.default_rng()
 
         # Dynamically extract objects from the model
         self.extract_objects()
@@ -295,7 +321,7 @@ class MujocoSim:
         # Set control callback
         mujoco.set_mjcb_control(self.control_callback)  # pylint: disable=no-member
 
-    def extract_objects(self):
+    def extract_objects(self) -> None:
         """Detects all object bodies in the MuJoCo model whose names match the pattern
         'cube+'.
 
@@ -311,14 +337,13 @@ class MujocoSim:
         self.object_names.sort()
         self.num_objects = len(self.object_names)
 
-    def reset(self, seed=None):
+    def reset(self, seed=None) -> None:
         """Reset the simulation and randomize object positions."""
         # Set the random seed if provided
         if seed is not None:
-            if hasattr(gymnasium.utils, "seeding"):
-                self.np_random, _ = gymnasium.utils.seeding.np_random(seed)
-            else:
-                self.np_random = np.random.default_rng(seed)
+            self.np_random, _ = gymnasium.utils.seeding.np_random(seed)
+        else:
+            self.np_random = np.random.default_rng()
 
         # Reset simulation
         mujoco.mj_resetData(self.model, self.data)  # pylint: disable=no-member
@@ -341,7 +366,11 @@ class MujocoSim:
         self.base_controller.reset()
         self.arm_controller.reset()
 
-    def control_callback(self, *_):
+    def control_callback(
+        self,
+        _model: mujoco.MjModel,  # pylint: disable=no-member
+        _data: mujoco.MjData,  # pylint: disable=no-member
+    ) -> None:
         """Process control commands and update simulation state."""
         # Check for new command
         command = None if self.command_queue.empty() else self.command_queue.get()
@@ -359,8 +388,13 @@ class MujocoSim:
                 command = None  # Clear command after processing reset
 
         # Control callbacks
-        self.base_controller.control_callback(command)
-        self.arm_controller.control_callback(command)
+        cmd: dict[Any, Any] = (
+            {}
+            if command is None
+            else command if isinstance(command, dict) else {"action": command}
+        )
+        self.base_controller.control_callback(cmd)
+        self.arm_controller.control_callback(cmd)
 
         # Update base pose
         self.shm_state.base_pose[:] = self.qpos_base
@@ -399,7 +433,7 @@ class MujocoSim:
         # Notify reset() function that state has been initialized
         self.shm_state.initialized[:] = 1.0
 
-    def launch(self):
+    def launch(self) -> None:
         """Launch the MuJoCo viewer or run headless simulation."""
         if self.show_viewer:
             mujoco.viewer.launch(  # pylint: disable=no-member
@@ -408,7 +442,7 @@ class MujocoSim:
 
         else:
             # Run headless simulation at real-time speed
-            last_step_time = 0
+            last_step_time: float = 0.0
             while True:
                 while time.time() - last_step_time < self.model.opt.timestep:
                     time.sleep(0.0001)
@@ -428,11 +462,11 @@ class MujocoEnv:
 
     def __init__(
         self,
-        render_images=True,
-        show_viewer=True,
-        show_images=False,
-        mjcf_path=None,
-    ):
+        render_images: bool = True,
+        show_viewer: bool = True,
+        show_images: bool = False,
+        mjcf_path: Optional[str] = None,
+    ) -> None:
         if mjcf_path is not None:
             self.mjcf_path = mjcf_path
         else:
@@ -440,7 +474,7 @@ class MujocoEnv:
         self.render_images = render_images
         self.show_viewer = show_viewer
         self.show_images = show_images
-        self.command_queue = mp.Queue(1)
+        self.command_queue: mp.Queue = mp.Queue(1)
         self.suppress_render_warning = True  # Instance-level default
 
         # Detect objects from the model to determine shared memory size
@@ -474,11 +508,11 @@ class MujocoEnv:
             # Start visualizer loop
             mp.Process(target=self.visualizer_loop, daemon=True).start()
 
-    def physics_loop(self):
+    def physics_loop(self) -> None:
         """Run the physics simulation loop in a separate process."""
         try:
             # Create sim
-            sim = MujocoSim(
+            sim = TidybotMujocoSim(
                 self.mjcf_path,
                 self.command_queue,
                 self.shm_state,
@@ -498,16 +532,35 @@ class MujocoEnv:
             print("Physics process crashed:", e)
             traceback.print_exc()
 
-    def render_loop(self, model, data):
+    def render_loop(
+        self,
+        model: mujoco.MjModel,  # pylint: disable=no-member
+        data: mujoco.MjData,  # pylint: disable=no-member
+    ) -> None:
         """Run the rendering loop for camera images in a separate process."""
         # Set up renderers
-        renderers = [Renderer(model, data, shm_image) for shm_image in self.shm_images]
+        renderers = []
+        for shm_image in self.shm_images:
+            try:
+                renderers.append(Renderer(model, data, shm_image))
+            except Exception as e:
+                print(
+                    f"Error creating Renderer for camera '{shm_image.camera_name}': {e}"
+                )
+                traceback.print_exc()
 
         # Render camera images continuously
         while True:
             start_time = time.time()
             for renderer in renderers:
-                renderer.render()
+                try:
+                    renderer.render()
+                except Exception as e:
+                    cam_name = getattr(
+                        getattr(renderer, "shm_image", None), "camera_name", "<unknown>"
+                    )
+                    print(f"Error during rendering for camera '{cam_name}': {e}")
+                    traceback.print_exc()
             render_time = time.time() - start_time
             if render_time > 0.1 and not self.suppress_render_warning:
                 print(
@@ -516,7 +569,7 @@ class MujocoEnv:
                     f"offscreen rendering"
                 )
 
-    def visualizer_loop(self):
+    def visualizer_loop(self) -> None:
         """Run the visualizer loop for displaying camera images."""
         shm_images = [
             ShmImage(existing_instance=shm_image) for shm_image in self.shm_images
@@ -538,24 +591,44 @@ class MujocoEnv:
                 )
             cv.waitKey(1)  # pylint: disable=no-member
 
-    def reset(self, seed: int | None = None) -> None:
+    def reset(self, seed: Optional[int] = None) -> None:
         """Reset the environment and wait for initialization."""
         self.shm_state.initialized[:] = 0.0
         # Pass seed along with reset command
         reset_command = {"action": "reset", "seed": seed}
         self.command_queue.put(reset_command)
 
-        # Wait for state publishing to initialize
-        while self.shm_state.initialized == 0.0:
+        # Wait for state publishing to initialize with timeout
+        state_timeout_s = 10.0
+        start_time = time.time()
+        while self.shm_state.initialized[0] == 0.0:
+            if time.time() - start_time > state_timeout_s:
+                raise RuntimeError(
+                    f"State initialization timed out after {state_timeout_s} seconds"
+                )
             time.sleep(0.01)
 
         # Wait for image rendering to initialize
         # (Note: Assumes all zeros is not a valid image)
         if self.render_images:
+            image_timeout_s = 15.0
+            start_time = time.time()
             while any(np.all(shm_image.data == 0) for shm_image in self.shm_images):
+                if time.time() - start_time > image_timeout_s:
+                    not_ready = [
+                        shm_image.camera_name
+                        for shm_image in self.shm_images
+                        if np.all(shm_image.data == 0)
+                    ]
+                    raise RuntimeError(
+                        (
+                            f"Image initialization timed out after {image_timeout_s} "
+                            f"seconds; cameras not ready: {not_ready}"
+                        )
+                    )
                 time.sleep(0.01)
 
-    def get_obs(self) -> dict[str, object]:
+    def get_obs(self) -> dict[str, NDArray]:
         """Get the current observation from the environment."""
         arm_quat = self.shm_state.arm_quat[[1, 2, 3, 0]]  # (w, x, y, z) -> (x, y, z, w)
         if arm_quat[3] < 0.0:  # Enforce quaternion uniqueness

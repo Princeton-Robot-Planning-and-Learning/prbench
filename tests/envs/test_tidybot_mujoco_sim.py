@@ -13,11 +13,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from prbench.envs.tidybot.tidybot_mujoco_env import MujocoSim
+from prbench.envs.tidybot.tidybot_mujoco_env import TidybotMujocoSim
 
 
 def test_mujoco_sim_init_and_reset():
-    """Test MujocoSim initialization and reset with a minimal MJCF file."""
+    """Test TidybotMujocoSim initialization and reset with a minimal MJCF file."""
     # Construct the MJCF path relative to this test file
     model_base_path = (
         Path(__file__).parent
@@ -37,10 +37,10 @@ def test_mujoco_sim_init_and_reset():
         pytest.skip(f"MJCF file not found: {absolute_model_path}")
 
     command_queue = mp.Queue(1)
-    shm_state = None  # Let MujocoSim create its own state if needed
+    shm_state = None  # Let TidybotMujocoSim create its own state if needed
 
-    # Try to initialize MujocoSim
-    sim = MujocoSim(
+    # Try to initialize TidybotMujocoSim
+    sim = TidybotMujocoSim(
         mjcf_path=str(absolute_model_path),
         command_queue=command_queue,
         shm_state=shm_state,
