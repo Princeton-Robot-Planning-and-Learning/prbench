@@ -57,7 +57,7 @@ def register_all_environments() -> None:
         )
 
     # StickButton2D environment with different numbers of buttons.
-    num_buttons = [1, 5, 10]
+    num_buttons = [1, 2, 3, 5, 10]
     for num_button in num_buttons:
         register(
             id=f"prbench/StickButton2D-b{num_button}-v0",

@@ -351,7 +351,7 @@ class TidybotMujocoSim:
         # Randomize positions and orientations for all detected objects
         for cube_qpos in self.qpos_objects:
 
-            # Randomize position within a reasonable range around the table
+            # Randomize position within a reasonable range
             cube_qpos[:2] += self.np_random.uniform(-0.3, 0.3, 2)
             # Keep Z position at table height (don't randomize vertical position)
 

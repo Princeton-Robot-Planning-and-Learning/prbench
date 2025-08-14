@@ -1,10 +1,4 @@
-"""TidyBot 3D environment wrapper for PRBench.
-
-Test.
-"""
-
-# pylint: disable=relative-beyond-top-level, import-outside-toplevel
-# for GL context import
+"""TidyBot 3D environment wrapper for PRBench."""
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -15,17 +9,12 @@ import numpy as np
 from gymnasium import spaces
 from numpy.typing import NDArray
 
+from prbench.envs.tidybot.tidybot_mujoco_env import MujocoEnv
 from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
-
-# Import TidyBot components from local files
-from .tidybot_mujoco_env import MujocoEnv
 
 
 class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
-    """TidyBot 3D environment with mobile manipulation tasks.
-
-    (Policy-agnostic, random actions only)
-    """
+    """TidyBot 3D environment with mobile manipulation tasks."""
 
     metadata: dict[str, Any] = {"render_modes": ["rgb_array"]}
 
@@ -37,7 +26,8 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         custom_grasp: bool = False,
         render_images: bool = True,
         seed: int | None = None,
-        **kwargs,
+        show_viewer: bool = False,
+        show_images: bool = False,
     ) -> None:
         super().__init__()
 
@@ -45,24 +35,20 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.num_objects = num_objects
         self.render_mode = render_mode
         self.custom_grasp = custom_grasp
-        # Allow show_viewer/show_images/render_images to be set via kwargs or directly
-        self.show_viewer = kwargs.pop("show_viewer", False)
-        self.show_images = kwargs.pop("show_images", False)
-        self.render_images = kwargs.pop("render_images", render_images)
-        # Store any other kwargs for future use
-        self._extra_kwargs = kwargs
+        # Allow show_viewer/show_images/render_images to be set directly
+        self.show_viewer = show_viewer
+        self.show_images = show_images
+        self.render_images = render_images
         self._render_camera_name: str | None = None
 
         # Initialize random number generator
-        if hasattr(gymnasium.utils, "seeding"):
+        if seed is not None:
             self.np_random, _ = gymnasium.utils.seeding.np_random(seed)
         else:
-            self.np_random = np.random.default_rng(seed)
+            self.np_random = np.random.default_rng()
 
         # Initialize TidyBot environment
         self._tidybot_env = self._create_tidybot_env()
-
-        # Remove policy initialization
 
         self._reward_calculator = create_reward_calculator(
             self.scene_type, self.num_objects
@@ -72,7 +58,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.observation_space = self._create_observation_space()
         self.action_space = self._create_action_space()
 
-        # Add metadata for documentation (remove policy references)
+        # Add metadata for documentation
         self.metadata.update(
             {
                 "description": self._create_env_markdown_description(),
@@ -84,13 +70,11 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             }
         )
 
-    def _create_tidybot_env(self) -> "MujocoEnv":
+    def _create_tidybot_env(self) -> MujocoEnv:
         """Create the underlying TidyBot MuJoCo environment."""
         # Set model path to local models directory
         model_base_path = Path(__file__).parent / "models" / "stanford_tidybot"
 
-        # Remove table, cabinet, and cupboard from scene_type options
-        # Only keep 'ground' (if present)
         model_file = "scene.xml"
         # Construct absolute path to model file
         absolute_model_path = model_base_path / model_file
@@ -144,8 +128,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             "show_images": self.show_images,
             "mjcf_path": str(dynamic_model_path),
         }
-        # Allow any extra kwargs to override
-        kwargs.update(self._extra_kwargs)
 
         return MujocoEnv(**kwargs)  # type: ignore
 
@@ -176,10 +158,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         obs_vector: list[float] = []
         for key in sorted(obs.keys()):  # Sort for consistency
             value = obs[key]
-            if isinstance(value, np.ndarray):
-                obs_vector.extend(value.flatten())
-            else:
-                obs_vector.append(float(value))
+            obs_vector.extend(value.flatten())
         return np.array(obs_vector, dtype=np.float32)
 
     def _dict_to_action(self, action_vector: NDArray[np.float32]) -> dict[str, Any]:
@@ -201,10 +180,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # Pass the seed to the TidyBot environment
         self._tidybot_env.reset(seed=seed)
 
-        # Remove policy reset
-        self._reward_calculator = create_reward_calculator(
-            self.scene_type, self.num_objects
-        )
         obs = self._tidybot_env.get_obs()
         vec_obs = self._vectorize_observation(obs)
         return vec_obs, {}
@@ -242,13 +217,13 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             # If a specific camera is requested, use it.
             if self._render_camera_name:
                 key = f"{self._render_camera_name}_image"
-                if key in obs and isinstance(obs[key], np.ndarray):
+                if key in obs:
                     return obs[key]
             # Otherwise, fall back to the first available image.
             for key, value in obs.items():
-                if key.endswith("_image") and isinstance(value, np.ndarray):
+                if key.endswith("_image"):
                     return value
-            return np.zeros((480, 640, 3), dtype=np.uint8)
+            raise RuntimeError("No camera image available in observation.")
         return None
 
     def close(self) -> None:

@@ -44,10 +44,10 @@ prbench.register_all_environments()
 
 # Create a TidyBot environment (no policy_type)
 env = prbench.make(
-    "prbench/TidyBot3D-ground-o7-v0",
+    "prbench/TidyBot3D-ground-o5-v0",
     render_images=True,
-    show_viewer=False,
-    show_images=False
+    show_viewer=True,
+    show_images=True
     )
 
 # Standard Gymnasium interface

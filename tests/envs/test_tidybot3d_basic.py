@@ -1,4 +1,5 @@
-"""Basic tests for the TidyBot3D environment: observation and action space validity."""
+"""Basic tests for the TidyBot3D environment observation and action space validity,
+step, and reset."""
 
 from prbench.envs.tidybot.tidybot3d import TidyBot3DEnv
 
@@ -17,4 +18,32 @@ def test_tidybot3d_action_space():
     env = TidyBot3DEnv(num_objects=3, render_images=False)
     action = env.action_space.sample()
     assert env.action_space.contains(action), "Action not in action space"
+    env.close()
+
+
+def test_tidybot3d_reset_returns_valid_observation():
+    """Test that reset() returns an observation in the observation space."""
+    env = TidyBot3DEnv(num_objects=3, render_images=False)
+    obs, info = env.reset()
+    assert env.observation_space.contains(
+        obs
+    ), "Reset observation not in observation space"
+    assert isinstance(info, dict)
+    env.close()
+
+
+def test_tidybot3d_step_returns_valid_outputs():
+    """Test that step() returns valid outputs: obs in space, reward is float, done flags
+    are bools."""
+    env = TidyBot3DEnv(num_objects=3, render_images=False)
+    env.reset()
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
+    assert env.observation_space.contains(
+        obs
+    ), "Step observation not in observation space"
+    assert isinstance(reward, float), "Reward is not a float"
+    assert isinstance(terminated, bool), "Terminated is not a bool"
+    assert isinstance(truncated, bool), "Truncated is not a bool"
+    assert isinstance(info, dict), "Info is not a dict"
     env.close()
