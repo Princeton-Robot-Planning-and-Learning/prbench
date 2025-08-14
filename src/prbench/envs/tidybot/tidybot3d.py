@@ -95,11 +95,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 # Insert new cubes
                 for i in range(self.num_objects):
                     name = f"cube{i+1}"
-                    # Only support ground scene
-                    x = round(self.np_random.uniform(0.4, 0.8), 3)
-                    y = round(self.np_random.uniform(-0.3, 0.3), 3)
-                    z = 0.02
-                    pos = f"{x} {y} {z}"
+                    pos = f"{0} {0} {0}"
                     body = ET.Element("body", name=name, pos=pos)
                     ET.SubElement(body, "freejoint")
                     ET.SubElement(
