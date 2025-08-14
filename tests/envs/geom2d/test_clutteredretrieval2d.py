@@ -5,7 +5,9 @@ from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
 
 import prbench
-from prbench.envs.clutteredretrieval2d import ObjectCentricClutteredRetrieval2DEnv
+from prbench.envs.geom2d.clutteredretrieval2d import (
+    ObjectCentricClutteredRetrieval2DEnv,
+)
 
 
 def test_object_centric_clutteredretrieval2d_env():

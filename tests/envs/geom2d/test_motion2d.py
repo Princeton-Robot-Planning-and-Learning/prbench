@@ -6,7 +6,7 @@ from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
 
 import prbench
-from prbench.envs.motion2d import Motion2DEnvSpec, ObjectCentricMotion2DEnv
+from prbench.envs.geom2d.motion2d import Motion2DEnvSpec, ObjectCentricMotion2DEnv
 
 prbench.register_all_environments()
 

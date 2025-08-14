@@ -6,7 +6,7 @@ from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
 
 import prbench
-from prbench.envs.stickbutton2d import ObjectCentricStickButton2DEnv
+from prbench.envs.geom2d.stickbutton2d import ObjectCentricStickButton2DEnv
 
 
 def test_object_centric_stickbutton2d_env():
