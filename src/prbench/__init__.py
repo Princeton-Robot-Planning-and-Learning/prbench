@@ -13,7 +13,7 @@ def register_all_environments() -> None:
     for num_obstruction in num_obstructions:
         register(
             id=f"prbench/Obstruction2D-o{num_obstruction}-v0",
-            entry_point="prbench.envs.obstruction2d:Obstruction2DEnv",
+            entry_point="prbench.envs.geom2d.obstruction2d:Obstruction2DEnv",
             kwargs={"num_obstructions": num_obstruction},
         )
 
@@ -22,7 +22,7 @@ def register_all_environments() -> None:
     for num_obstruction in num_obstructions:
         register(
             id=f"prbench/ClutteredRetrieval2D-o{num_obstruction}-v0",
-            entry_point="prbench.envs.clutteredretrieval2d:ClutteredRetrieval2DEnv",
+            entry_point="prbench.envs.geom2d.clutteredretrieval2d:ClutteredRetrieval2DEnv",  # pylint: disable=line-too-long
             kwargs={"num_obstructions": num_obstruction},
         )
 
@@ -31,7 +31,7 @@ def register_all_environments() -> None:
     for num_block in num_blocks:
         register(
             id=f"prbench/ClutteredStorage2D-b{num_block}-v0",
-            entry_point="prbench.envs.clutteredstorage2d:ClutteredStorage2DEnv",
+            entry_point="prbench.envs.geom2d.clutteredstorage2d:ClutteredStorage2DEnv",
             kwargs={"num_blocks": num_block},
         )
 
@@ -40,7 +40,7 @@ def register_all_environments() -> None:
     for num_passage in num_passages:
         register(
             id=f"prbench/Motion2D-p{num_passage}-v0",
-            entry_point="prbench.envs.motion2d:Motion2DEnv",
+            entry_point="prbench.envs.geom2d.motion2d:Motion2DEnv",
             kwargs={"num_passages": num_passage},
         )
 
@@ -49,7 +49,7 @@ def register_all_environments() -> None:
     for num_button in num_buttons:
         register(
             id=f"prbench/StickButton2D-b{num_button}-v0",
-            entry_point="prbench.envs.stickbutton2d:StickButton2DEnv",
+            entry_point="prbench.envs.geom2d.stickbutton2d:StickButton2DEnv",
             kwargs={"num_buttons": num_button},
         )
 
