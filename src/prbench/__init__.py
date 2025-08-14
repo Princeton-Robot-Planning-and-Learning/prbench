@@ -53,6 +53,12 @@ def register_all_environments() -> None:
             kwargs={"num_buttons": num_button},
         )
 
+    # PushPullHook2D environment
+    register(
+        id="prbench/PushPullHook2D-v0",
+        entry_point="prbench.envs.pushpullhook2d:PushPullHook2DEnv",
+    )
+
 
 def _register(id: str, *args, **kwargs) -> None:  # pylint: disable=redefined-builtin
     """Call register(), but only if the environment id is not already registered.
