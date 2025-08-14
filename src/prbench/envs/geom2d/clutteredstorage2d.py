@@ -24,7 +24,7 @@ from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 from tomsgeoms2d.structs import Rectangle
 
-from prbench.envs.geom2d_utils import ConstantObjectGeom2DEnv
+from prbench.envs.geom2d.geom2d_utils import ConstantObjectGeom2DEnv
 
 # NOTE: unlike some other environments, there are multiple target blocks here.
 TargetBlockType = Type("target_block", parent=RectangleType)
