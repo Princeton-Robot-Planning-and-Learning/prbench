@@ -1,4 +1,4 @@
-"""MuJoCo environment for robotic simulation and control.
+"""MuJoCo environment for tidybot simulation and control.
 
 This module provides a comprehensive MuJoCo-based environment for simulating robotic
 systems with shared memory communication, real-time control, and multi-process rendering
