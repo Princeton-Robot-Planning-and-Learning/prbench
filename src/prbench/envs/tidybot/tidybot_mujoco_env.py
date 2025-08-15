@@ -1,4 +1,4 @@
-"""MuJoCo environment for robotic simulation and control.
+"""MuJoCo environment for tidybot simulation and control.
 
 This module provides a comprehensive MuJoCo-based environment for simulating robotic
 systems with shared memory communication, real-time control, and multi-process rendering
@@ -351,9 +351,10 @@ class TidybotMujocoSim:
         # Randomize positions and orientations for all detected objects
         for cube_qpos in self.qpos_objects:
 
-            # Randomize position within a reasonable range around the table
-            cube_qpos[:2] += self.np_random.uniform(-0.3, 0.3, 2)
-            # Keep Z position at table height (don't randomize vertical position)
+            # Randomize position within a reasonable range for the ground environment
+            cube_qpos[0] = round(self.np_random.uniform(0.4, 0.8), 3)
+            cube_qpos[1] = round(self.np_random.uniform(-0.3, 0.3), 3)
+            cube_qpos[2] = 0.02
 
             # Randomize orientation around Z-axis (yaw)
             theta = self.np_random.uniform(-math.pi, math.pi)

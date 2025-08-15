@@ -1,4 +1,4 @@
-"""Inverse kinematics solver for robotic arm control.
+"""Inverse kinematics solver for tidybot arm control.
 
 This module provides an inverse kinematics solver that uses the MuJoCo physics
 engine to compute joint configurations that achieve desired end-effector poses.

@@ -1,5 +1,8 @@
 """Register environments and expose them through make()."""
 
+import os
+import sys
+
 import gymnasium
 from gymnasium.envs.registration import register
 
@@ -7,6 +10,15 @@ from gymnasium.envs.registration import register
 def register_all_environments() -> None:
     """Add all benchmark environments to the gymnasium registry."""
     # NOTE: ids must start with "prbench/" to be properly registered.
+
+    # Detect headless mode (no DISPLAY) and set OSMesa if needed
+    if not os.environ.get("DISPLAY"):
+        if sys.platform == "darwin":
+            os.environ["MUJOCO_GL"] = "glfw"
+            os.environ["PYOPENGL_PLATFORM"] = "glfw"
+        else:
+            os.environ["MUJOCO_GL"] = "osmesa"
+            os.environ["PYOPENGL_PLATFORM"] = "osmesa"
 
     # Obstructions2D environment with different numbers of obstructions.
     num_obstructions = [0, 1, 2, 3, 4]
@@ -52,6 +64,22 @@ def register_all_environments() -> None:
             entry_point="prbench.envs.geom2d.stickbutton2d:StickButton2DEnv",
             kwargs={"num_buttons": num_button},
         )
+
+    # TidyBot3D environments with different scenes and object counts
+    scene_configs = [
+        ("ground", [3, 5, 7]),  # Ground/scene.xml with different object counts
+    ]
+
+    for scene_type, object_counts in scene_configs:
+        for num_objects in object_counts:
+            register(
+                id=f"prbench/TidyBot3D-{scene_type}-o{num_objects}-v0",
+                entry_point="prbench.envs.tidybot.tidybot3d:TidyBot3DEnv",
+                kwargs={
+                    "scene_type": scene_type,
+                    "num_objects": num_objects,
+                },
+            )
 
 
 def _register(id: str, *args, **kwargs) -> None:  # pylint: disable=redefined-builtin
