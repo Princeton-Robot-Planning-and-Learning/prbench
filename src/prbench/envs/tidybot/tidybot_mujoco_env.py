@@ -480,9 +480,9 @@ class MujocoEnv:
         if mjcf_path is not None:
             self.mjcf_path = mjcf_path
         elif table_scene:
-            self.mjcf_path = "models/stanford_tidybot/blocks_table_scene.xml"
+            self.mjcf_path = "models/stanford_tidybot/table_scene.xml"
         else:
-            self.mjcf_path = "models/stanford_tidybot/scene.xml"
+            self.mjcf_path = "models/stanford_tidybot/ground_scene.xml"
         self.render_images = render_images
         self.show_viewer = show_viewer
         self.show_images = show_images

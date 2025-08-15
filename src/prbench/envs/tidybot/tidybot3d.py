@@ -74,9 +74,9 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # Set model path to local models directory
         model_base_path = Path(__file__).parent / "models" / "stanford_tidybot"
         if self.scene_type == "table":
-            model_file = "blocks_table_scene.xml"
+            model_file = "table_scene.xml"
         else:
-            model_file = "scene.xml"
+            model_file = "ground_scene.xml"
         # Construct absolute path to model file
         absolute_model_path = model_base_path / model_file
 
