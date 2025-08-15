@@ -42,12 +42,12 @@ import prbench
 # Register all environments (including TidyBot)
 prbench.register_all_environments()
 
-# Create a TidyBot environment (no policy_type)
+# Create a TidyBot environment
 env = prbench.make(
     "prbench/TidyBot3D-ground-o5-v0",
     render_images=True,
-    show_viewer=True,
-    show_images=True
+    show_viewer=False,
+    show_images=False
     )
 
 # Standard Gymnasium interface

@@ -35,7 +35,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.num_objects = num_objects
         self.render_mode = render_mode
         self.custom_grasp = custom_grasp
-        # Allow show_viewer/show_images/render_images to be set directly
         self.show_viewer = show_viewer
         self.show_images = show_images
         self.render_images = render_images
@@ -234,8 +233,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Create environment description (policy-agnostic)."""
         scene_description = ""
         if self.scene_type == "ground":
-            scene_description = """ In the 'ground' scene,
-objects are placed randomly on a flat ground plane."""
+            scene_description = """ In the 'ground' scene, objects are placed randomly on a flat ground plane."""  # pylint: disable=line-too-long
 
         return f"""A 3D mobile manipulation environment using the TidyBot platform.
         
@@ -270,8 +268,7 @@ The robot can control:
     def _create_reward_markdown_description(self) -> str:
         """Create reward description."""
         if self.scene_type == "ground":
-            return """The primary reward is for successfully placing objects
-at their target locations.
+            return """The primary reward is for successfully placing objects at their target locations. # pylint: disable=line-too-long
 - A reward of +1.0 is given for each object placed within a 5cm tolerance of its target.
 - A smaller positive reward is given for objects within a 10cm tolerance to guide the robot.
 - A small negative reward (-0.01) is applied at each timestep to encourage efficiency.
