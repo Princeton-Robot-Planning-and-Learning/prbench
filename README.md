@@ -36,21 +36,33 @@ This section describes the integration of TidyBot 3D mobile manipulation environ
 
 ### Basic Usage
 
+Table environment
 ```python
 import prbench
-
-# Register all environments (including TidyBot)
 prbench.register_all_environments()
-
-# Create a TidyBot environment
 env = prbench.make(
     "prbench/TidyBot3D-table-o5-v0",
     render_images=True,
     show_viewer=True,
     show_images=True
     )
+obs, info = env.reset(seed=123)
+action = env.action_space.sample()
+obs, reward, terminated, truncated, info = env.step(action)
+img = env.render()
+env.close()
+```
 
-# Standard Gymnasium interface
+Cupboard environment
+```python
+import prbench
+prbench.register_all_environments()
+env = prbench.make(
+    "prbench/TidyBot3D-cupboard-o8-v0",
+    render_images=True,
+    show_viewer=True,
+    show_images=True
+    )
 obs, info = env.reset(seed=123)
 action = env.action_space.sample()
 obs, reward, terminated, truncated, info = env.step(action)
