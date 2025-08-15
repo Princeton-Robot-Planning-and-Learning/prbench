@@ -44,10 +44,10 @@ prbench.register_all_environments()
 
 # Create a TidyBot environment
 env = prbench.make(
-    "prbench/TidyBot3D-ground-o5-v0",
+    "prbench/TidyBot3D-table-o5-v0",
     render_images=True,
-    show_viewer=False,
-    show_images=False
+    show_viewer=True,
+    show_images=True
     )
 
 # Standard Gymnasium interface
@@ -56,17 +56,6 @@ action = env.action_space.sample()
 obs, reward, terminated, truncated, info = env.step(action)
 img = env.render()
 env.close()
-```
-
-You can also check environment compliance:
-
-```
-import gymnasium
-from gymnasium.utils.env_checker import check_env
-import prbench
-prbench.register_all_environments()
-env = prbench.make("prbench/TidyBot3D-cabinet-o3-v0",render_mode="rgb_array")
-check_env(env.unwrapped)
 ```
 
 ### Action Space

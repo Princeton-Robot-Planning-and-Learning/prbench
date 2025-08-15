@@ -73,13 +73,15 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Create the underlying TidyBot MuJoCo environment."""
         # Set model path to local models directory
         model_base_path = Path(__file__).parent / "models" / "stanford_tidybot"
-
-        model_file = "scene.xml"
+        if self.scene_type == "table":
+            model_file = "blocks_table_scene.xml"
+        else:
+            model_file = "scene.xml"
         # Construct absolute path to model file
         absolute_model_path = model_base_path / model_file
 
         # --- Dynamic object insertion logic ---
-        needs_dynamic_objects = self.scene_type in ["ground"]
+        needs_dynamic_objects = self.scene_type in ["ground", "table"]
         if needs_dynamic_objects:
             tree = ET.parse(str(absolute_model_path))
             root = tree.getroot()
@@ -123,6 +125,9 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             "show_images": self.show_images,
             "mjcf_path": str(dynamic_model_path),
         }
+
+        if self.scene_type == "table":
+            kwargs["table_scene"] = True
 
         return MujocoEnv(**kwargs)  # type: ignore
 

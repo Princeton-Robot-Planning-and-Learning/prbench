@@ -239,6 +239,7 @@ class TidybotMujocoSim:
         command_queue: mp.Queue,
         shm_state: ShmState,
         show_viewer: bool = True,
+        table_scene: bool = False,
         seed=None,
     ) -> None:
         self.model = mujoco.MjModel.from_xml_path(  # pylint: disable=no-member
@@ -247,6 +248,7 @@ class TidybotMujocoSim:
         self.data = mujoco.MjData(self.model)  # pylint: disable=no-member
         self.command_queue = command_queue
         self.show_viewer = show_viewer
+        self.table_scene = table_scene
 
         # Initialize random number generator
         if seed is not None:
@@ -351,10 +353,16 @@ class TidybotMujocoSim:
         # Randomize positions and orientations for all detected objects
         for cube_qpos in self.qpos_objects:
 
-            # Randomize position within a reasonable range for the ground environment
-            cube_qpos[0] = round(self.np_random.uniform(0.4, 0.8), 3)
-            cube_qpos[1] = round(self.np_random.uniform(-0.3, 0.3), 3)
-            cube_qpos[2] = 0.02
+            if self.table_scene:
+                # Randomize position within a reasonable range for the ground environment
+                cube_qpos[0] = round(self.np_random.uniform(0.2, 0.8), 3)
+                cube_qpos[1] = round(self.np_random.uniform(-0.15, 0.15), 3)
+                cube_qpos[2] = 0.44
+            else:
+                # Randomize position within a reasonable range for the ground environment
+                cube_qpos[0] = round(self.np_random.uniform(0.4, 0.8), 3)
+                cube_qpos[1] = round(self.np_random.uniform(-0.3, 0.3), 3)
+                cube_qpos[2] = 0.02
 
             # Randomize orientation around Z-axis (yaw)
             theta = self.np_random.uniform(-math.pi, math.pi)
@@ -466,15 +474,19 @@ class MujocoEnv:
         render_images: bool = True,
         show_viewer: bool = True,
         show_images: bool = False,
+        table_scene=False,
         mjcf_path: Optional[str] = None,
     ) -> None:
         if mjcf_path is not None:
             self.mjcf_path = mjcf_path
+        elif table_scene:
+            self.mjcf_path = "models/stanford_tidybot/blocks_table_scene.xml"
         else:
             self.mjcf_path = "models/stanford_tidybot/scene.xml"
         self.render_images = render_images
         self.show_viewer = show_viewer
         self.show_images = show_images
+        self.table_scene = table_scene
         self.command_queue: mp.Queue = mp.Queue(1)
         self.suppress_render_warning = True  # Instance-level default
 
@@ -518,6 +530,7 @@ class MujocoEnv:
                 self.command_queue,
                 self.shm_state,
                 show_viewer=self.show_viewer,
+                table_scene=self.table_scene,
             )
 
             # Start render loop
