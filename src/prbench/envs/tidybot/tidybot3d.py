@@ -73,7 +73,9 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Create the underlying TidyBot MuJoCo environment."""
         # Set model path to local models directory
         model_base_path = Path(__file__).parent / "models" / "stanford_tidybot"
-        if self.scene_type == "table":
+        if self.scene_type == "cupboard":
+            model_file = "cupboard_scene.xml"
+        elif self.scene_type == "table":
             model_file = "table_scene.xml"
         else:
             model_file = "ground_scene.xml"
@@ -126,7 +128,9 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             "mjcf_path": str(dynamic_model_path),
         }
 
-        if self.scene_type == "table":
+        if self.scene_type == "cupboard":
+            kwargs["cupboard_scene"] = True
+        elif self.scene_type == "table":
             kwargs["table_scene"] = True
 
         return MujocoEnv(**kwargs)  # type: ignore
