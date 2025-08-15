@@ -23,7 +23,7 @@ from geom2drobotenvs.utils import (
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
-from prbench.envs.geom2d_utils import ConstantObjectGeom2DEnv
+from prbench.envs.geom2d.geom2d_utils import ConstantObjectGeom2DEnv
 
 TargetRegionType = Type("target_region", parent=RectangleType)
 Geom2DRobotEnvTypeFeatures[TargetRegionType] = list(

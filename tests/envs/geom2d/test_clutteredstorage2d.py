@@ -6,7 +6,7 @@ from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
 
 import prbench
-from prbench.envs.clutteredstorage2d import (
+from prbench.envs.geom2d.clutteredstorage2d import (
     ObjectCentricClutteredStorage2DEnv,
     ShelfType,
     TargetBlockType,
