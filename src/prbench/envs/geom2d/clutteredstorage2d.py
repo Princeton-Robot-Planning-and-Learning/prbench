@@ -285,7 +285,7 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         init_state_dict[shelf] = {
             "x1": shelf_pose.x,
             "y1": shelf_pose.y,
-            "theta": shelf_pose.theta,
+            "theta1": shelf_pose.theta,
             "width1": shelf_width,
             "height1": self._spec.shelf_height,
             "static": True,
@@ -295,6 +295,7 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
             "z_order1": ZOrder.NONE.value,
             "x": self._spec.world_min_x,
             "y": shelf_pose.y,
+            "theta": shelf_pose.theta,
             "width": self._spec.world_max_x - self._spec.world_min_x,
             "height": self._spec.shelf_height,
             "color_r": BLACK[0],
