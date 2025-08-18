@@ -7,6 +7,7 @@ from geom2drobotenvs.concepts import is_inside
 from geom2drobotenvs.envs.base_env import Geom2DRobotEnv, Geom2DRobotEnvSpec
 from geom2drobotenvs.object_types import (
     CRVRobotType,
+    DoubleRectType,
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
 )
@@ -32,8 +33,8 @@ Geom2DRobotEnvTypeFeatures[TargetBlockType] = list(
     Geom2DRobotEnvTypeFeatures[RectangleType]
 )
 # There is only one target region (the shelf) and it is bookended by obstacles.
-ShelfType = Type("shelf", parent=RectangleType)
-Geom2DRobotEnvTypeFeatures[ShelfType] = list(Geom2DRobotEnvTypeFeatures[RectangleType])
+ShelfType = Type("shelf", parent=DoubleRectType)
+Geom2DRobotEnvTypeFeatures[ShelfType] = list(Geom2DRobotEnvTypeFeatures[DoubleRectType])
 
 
 @dataclass(frozen=True)
@@ -282,42 +283,20 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         shelf = Object("shelf", ShelfType)
         shelf_width = self._spec.get_shelf_width(self._num_init_shelf_blocks)
         init_state_dict[shelf] = {
-            "x": shelf_pose.x,
-            "y": shelf_pose.y,
+            "x1": shelf_pose.x,
+            "y1": shelf_pose.y,
             "theta": shelf_pose.theta,
-            "width": shelf_width,
-            "height": self._spec.shelf_height,
+            "width1": shelf_width,
+            "height1": self._spec.shelf_height,
             "static": True,
-            "color_r": self._spec.shelf_rgb[0],
-            "color_g": self._spec.shelf_rgb[1],
-            "color_b": self._spec.shelf_rgb[2],
-            "z_order": ZOrder.FLOOR.value,
-        }
-
-        # Create the left shelf bookend.
-        shelf_left_bookend = Object("shelf_left_bookend", RectangleType)
-        init_state_dict[shelf_left_bookend] = {
+            "color_r1": self._spec.shelf_rgb[0],
+            "color_g1": self._spec.shelf_rgb[1],
+            "color_b1": self._spec.shelf_rgb[2],
+            "z_order1": ZOrder.NONE.value,
             "x": self._spec.world_min_x,
             "y": shelf_pose.y,
-            "theta": shelf_pose.theta,
-            "width": shelf_pose.x - self._spec.world_min_x,
+            "width": self._spec.world_max_x - self._spec.world_min_x,
             "height": self._spec.shelf_height,
-            "static": True,
-            "color_r": BLACK[0],
-            "color_g": BLACK[1],
-            "color_b": BLACK[2],
-            "z_order": ZOrder.ALL.value,
-        }
-
-        # Create the right shelf bookend.
-        shelf_right_bookend = Object("shelf_right_bookend", RectangleType)
-        init_state_dict[shelf_right_bookend] = {
-            "x": shelf_pose.x + shelf_width,
-            "y": shelf_pose.y,
-            "theta": shelf_pose.theta,
-            "width": self._spec.world_max_x - (shelf_pose.x + shelf_width),
-            "height": self._spec.shelf_height,
-            "static": True,
             "color_r": BLACK[0],
             "color_g": BLACK[1],
             "color_b": BLACK[2],
