@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 import numpy as np
-from geom2drobotenvs.concepts import is_inside
+from geom2drobotenvs.concepts import is_inside_shelf
 from geom2drobotenvs.envs.base_env import Geom2DRobotEnv, Geom2DRobotEnvSpec
 from geom2drobotenvs.object_types import (
     CRVRobotType,
@@ -364,7 +364,9 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         shelf = self._current_state.get_objects(ShelfType)[0]
         blocks = self._current_state.get_objects(TargetBlockType)
         terminated = all(
-            is_inside(self._current_state, block, shelf, self._static_object_body_cache)
+            is_inside_shelf(
+                self._current_state, block, shelf, self._static_object_body_cache
+            )
             for block in blocks
         )
         return -1.0, terminated

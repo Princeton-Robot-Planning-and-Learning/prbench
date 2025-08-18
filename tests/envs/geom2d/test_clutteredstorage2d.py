@@ -49,8 +49,9 @@ def test_clutteredstorage2d_termination():
     blocks = state.get_objects(TargetBlockType)
     for block in blocks:
         # Move the block to the shelf.
-        state.set(block, "x", state.get(shelf, "x"))
-        state.set(block, "y", state.get(shelf, "y"))
+        # The x, y positions are set to the (x1, y1) of the shelf
+        state.set(block, "x", state.get(shelf, "x1"))
+        state.set(block, "y", state.get(shelf, "y1"))
         state.set(block, "theta", 0.0)
 
     env.reset(options={"init_state": state})
