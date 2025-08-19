@@ -8,9 +8,7 @@ with the environment and allows small configuration tweaks.
 
 from typing import Any, Dict, Union
 
-from prbench.envs.tidybot.agent.mp_policy import (
-    MotionPlannerPolicy as MotionPlannerPolicyMP,
-)
+from prbench.envs.tidybot.agent.mp_policy import MotionPlannerPolicy
 
 
 class Policy:
@@ -48,9 +46,7 @@ class MotionPlannerPolicyMPWrapper(Policy):
         Args:
             custom_grasp: Enable experimental grasping behavior in the wrapped policy.
         """
-        self.impl: MotionPlannerPolicyMP = MotionPlannerPolicyMP(
-            custom_grasp=custom_grasp
-        )
+        self.impl: MotionPlannerPolicy = MotionPlannerPolicy(custom_grasp=custom_grasp)
         self.impl.PLACEMENT_X_OFFSET = 0.1
         self.impl.PLACEMENT_Y_OFFSET = 0.1
         self.impl.PLACEMENT_Z_OFFSET = 0.2
