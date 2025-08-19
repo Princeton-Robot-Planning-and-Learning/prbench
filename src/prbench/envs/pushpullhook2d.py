@@ -113,7 +113,7 @@ class PushPullHook2DEnvSpec(Geom2DRobotEnvSpec):
 
     # Movable Button hyperparameters.
     movable_button_unpressed_rgb: tuple[float, float, float] = (0.0, 0.0, 0.9)
-    movable_button_pressed_rgb: tuple[float, float, float] = (0.0, 0.9, 0.0)
+    movable_button_pressed_rgb: tuple[float, float, float] = (0.0, 0.0, 0.9)
     movable_button_radius: float = robot_base_radius / 2
     movable_button_init_position_bounds: tuple[
         tuple[float, float], tuple[float, float]
@@ -352,7 +352,7 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
             self._current_state.set(
                 button, "color_b", self._spec.target_button_pressed_rgb[2]
             )
-        del self._static_object_body_cache[button]
+            del self._static_object_body_cache[button]
         return self._current_state
 
     def release_button(self, button: Object) -> ObjectCentricState:
@@ -409,15 +409,14 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         hook = obj_name_to_obj["hook"]
         movable_button = obj_name_to_obj["movable_button"]
         target_button = obj_name_to_obj["target_button"]
-        full_state = self._current_state.copy()
-        full_state.data.update(self._initial_constant_state.data)
+        full_state = self.full_state
 
         if state_has_collision(
             full_state,
             {movable_button},
             {robot, hook},
             self._static_object_body_cache,
-            ignore_z_orders=True,
+            ignore_z_orders=False,
         ):
             self.press_button(movable_button)
         else:
