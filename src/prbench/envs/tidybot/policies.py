@@ -8,8 +8,7 @@ with the environment and allows small configuration tweaks.
 
 from typing import Any, Dict, Union
 
-from prbench.envs.tidybot.agent.mp_policy import (
-    MotionPlannerPolicy as MotionPlannerPolicyMP,)
+from prbench.envs.tidybot.agent.mp_policy import MotionPlannerPolicy as MotionPlannerPolicyMP
 
 
 class Policy:
