@@ -13,8 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-# Import BaseAgent base class
-from .base_agent import BaseAgent
+from prbench.envs.tidybot.agent.base_agent import BaseAgent
 
 
 class PickState(Enum):
@@ -167,8 +166,8 @@ class MotionPlannerPolicy(BaseAgent):
                     or self.object_location.shape[0] != 3
                 ):
                     print(
-                        f"""ERROR: object_location is not a 3D position array. 
-                        Shape: {self.object_location.shape 
+                        f"""ERROR: object_location is not a 3D position array.
+                        Shape: {self.object_location.shape
                         if hasattr(self.object_location, 'shape') else 'no shape'}"""
                     )
                     print(f"ERROR: object_location value: {self.object_location}")
