@@ -72,16 +72,22 @@ def register_all_environments() -> None:
         ("cupboard", [8]),  # Cupboard environment
     ]
 
+    policy_types = [
+        "mp",  # Motion planning policies
+    ]
+
     for scene_type, object_counts in scene_configs:
         for num_objects in object_counts:
-            register(
-                id=f"prbench/TidyBot3D-{scene_type}-o{num_objects}-v0",
-                entry_point="prbench.envs.tidybot.tidybot3d:TidyBot3DEnv",
-                kwargs={
-                    "scene_type": scene_type,
-                    "num_objects": num_objects,
-                },
-            )
+            for policy_type in policy_types:
+                register(
+                    id=f"prbench/TidyBot3D-{scene_type}-o{num_objects}-{policy_type}-v0",
+                    entry_point="prbench.envs.tidybot.tidybot3d:TidyBot3DEnv",
+                    kwargs={
+                        "scene_type": scene_type,
+                        "num_objects": num_objects,
+                        "policy_type": policy_type,
+                    },
+                )
 
 
 def _register(id: str, *args, **kwargs) -> None:  # pylint: disable=redefined-builtin
@@ -97,6 +103,17 @@ def _register(id: str, *args, **kwargs) -> None:  # pylint: disable=redefined-bu
 def make(*args, **kwargs) -> gymnasium.Env:
     """Create a registered environment from its name."""
     return gymnasium.make(*args, **kwargs)
+
+
+def make_unwrapped(*args, **kwargs) -> gymnasium.Env:
+    """Create a registered environment and return the unwrapped version.
+
+    This allows access to custom methods like step_with_policy.
+    """
+    env = gymnasium.make(*args, **kwargs)
+    while hasattr(env, "env"):
+        env = env.env
+    return env
 
 
 def get_all_env_ids() -> set[str]:
