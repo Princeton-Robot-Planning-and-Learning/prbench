@@ -1,5 +1,13 @@
+"""Base interfaces and utilities for TidyBot agents.
+
+This module defines `BaseAgent`, an abstract class that provides common
+functionality for TidyBot policies, including IK initialization, pose utilities,
+geometry helpers, and WebXR coordinate conversion. Concrete agents should
+inherit from `BaseAgent` and implement `reset` and `step`.
+"""
+
 import math
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
@@ -20,18 +28,6 @@ class BaseAgent(ABC):
         """Initialize IK solver with end effector offset."""
         if self.ik_solver is None:
             self.ik_solver = TidybotIKSolver(ee_offset=ee_offset)
-
-    @abstractmethod
-    def reset(self) -> None:
-        """Reset the agent to initial state."""
-        pass
-
-    @abstractmethod
-    def step(self, obs: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Take a step given observation, return action or None."""
-        pass
-
-    # Utility functions that can be used by all agents
 
     def normalize_quaternion(self, quat: np.ndarray) -> np.ndarray:
         """Ensure quaternion uniqueness (w >= 0)"""
@@ -195,7 +191,7 @@ class BaseAgent(ABC):
     ) -> Optional[float]:
         """
         Find intersection of line with circle for path planning
-        Based on: https://stackoverflow.com/questions/1073336/circle-line-segment-collision-detection-algorithm
+        Based on: https://stackoverflow.com/questions/1073336/circle-line-segment-collision-detection-algorithm # pylint: disable=line-too-long
         """
         a = d[0] * d[0] + d[1] * d[1]  # dot(d, d)
         b = 2 * (f[0] * d[0] + f[1] * d[1])  # 2 * dot(f, d)
@@ -213,23 +209,6 @@ class BaseAgent(ABC):
                     return t2
 
         return None
-
-    def get_end_effector_offset(
-        self, primitive_name: str = "pick", gripper_open: bool = True
-    ) -> float:
-        """Get end effector offset for different primitives."""
-        if gripper_open:
-            return 0.55
-
-        offset_map = {
-            "toss": 1.30,
-            "shelf": 0.75,
-            "drawer": 0.80,
-            "pick": 0.55,
-            "place": 0.55,
-        }
-
-        return offset_map.get(primitive_name, 0.55)
 
     def dot(self, a: tuple, b: tuple) -> float:
         """Dot product helper function from controller.py."""

@@ -1,6 +1,15 @@
+"""Motion planner policy for TidyBot.
+
+This module defines state machines and utilities to move the mobile base and
+manipulator to pick and place objects using ground-truth observations from the
+simulated environment. It provides a high-level policy that produces actions
+compatible with the `MujocoEnv` interface.
+"""
+
 import math
 import time
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -9,6 +18,8 @@ from .base_agent import BaseAgent
 
 
 class PickState(Enum):
+    """States of the pick subroutine."""
+
     APPROACH = "approach"
     LOWER = "lower"
     GRASP = "grasp"
@@ -17,6 +28,8 @@ class PickState(Enum):
 
 
 class PlaceState(Enum):
+    """States of the place subroutine."""
+
     APPROACH = "approach"
     LOWER = "lower"
     RELEASE = "release"
@@ -25,22 +38,29 @@ class PlaceState(Enum):
 
 # Motion Planner generated plan.
 class MotionPlannerPolicy(BaseAgent):
+    """High-level mobile manipulation policy for pick-and-place.
+
+    The policy uses a waypoint-based base controller and a small state machine for
+    grasping and placement. It consumes observation dictionaries and produces low-level
+    actions for base, arm, and gripper.
+    """
+
     # Base following parameters (from BaseController)
-    LOOKAHEAD_DISTANCE = 0.3  # 30 cm
-    POSITION_TOLERANCE = 0.005  # 0.5 cm (reduced from 1.5 cm)
-    GRASP_BASE_TOLERANCE = 0.002  # 0.2 cm for grasp
-    PLACE_BASE_TOLERANCE = 0.02  # 1.0 cm for placement (example, adjust as needed)
+    LOOKAHEAD_DISTANCE = 0.3
+    POSITION_TOLERANCE = 0.005
+    GRASP_BASE_TOLERANCE = 0.002
+    PLACE_BASE_TOLERANCE = 0.02
 
     # Object and target locations
-    PLACEMENT_X_OFFSET = 1.0  # 0.5  # 50cm in X direction
+    PLACEMENT_X_OFFSET = 1.0
     PLACEMENT_Y_OFFSET = 0.3
-    PLACEMENT_Z_OFFSET = 0
+    PLACEMENT_Z_OFFSET = 0.0
 
     # Manipulation parameters
     ROBOT_BASE_HEIGHT = 0.48
     PICK_APPROACH_HEIGHT_OFFSET = 0.25
     PICK_LOWER_DIST = 0.08
-    PICK_LIFT_DIST = 0.28  # Net lift is (PICK_LIFT_DIST - PICK_LOWER_DIST)
+    PICK_LIFT_DIST = 0.28
     PLACE_APPROACH_HEIGHT_OFFSET = 0.10
     SIDE_PLACE_OFFSET = 0.1
 
@@ -50,37 +70,46 @@ class MotionPlannerPolicy(BaseAgent):
     GRASP_TIMEOUT_S = 3.0
     PLACE_SUCCESS_THRESHOLD = 0.2
 
-    def __init__(self, cupboard_mode=False, custom_grasp=False, low_grasp=False):
+    def __init__(
+        self,
+        cupboard_mode: bool = False,
+        custom_grasp: bool = False,
+        low_grasp: bool = False,
+    ) -> None:
         """Initialize MotionPlannerPolicy.
 
         Args:
             cupboard_mode (bool): Enable cupboard-specific placement behavior
             custom_grasp (bool): Enable experimental grasping parameters for testing
         """
+        super().__init__()
         # Motion planning state - following controller.py pattern
-        self.state = "idle"  # States: idle, moving, manipulating, grasping
-        self.current_command = None
-        self.base_waypoints = []
-        self.current_waypoint_idx = 0
-        self.target_ee_pos = None
-        self.grasp_state = None  # Replaces grasp_step
+        self.state: str = "idle"  # States: idle, moving, manipulating, grasping
+        self.current_command: Optional[Dict[str, Any]] = None
+        self.base_waypoints: List[List[float]] = []
+        self.current_waypoint_idx: int = 0
+        self.target_ee_pos: Optional[List[float]] = None
+        self.grasp_state: Optional[Union[PickState, PlaceState]] = (
+            None  # Replaces grasp_step
+        )
 
         # Base following parameters
-        self.lookahead_position = None
+        self.lookahead_position: Optional[List[float]] = None
 
         # Object and target locations (using ground truth from MuJoCo)
-        self.object_location = None
-        self.target_location = None
+        self.object_location: Optional[np.ndarray] = None
+        self.target_location: Optional[np.ndarray] = None
 
         # Enable policy execution immediately (no web interface required)
-        self.enabled = True
-        self.episode_ended = False
+        self.enabled: bool = True
+        self.episode_ended: bool = False
 
-        self.cupboard_mode = cupboard_mode
-        self.custom_grasp = custom_grasp
-        self.low_grasp = low_grasp
+        self.cupboard_mode: bool = cupboard_mode
+        self.custom_grasp: bool = custom_grasp
+        self.low_grasp: bool = low_grasp
 
-    def reset(self):
+    def reset(self) -> None:
+        """Reset internal state and prepare for a new episode."""
         # Reset motion planning state
         self.state = "idle"
         self.current_command = None
@@ -97,10 +126,13 @@ class MotionPlannerPolicy(BaseAgent):
             delattr(self, "initial_gripper_pos")
         # Enable policy execution immediately
         self.enabled = True
-        # NOTE: This class is designed to be instantiated multiple times for sequential placement tasks.
         print("Motion planner reset - starting episode automatically")
 
-    def step(self, obs):
+    def step(self, obs: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Advance the policy by one step and return an action.
+
+        Returns None when the policy is disabled or the episode has ended.
+        """
         # Return no action if episode has ended
         if self.episode_ended:
             return None
@@ -111,7 +143,8 @@ class MotionPlannerPolicy(BaseAgent):
 
         return self._step(obs)
 
-    def _step(self, obs):
+    def _step(self, obs: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Internal step implementation operating the state machine."""
         # Extract current state
         base_pose = obs["base_pose"]
         arm_pos = obs["arm_pos"]
@@ -134,7 +167,9 @@ class MotionPlannerPolicy(BaseAgent):
                     or self.object_location.shape[0] != 3
                 ):
                     print(
-                        f"ERROR: object_location is not a 3D position array. Shape: {self.object_location.shape if hasattr(self.object_location, 'shape') else 'no shape'}"
+                        f"""ERROR: object_location is not a 3D position array. 
+                        Shape: {self.object_location.shape 
+                        if hasattr(self.object_location, 'shape') else 'no shape'}"""
                     )
                     print(f"ERROR: object_location value: {self.object_location}")
                     return None
@@ -151,23 +186,25 @@ class MotionPlannerPolicy(BaseAgent):
                             + self.PLACEMENT_Z_OFFSET,  # Same Z as object (table height)
                         ]
                     )
-                pick_command = {
+                pick_command: Dict[str, Any] = {
                     "primitive_name": "pick",
                     "waypoints": [
                         base_pose[:2].tolist(),
                         self.object_location[:2].tolist(),
                     ],
-                    "object_3d_pos": self.object_location.copy(),  # Store full 3D position
+                    "object_3d_pos": self.object_location.copy(),
                 }
 
                 print(
-                    f"Object detected at: [{self.object_location[0]:.3f}, {self.object_location[1]:.3f}, {self.object_location[2]:.3f}]"
+                    f"""Object detected at: [{self.object_location[0]:.3f},
+                    {self.object_location[1]:.3f}, {self.object_location[2]:.3f}]"""
                 )
                 print(
-                    f"Target placement location: [{self.target_location[0]:.3f}, {self.target_location[1]:.3f}, {self.target_location[2]:.3f}]"
+                    f"""Target placement location: [{self.target_location[0]:.3f},
+                    {self.target_location[1]:.3f}, {self.target_location[2]:.3f}]"""
                 )
                 print(
-                    f"Creating pick command with waypoints: {pick_command['waypoints']}"
+                    f"Creating pick command with waypoints: {pick_command['waypoints']}"  # pylint: disable=line-too-long
                 )
 
                 # Build base command and start moving
@@ -189,6 +226,7 @@ class MotionPlannerPolicy(BaseAgent):
                 return None
 
         elif self.state == "moving":
+            assert self.current_command is not None
             # Execute base movement following waypoints (like BaseController)
             action = self.execute_base_movement(obs)
             if action is None:  # Base movement complete
@@ -198,12 +236,10 @@ class MotionPlannerPolicy(BaseAgent):
                     distance_to_target = self.distance(
                         base_pose[:2], self.target_ee_pos
                     )
-                    end_effector_offset = self.get_end_effector_offset(
-                        self.current_command["primitive_name"]
-                    )
+                    end_effector_offset = self.get_end_effector_offset()
                     diff = abs(end_effector_offset - distance_to_target)
                     print(
-                        f"Distance to target EE: {distance_to_target:.3f}, EE offset: {end_effector_offset:.3f}, diff: {diff:.3f}"
+                        f"Distance to target EE: {distance_to_target:.3f}, EE offset: {end_effector_offset:.3f}, diff: {diff:.3f}"  # pylint: disable=line-too-long
                     )
                     if self.current_command["primitive_name"] == "pick":
                         base_tolerance = self.GRASP_BASE_TOLERANCE
@@ -215,7 +251,7 @@ class MotionPlannerPolicy(BaseAgent):
                         print("Base reached target, starting arm manipulation")
                     else:
                         print(
-                            f"Too far from target end effector position ({(100 * diff):.1f} cm)"
+                            f"Too far from target end effector position ({(100 * diff):.1f} cm)"  # pylint: disable=line-too-long
                         )
                         self.state = "idle"
                 else:
@@ -225,11 +261,12 @@ class MotionPlannerPolicy(BaseAgent):
                 if action and "base_pose" in action:
                     target_pose = action["base_pose"]
                     print(
-                        f"Target base pose: [{target_pose[0]:.3f}, {target_pose[1]:.3f}, {target_pose[2]:.3f}]"
+                        f"Target base pose: [{target_pose[0]:.3f}, {target_pose[1]:.3f}, {target_pose[2]:.3f}]"  # pylint: disable=line-too-long
                     )
             return action
 
         elif self.state == "manipulating":
+            assert self.current_command is not None
             # Execute arm manipulation
             if self.current_command["primitive_name"] == "pick":
                 if self.grasp_state is None:
@@ -249,7 +286,7 @@ class MotionPlannerPolicy(BaseAgent):
                         object_3d_pos[1] - base_pose[1],
                         object_3d_pos[2]
                         + self.PICK_APPROACH_HEIGHT_OFFSET
-                        - self.ROBOT_BASE_HEIGHT,  # Object height + higher offset - base height (was 0.15, now 0.25)
+                        - self.ROBOT_BASE_HEIGHT,
                     ]
                 )
 
@@ -268,25 +305,25 @@ class MotionPlannerPolicy(BaseAgent):
                 print(f"Primary path: global_diff = {global_diff}")
 
                 print(
-                    f"Base angle: {base_pose[2]:.3f} rad ({math.degrees(base_pose[2]):.1f} deg)"
+                    f"Base angle: {base_pose[2]:.3f} rad ({math.degrees(base_pose[2]):.1f} deg)"  # pylint: disable=line-too-long
                 )
                 print(
-                    f"Object global pos: {self.current_command.get('object_3d_pos', 'N/A')}"
+                    f"Object global pos: {self.current_command.get('object_3d_pos', 'N/A')}"  # pylint: disable=line-too-long
                 )
 
                 print(f"Current arm pos: {arm_pos}")
                 print(
-                    f"Position error: {np.linalg.norm(arm_pos - object_relative_pos):.4f}m"
+                    f"Position error: {np.linalg.norm(arm_pos - object_relative_pos):.4f}m"  # pylint: disable=line-too-long
                 )
                 print(f"Grasp state: {self.grasp_state}")
 
                 if self.grasp_state == PickState.APPROACH:
-                    # Step 1: Position arm well above object with open gripper (safe approach)
+                    # Step 1: Position arm above object with open gripper (safe approach)
                     target_arm_pos = object_relative_pos
                     target_arm_quat = np.array([1.0, 0.0, 0.0, 0.0])  # Gripper down
                     target_gripper_pos = np.array([0.0])  # Gripper open
 
-                    print(f"Step 1: Positioning arm above object with open gripper")
+                    print("Step 1: Positioning arm above object with open gripper")
                     if np.allclose(
                         arm_pos, target_arm_pos, atol=0.03
                     ):  # Tighter tolerance: 3cm
@@ -303,7 +340,7 @@ class MotionPlannerPolicy(BaseAgent):
                     target_gripper_pos = np.array([0.0])  # Gripper open
 
                     print(
-                        f"Step 2: Lowering gripper for precise approach... target: {target_arm_pos[2]:.3f}, current: {arm_pos[2]:.3f}"
+                        f"Step 2: Lowering gripper for precise approach... target: {target_arm_pos[2]:.3f}, current: {arm_pos[2]:.3f}"  # pylint: disable=line-too-long
                     )
                     if np.allclose(
                         arm_pos, target_arm_pos, atol=0.02
@@ -321,15 +358,19 @@ class MotionPlannerPolicy(BaseAgent):
                     target_gripper_pos = np.array([1.0])  # Close gripper
 
                     print(
-                        f"Step 3: Closing gripper... current position: {gripper_pos[0]:.3f}"
+                        f"Step 3: Closing gripper... current position: {gripper_pos[0]:.3f}"  # pylint: disable=line-too-long
                     )
 
                     # Initialize grasp attempt tracking
                     if not hasattr(self, "grasp_start_time"):
-                        self.grasp_start_time = time.time()
-                        self.initial_gripper_pos = gripper_pos[0]
+                        self.grasp_start_time = (  # pylint: disable=attribute-defined-outside-init
+                            time.time()
+                        )
+                        self.initial_gripper_pos = gripper_pos[  # pylint: disable=attribute-defined-outside-init
+                            0
+                        ]
                         print(
-                            f"Started grasp attempt, initial gripper pos: {self.initial_gripper_pos:.3f}"
+                            f"Started grasp attempt, initial gripper pos: {self.initial_gripper_pos:.3f}"  # pylint: disable=line-too-long
                         )
 
                     # Check for successful grasp (multiple criteria)
@@ -346,11 +387,12 @@ class MotionPlannerPolicy(BaseAgent):
                     if gripper_closed_enough or gripper_progress or grasp_timeout:
                         if gripper_closed_enough or gripper_progress:
                             print(
-                                f"Grasp successful! Gripper pos: {gripper_pos[0]:.3f}, progress: {gripper_pos[0] - self.initial_gripper_pos:.3f}"
+                                f"""Grasp successful! Gripper pos: {gripper_pos[0]:.3f},
+                                progress: {gripper_pos[0] - self.initial_gripper_pos:.3f}"""  # pylint: disable=line-too-long
                             )
                         else:
                             print(
-                                f"Grasp timeout reached, proceeding with current grip: {gripper_pos[0]:.3f}"
+                                f"Grasp timeout reached, proceeding with current grip: {gripper_pos[0]:.3f}"  # pylint: disable=line-too-long
                             )
 
                         self.grasp_state = PickState.LIFT
@@ -370,15 +412,16 @@ class MotionPlannerPolicy(BaseAgent):
                     target_gripper_pos = np.array([1.0])  # Gripper closed
 
                     print(
-                        f"Step 4: Lifting object... target height: {target_arm_pos[2]:.3f}, current: {arm_pos[2]:.3f}"
+                        f"""Step 4: Lifting object... target height:
+                        {target_arm_pos[2]:.3f}, current: {arm_pos[2]:.3f}"""
                     )
                     if np.allclose(arm_pos, target_arm_pos, atol=0.05):  # 5cm tolerance
                         print(
-                            "Object lifted successfully! Now moving to placement location."
+                            "Object lifted successfully! Now moving to placement location."  # pylint: disable=line-too-long
                         )
                         # Create place command
-
-                        place_command = {
+                        assert self.target_location is not None
+                        place_command: Dict[str, Any] = {
                             "primitive_name": "place",
                             "waypoints": [
                                 base_pose[:2].tolist(),
@@ -397,7 +440,7 @@ class MotionPlannerPolicy(BaseAgent):
                             self.state = "moving"
                             self.grasp_state = None  # Reset for next manipulation
                             print(
-                                f"Starting base movement to placement location at {self.target_location}"
+                                f"Starting base movement to placement location at {self.target_location}"  # pylint: disable=line-too-long
                             )
                         else:
                             print("Failed to build place command")
@@ -405,15 +448,15 @@ class MotionPlannerPolicy(BaseAgent):
                             self.state = "idle"
 
                 # Create action from targets
-                action = {
+                out_action: Dict[str, Any] = {
                     "base_pose": base_pose.copy(),
                     "arm_pos": target_arm_pos,
                     "arm_quat": target_arm_quat,
                     "gripper_pos": target_gripper_pos,
                 }
-                return action
+                return out_action
 
-            elif self.current_command["primitive_name"] == "place":
+            if self.current_command["primitive_name"] == "place":
                 if self.grasp_state is None:
                     self.grasp_state = PlaceState.APPROACH
 
@@ -481,7 +524,7 @@ class MotionPlannerPolicy(BaseAgent):
                     # target_arm_quat = np.array([ 0.707, 0, 0.707, 0 ]) # point forward
                     target_gripper_pos = np.array([1.0])
                     print(
-                        f"Step 1: Positioning arm above placement location with closed gripper"
+                        "Step 1: Positioning arm above placement location with closed gripper"  # pylint: disable=line-too-long
                     )
                     if np.allclose(arm_pos, target_arm_pos, atol=0.03):
                         self.grasp_state = PlaceState.LOWER
@@ -491,7 +534,7 @@ class MotionPlannerPolicy(BaseAgent):
                     target_arm_pos = target_relative_pos_lower
                     target_arm_quat = np.array([1.0, 0.0, 0.0, 0.0])
                     target_gripper_pos = np.array([1.0])
-                    print(f"Step 2: Lowering arm to placement height")
+                    print("Step 2: Lowering arm to placement height")
                     if np.allclose(arm_pos, target_arm_pos, atol=0.02):
                         self.grasp_state = PlaceState.RELEASE
                         print("Arm at placement height, opening gripper...")
@@ -500,7 +543,7 @@ class MotionPlannerPolicy(BaseAgent):
                     target_arm_pos = target_relative_pos_lower
                     target_arm_quat = np.array([1.0, 0.0, 0.0, 0.0])
                     target_gripper_pos = np.array([0.0])
-                    print(f"Step 3: Opening gripper to release object")
+                    print("Step 3: Opening gripper to release object")
                     if gripper_pos[0] < self.PLACE_SUCCESS_THRESHOLD:
                         self.grasp_state = PlaceState.HOME
                         print("Object placed, moving to home position...")
@@ -509,31 +552,31 @@ class MotionPlannerPolicy(BaseAgent):
                     target_arm_pos = arm_home_pos
                     target_arm_quat = arm_home_quat
                     target_gripper_pos = np.array([0.0])
-                    print(f"Step 4: Moving arm to home position")
+                    print("Step 4: Moving arm to home position")
                     if np.allclose(arm_pos, target_arm_pos, atol=0.03):
                         print("Arm at home position. Task complete.")
                         self.episode_ended = True
                         self.state = "idle"
                 # Create action from targets
-                action = {
+                out_action = {
                     "base_pose": base_pose.copy(),
                     "arm_pos": target_arm_pos,
                     "arm_quat": target_arm_quat,
                     "gripper_pos": target_gripper_pos,
                 }
-                return action
+                return out_action
 
         # Default: hold current pose
-        action = {
+        out_action = {
             "base_pose": base_pose.copy(),
             "arm_pos": arm_pos.copy(),
             "arm_quat": arm_quat.copy(),
             "gripper_pos": gripper_pos.copy(),
         }
-        print(f"Default action - holding current pose")
-        return action
+        print("Default action - holding current pose")
+        return out_action
 
-    def execute_base_movement(self, obs):
+    def execute_base_movement(self, obs: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Execute base movement following waypoints like BaseController."""
         base_pose = obs["base_pose"]
 
@@ -543,7 +586,7 @@ class MotionPlannerPolicy(BaseAgent):
             return None  # Movement complete
 
         print(
-            f"Current waypoint index: {self.current_waypoint_idx}/{len(self.base_waypoints)}"
+            f"Current waypoint index: {self.current_waypoint_idx}/{len(self.base_waypoints)}"  # pylint: disable=line-too-long
         )
         print(f"Base waypoints: {self.base_waypoints}")
 
@@ -581,7 +624,8 @@ class MotionPlannerPolicy(BaseAgent):
             # Check if we've reached the final position
             position_error = self.distance(base_pose[:2], target_position)
             print(
-                f"Position error to final target: {position_error:.3f} (tolerance: {self.POSITION_TOLERANCE})"
+                f"""Position error to final target: {position_error:.3f}
+                (tolerance: {self.POSITION_TOLERANCE})"""
             )
             if position_error < self.POSITION_TOLERANCE:
                 print("Reached final position within tolerance")
@@ -601,10 +645,11 @@ class MotionPlannerPolicy(BaseAgent):
             )  # Removed + math.pi to point towards target, not away
 
             print(
-                f"Target EE: {self.target_ee_pos}, dx={dx:.3f}, dy={dy:.3f}, desired_heading={desired_heading:.3f}"
+                f"""Target EE: {self.target_ee_pos}, dx={dx:.3f},
+                dy={dy:.3f}, desired_heading={desired_heading:.3f}"""
             )
 
-            frac = 1
+            frac = 1.0
             if self.lookahead_position is not None:
                 # Turn slowly at first, more quickly as we approach
                 remaining_path_length = self.LOOKAHEAD_DISTANCE
@@ -621,7 +666,8 @@ class MotionPlannerPolicy(BaseAgent):
             heading_diff = self.restrict_heading_range(desired_heading - base_pose[2])
             target_heading += frac * heading_diff
             print(
-                f"Heading: current={base_pose[2]:.3f}, desired={desired_heading:.3f}, diff={heading_diff:.3f}, frac={frac:.3f}, target={target_heading:.3f}"
+                f"""Heading: current={base_pose[2]:.3f}, desired={desired_heading:.3f},
+                diff={heading_diff:.3f}, frac={frac:.3f}, target={target_heading:.3f}"""
             )
 
         # Create action to move towards target
@@ -636,11 +682,17 @@ class MotionPlannerPolicy(BaseAgent):
 
         return action
 
-    def dot(self, a, b):
+    def dot(self, a: Tuple[float, float], b: Tuple[float, float]) -> float:
         """Dot product helper function from controller.py."""
         return a[0] * b[0] + a[1] * b[1]
 
-    def intersect(self, d, f, r, use_t1=False):
+    def intersect(
+        self,
+        d: Tuple[float, float],
+        f: Tuple[float, float],
+        r: float,
+        use_t1: bool = False,
+    ) -> Optional[float]:
         """Line-circle intersection from controller.py."""
         # https://stackoverflow.com/questions/1073336/circle-line-segment-collision-detection-algorithm/1084899%231084899
         a = self.dot(d, d)
@@ -658,13 +710,13 @@ class MotionPlannerPolicy(BaseAgent):
                     return t2
         return None
 
-    def detect_objects_from_ground_truth(self, obs):
+    def detect_objects_from_ground_truth(self, obs: Dict[str, Any]) -> List[np.ndarray]:
         """Detect objects using ground truth from MuJoCo simulation and find the one
         with smallest x value."""
-        detected_objects = []
+        detected_objects: List[np.ndarray] = []
 
         # Get all object positions from MuJoCo environment dynamically
-        cubes = []
+        cubes: List[Tuple[np.ndarray, str]] = []
         for key in obs.keys():
             if (
                 key.endswith("_pos")
@@ -691,36 +743,31 @@ class MotionPlannerPolicy(BaseAgent):
                 target_cube_pos, target_cube_name = cubes[0]
             detected_objects.append(target_cube_pos)
             print(
-                f"Selected {target_cube_name} with smallest x value: {target_cube_pos[0]:.3f}"
+                f"Selected {target_cube_name} with smallest x value: {target_cube_pos[0]:.3f}"  # pylint: disable=line-too-long
             )
 
         return detected_objects
 
-    def distance(self, pt1, pt2):
+    def distance(
+        self,
+        pt1: Union[Tuple[float, float], List[float], np.ndarray],
+        pt2: Union[Tuple[float, float], List[float], np.ndarray],
+    ) -> float:
         """Calculate distance between two points from controller.py."""
-        return math.sqrt((pt2[0] - pt1[0]) ** 2 + (pt2[1] - pt1[1]) ** 2)
+        return math.sqrt(
+            (float(pt2[0]) - float(pt1[0])) ** 2 + (float(pt2[1]) - float(pt1[1])) ** 2
+        )
 
-    def restrict_heading_range(self, h):
+    def restrict_heading_range(self, h: float) -> float:
         """Normalize heading to [-π, π] range from controller.py."""
         return (h + math.pi) % (2 * math.pi) - math.pi
 
-    def get_end_effector_offset(self, primitive_name):
+    def get_end_effector_offset(self) -> float:
         """Calculate end-effector offset based on task and gripper state from
         controller.py."""
-        # Simplified version - assume gripper starts open
-        if (
-            self.cupboard_mode
-            and primitive_name == "pick"
-            and (self.custom_grasp or self.low_grasp)
-        ):
-            return 0.7
-        elif self.cupboard_mode and primitive_name == "place":
-            return 0.75
-        else:
-            return 0.55
-        return {"toss": 1.30, "shelf": 0.75, "drawer": 0.80}.get(primitive_name, 0.55)
+        return 0.55
 
-    def build_base_command(self, command):
+    def build_base_command(self, command: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Build base command using exact logic from controller.py."""
         assert command["primitive_name"] in {
             "move",
@@ -738,11 +785,9 @@ class MotionPlannerPolicy(BaseAgent):
                 "target_ee_pos": None,
                 "position_tolerance": 0.1,
             }
-
-        # Modify waypoints so that the end effector is placed at the target end effector position
         target_ee_pos = command["waypoints"][-1]
-        end_effector_offset = self.get_end_effector_offset(command["primitive_name"])
-        new_waypoint = None  # Find new_waypoint such that distance(new_waypoint, target_ee_pos) == end_effector_offset
+        end_effector_offset = self.get_end_effector_offset()
+        new_waypoint = None
         reversed_waypoints = command["waypoints"][::-1]
 
         for idx in range(1, len(reversed_waypoints)):
@@ -762,7 +807,8 @@ class MotionPlannerPolicy(BaseAgent):
         else:
             # Base is too close to target end effector position and needs to back up
             print(
-                "Warning: Base needs to deviate from commanded path to reach target position, watch out for potential collisions"
+                """Warning: Base needs to deviate from commanded
+                path to reach target position, watch out for potential collisions"""
             )
             curr_position = command["waypoints"][0]
             signed_dist = (
@@ -806,4 +852,7 @@ class MotionPlannerPolicy(BaseAgent):
                 )
                 waypoints = [curr_position, target_position]
 
-        return {"waypoints": waypoints, "target_ee_pos": target_ee_pos}
+        return {
+            "waypoints": waypoints,  # pylint: disable=possibly-used-before-assignment
+            "target_ee_pos": target_ee_pos,
+        }

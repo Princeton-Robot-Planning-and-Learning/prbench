@@ -86,13 +86,13 @@ def register_all_environments() -> None:
                     "num_objects": num_objects,
                 },
             )
-    
+
     for scene_type, object_counts in scene_configs:
         for num_objects in object_counts:
             if scene_type == "ground":
                 for policy_type in policy_types:
                     register(
-                        id=f"prbench/TidyBot3D-{scene_type}-o{num_objects}-{policy_type}-v0",
+                        id=f"prbench/TidyBot3D-{scene_type}-o{num_objects}-{policy_type}-v0",  # pylint: disable=line-too-long
                         entry_point="prbench.envs.tidybot.tidybot3d:TidyBot3DEnv",
                         kwargs={
                             "scene_type": scene_type,
