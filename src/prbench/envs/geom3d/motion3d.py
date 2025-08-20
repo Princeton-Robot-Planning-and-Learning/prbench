@@ -235,7 +235,7 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
             self.robot.joint_upper_limits[:7],
         ).tolist()
         next_joints = next_joints_no_fingers + current_joints_fingers
-        self.robot.set_joints(next_joints)
+        self._set_robot_joints(next_joints)
         reward = -1
         terminated = self._goal_reached()
         return self._get_obs(), reward, terminated, False, {}
