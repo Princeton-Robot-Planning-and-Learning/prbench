@@ -26,7 +26,7 @@ class Motion3DEnvSpec:
     """Spec for Motion3DEnv()."""
 
     # Robot.
-    robot_name: str = "kinova-gen3"
+    robot_name: str = "kinova-gen3-no-gripper"
     robot_base_pose: Pose = Pose.identity()
     initial_joints: JointPositions = field(
         default_factory=lambda: [
@@ -37,12 +37,6 @@ class Motion3DEnvSpec:
             -1.4,
             -1.1,
             1.6,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
         ]
     )
     end_effector_viz_radius: float = 0.01
@@ -66,7 +60,6 @@ class Motion3DEnvSpec:
             "camera_yaw": 90,
             "camera_distance": 1.5,
             "camera_pitch": -20,
-            "background_rgb": (250 / 255, 220 / 255, 255 / 255),
             # Use for fast testing.
             # "image_width": 32,
             # "image_height": 32,
@@ -257,3 +250,53 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
             -self._spec.max_action_mag, self._spec.max_action_mag, size=(num_dof,)
         )
         return Motion3DAction(arr.tolist())
+
+    def _create_env_markdown_description(self) -> str:
+        """Create environment description."""
+        # pylint: disable=line-too-long
+        return f"""A 3D motion planning environment where the goal is to reach a target sphere with the robot's end effector.
+
+The robot is a Kinova Gen-3 with 7 degrees of freedom. The target is a sphere with radius {self._spec.target_radius:.3f}m positioned randomly within the workspace bounds.
+
+The workspace bounds are:
+- X: [{self._spec.target_lower_bound[0]:.1f}, {self._spec.target_upper_bound[0]:.1f}]
+- Y: [{self._spec.target_lower_bound[1]:.1f}, {self._spec.target_upper_bound[1]:.1f}]
+- Z: [{self._spec.target_lower_bound[2]:.1f}, {self._spec.target_upper_bound[2]:.1f}]
+
+Only targets that are reachable via inverse kinematics are sampled.
+"""
+
+    def _create_observation_space_markdown_description(self) -> str:
+        """Create observation space description."""
+        # pylint: disable=line-too-long
+        return f"""Observations consist of:
+- **joint_positions**: Current joint positions of the {len(self._spec.initial_joints)}-DOF robot arm (list of floats)
+- **target**: 3D position (x, y, z) of the target sphere to reach (tuple of 3 floats)
+
+The observation is returned as a Motion3DState dataclass with these two fields.
+"""
+
+    def _create_action_space_markdown_description(self) -> str:
+        """Create action space description."""
+        # pylint: disable=line-too-long
+        return f"""Actions control the change in joint positions:
+- **delta_joints**: Change in joint positions for all {len(self._spec.initial_joints)} joints (list of floats)
+
+The action is a Motion3DAction dataclass with delta_joints field. Each delta is clipped to the range [-{self._spec.max_action_mag:.3f}, {self._spec.max_action_mag:.3f}].
+
+The resulting joint positions are clipped to the robot's joint limits before being applied.
+"""
+
+    def _create_reward_markdown_description(self) -> str:
+        """Create reward description."""
+        # pylint: disable=line-too-long
+        return f"""The reward structure is simple:
+- **-1.0** penalty at every timestep until the goal is reached
+- **Termination** occurs when the end effector is within {self._spec.target_radius:.3f}m of the target center
+
+This encourages the robot to reach the target as quickly as possible while avoiding infinite episodes.
+"""
+
+    def _create_references_markdown_description(self) -> str:
+        """Create references description."""
+        return """This is a very common kind of environment."""
