@@ -11,11 +11,8 @@ from prpl_utils.spaces import FunctionalSpace
 from pybullet_helpers.camera import capture_image
 from pybullet_helpers.geometry import Pose, get_pose, multiply_poses, set_pose
 from pybullet_helpers.gui import create_gui_connection
-from pybullet_helpers.inverse_kinematics import check_body_collisions
 from pybullet_helpers.joint import JointPositions
 from pybullet_helpers.robots import create_pybullet_robot
-from pybullet_helpers.robots.single_arm import FingeredSingleArmPyBulletRobot
-from pybullet_helpers.utils import create_pybullet_block
 import pybullet as p
 
 
@@ -30,6 +27,12 @@ class Motion3DEnvSpec:
     initial_joints: JointPositions = field(
         default_factory=lambda: [-4.3, -1.6, -4.8, -1.8, -1.4, -1.1, 1.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     )
+    end_effector_viz_radius: float = 0.01
+    end_effector_viz_color: tuple[float, float, float, float] = (1.0, 0.2, 0.2, 0.5)
+
+    # Target.
+    target_radius: float = 0.1
+    target_color: tuple[float, float, float, float] = (1.0, 0.2, 0.2, 0.5)
 
     # For rendering.
     render_dpi: int = 300
@@ -39,9 +42,10 @@ class Motion3DEnvSpec:
         """Get kwargs to pass to PyBullet camera."""
         return {
             "camera_target": self.robot_base_pose.position,
-            "camera_yaw": 90,  # yaw,
+            "camera_yaw": 90,
             "camera_distance": 1.5,
             "camera_pitch": -20,
+            "background_rgb": (250 / 255, 220 / 255, 255 / 255),
             # Use for fast testing.
             # "image_width": 32,
             # "image_height": 32,
@@ -106,7 +110,42 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
         )
         self.robot = robot
 
-        # TODO create the target.
+        # Show a visualization of the end effector.
+        visual_id = p.createVisualShape(
+            p.GEOM_SPHERE,
+            radius=self._spec.end_effector_viz_radius,
+            rgbaColor=self._spec.end_effector_viz_color,
+            physicsClientId=self.physics_client_id,
+        )
+
+        # Create the body.
+        end_effector_pose = self.robot.get_end_effector_pose()
+        self.end_effector_viz_id = p.createMultiBody(
+            baseMass=0,
+            baseCollisionShapeIndex=-1,
+            baseVisualShapeIndex=visual_id,
+            basePosition=end_effector_pose.position,
+            baseOrientation=end_effector_pose.orientation,
+            physicsClientId=self.physics_client_id,
+        )
+
+        # Create target.
+        visual_id = p.createVisualShape(
+            p.GEOM_SPHERE,
+            radius=self._spec.target_radius,
+            rgbaColor=self._spec.target_color,
+            physicsClientId=self.physics_client_id,
+        )
+
+        # Create the body.
+        self.cylinder_id = p.createMultiBody(
+            baseMass=0,
+            baseCollisionShapeIndex=-1,
+            baseVisualShapeIndex=visual_id,
+            basePosition=(0, 0, 0),  # TODO set in reset()
+            baseOrientation=(0, 0, 0, 1),
+            physicsClientId=self.physics_client_id,
+        )
 
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
@@ -117,6 +156,8 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
         self.robot.set_joints(self._spec.initial_joints)
 
         # TODO reset the target.
+
+        return self._get_obs(), {}
 
     def step(self, action: Motion3DAction) -> tuple[Motion3DState, float, bool, bool, dict]:
         # TODO
