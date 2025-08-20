@@ -100,16 +100,31 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
     def __init__(
         self,
         spec: Motion3DEnvSpec = Motion3DEnvSpec(),
+        render_mode: str | None = None,
         use_gui: bool = False,
     ) -> None:
         self._spec = spec
 
         # Set up Gymnasium env fields.
-        self.metadata = {
-            "render_modes": ["rgb_array"],
-            "render_fps": self._spec.render_fps,
-        }
-        self.render_mode = "rgb_array"
+        obs_md = self._create_observation_space_markdown_description()
+        act_md = self._create_action_space_markdown_description()
+        env_md = self._create_env_markdown_description()
+        reward_md = self._create_reward_markdown_description()
+        references_md = self._create_references_markdown_description()
+        # Update the metadata. Note that we need to define the render_modes in the class
+        # rather than in the instance because gym.make() extracts render_modes from cls.
+        self.metadata = self.metadata.copy()
+        self.metadata.update(
+            {
+                "description": env_md,
+                "observation_space_description": obs_md,
+                "action_space_description": act_md,
+                "reward_description": reward_md,
+                "references": references_md,
+                "render_fps": self._spec.render_fps,
+            }
+        )
+        self.render_mode = render_mode
         self.observation_space = FunctionalSpace(
             contains_fn=lambda o: isinstance(o, Motion3DState)
         )
