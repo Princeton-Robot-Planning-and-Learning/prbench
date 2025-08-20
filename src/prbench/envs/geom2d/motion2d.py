@@ -135,6 +135,10 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
             "render_modes": ["rgb_array"],
             "render_fps": self._spec.render_fps,
         }
+        initial_state_dict = self._create_constant_initial_state_dict()
+        self._initial_constant_state = create_state_from_dict(
+            initial_state_dict, Geom2DRobotEnvTypeFeatures
+        )
 
     def _sample_initial_state(self) -> ObjectCentricState:
         # Sample initial robot pose.
@@ -183,13 +187,7 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
 
         return state
 
-    def _create_initial_state(
-        self,
-        robot_pose: SE2Pose,
-        target_region_pose: SE2Pose | None = None,
-        obstacles: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
-    ) -> ObjectCentricState:
-
+    def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create room walls.
@@ -207,6 +205,20 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
             max_dy,
         )
         init_state_dict.update(wall_state_dict)
+
+        return init_state_dict
+
+    def _create_initial_state(
+        self,
+        robot_pose: SE2Pose,
+        target_region_pose: SE2Pose | None = None,
+        obstacles: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
+    ) -> ObjectCentricState:
+
+        # Shallow copy should be okay because the constant objects should not
+        # ever change in this method.
+        assert self._initial_constant_state is not None
+        init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.
         robot = Object("robot", CRVRobotType)
