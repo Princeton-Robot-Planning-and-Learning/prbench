@@ -85,5 +85,6 @@ module = [
     "redis.*",
     "phoenix6.*",
     "cv2.*",
+    "pybullet.*",
 ]
 ignore_missing_imports = true
