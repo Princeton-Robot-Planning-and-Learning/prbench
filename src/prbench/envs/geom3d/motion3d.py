@@ -103,6 +103,7 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
         render_mode: str | None = None,
         use_gui: bool = False,
     ) -> None:
+        super().__init__()
         self._spec = spec
 
         # Set up Gymnasium env fields.
@@ -189,9 +190,14 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
         )
 
     def reset(
-        self, *, seed: int | None = None, options: dict | None = None
+        self,
+        *args,
+        **kwargs,
     ) -> tuple[Motion3DState, dict]:
-        super().reset(seed=seed)
+        super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
+
+        # Reset the robot.
+        self._set_robot_joints(self._spec.initial_joints)
 
         # Reset the target. Sample and check reachability.
         target_pose: Pose | None = None
@@ -204,15 +210,13 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
                 inverse_kinematics(self.robot, target_pose, validate=True)
             except InverseKinematicsError:
                 continue
+            self._set_robot_joints(self._spec.initial_joints)
             # If the goal is already reached, keep sampling.
             if not self._goal_reached():
                 break
         if target_pose is None:
             raise RuntimeError("Failed to find reachable target position")
         set_pose(self.target_id, target_pose, self.physics_client_id)
-
-        # Reset the robot.
-        self._set_robot_joints(self._spec.initial_joints)
 
         return self._get_obs(), {}
 
