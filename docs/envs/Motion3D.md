@@ -21,7 +21,7 @@ Only targets that are reachable via inverse kinematics are sampled.
 
 ### Observation Space
 Observations consist of:
-- **joint_positions**: Current joint positions of the 7-DOF robot arm (list of floats)
+- **joint_positions**: Current joint positions of the 13-DOF robot arm (list of floats)
 - **target**: 3D position (x, y, z) of the target sphere to reach (tuple of 3 floats)
 
 The observation is returned as a Motion3DState dataclass with these two fields.
@@ -29,7 +29,7 @@ The observation is returned as a Motion3DState dataclass with these two fields.
 
 ### Action Space
 Actions control the change in joint positions:
-- **delta_joints**: Change in joint positions for all 7 joints (list of floats)
+- **delta_joints**: Change in joint positions for all 13 joints (list of floats)
 
 The action is a Motion3DAction dataclass with delta_joints field. Each delta is clipped to the range [-0.050, 0.050].
 

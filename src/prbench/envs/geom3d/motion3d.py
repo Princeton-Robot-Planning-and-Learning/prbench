@@ -19,6 +19,7 @@ from pybullet_helpers.inverse_kinematics import (
 )
 from pybullet_helpers.joint import JointPositions
 from pybullet_helpers.robots import create_pybullet_robot
+from pybullet_helpers.robots.single_arm import FingeredSingleArmPyBulletRobot
 
 
 @dataclass(frozen=True)
@@ -26,7 +27,7 @@ class Motion3DEnvSpec:
     """Spec for Motion3DEnv()."""
 
     # Robot.
-    robot_name: str = "kinova-gen3-no-gripper"
+    robot_name: str = "kinova-gen3"
     robot_base_pose: Pose = Pose.identity()
     initial_joints: JointPositions = field(
         default_factory=lambda: [
@@ -37,6 +38,12 @@ class Motion3DEnvSpec:
             -1.4,
             -1.1,
             1.6,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
         ]
     )
     end_effector_viz_radius: float = 0.01
@@ -81,7 +88,7 @@ class Motion3DAction:
     NOTE: the environment enforces a limit on the magnitude of the deltas.
     """
 
-    delta_joints: JointPositions  # change in joint positions
+    delta_joints: JointPositions  # change in joint positions, not including fingers
 
 
 class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
@@ -141,6 +148,7 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
             control_mode="reset",
             home_joint_positions=self._spec.initial_joints,
         )
+        assert isinstance(robot, FingeredSingleArmPyBulletRobot)
         self.robot = robot
 
         # Show a visualization of the end effector.
@@ -215,11 +223,14 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
             action.delta_joints, -self._spec.max_action_mag, self._spec.max_action_mag
         )
         current_joints = self.robot.get_joint_positions()
-        next_joints = np.clip(
-            current_joints + delta_joints,
-            self.robot.joint_lower_limits,
-            self.robot.joint_upper_limits,
+        current_joints_fingers = current_joints[7:]
+        current_joints_no_fingers = current_joints[:7]
+        next_joints_no_fingers = np.clip(
+            current_joints_no_fingers + delta_joints,
+            self.robot.joint_lower_limits[:7],
+            self.robot.joint_upper_limits[:7],
         ).tolist()
+        next_joints = next_joints_no_fingers + current_joints_fingers
         self.robot.set_joints(next_joints)
         reward = -1
         terminated = self._goal_reached()
@@ -241,11 +252,12 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
 
     def _set_robot_joints(self, joints: JointPositions) -> None:
         self.robot.set_joints(joints)
+        self.robot.open_fingers()
         end_effector_pose = self.robot.get_end_effector_pose()
         set_pose(self.end_effector_viz_id, end_effector_pose, self.physics_client_id)
 
     def _sample_action(self, rng: np.random.Generator) -> Motion3DAction:
-        num_dof = len(self.robot.get_joint_positions())
+        num_dof = 7
         arr = rng.uniform(
             -self._spec.max_action_mag, self._spec.max_action_mag, size=(num_dof,)
         )
