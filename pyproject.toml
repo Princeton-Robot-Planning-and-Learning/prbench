@@ -26,6 +26,9 @@ dependencies = [
    "h5py>=3.11.0",
    "tqdm>=4.66.2",
    "threadpoolctl>=3.5.0",
+   # PyBullet dependencies
+   "pybullet==3.2.7",
+   "pybullet-helpers@git+https://github.com/tomsilver/pybullet-helpers.git",
 ]
 
 [project.optional-dependencies]
