@@ -68,7 +68,7 @@ def register_all_environments() -> None:
     # PushPullHook2D environment
     register(
         id="prbench/PushPullHook2D-v0",
-        entry_point="prbench.envs.pushpullhook2d:PushPullHook2DEnv",
+        entry_point="prbench.envs.geom2d.pushpullhook2d:PushPullHook2DEnv",
     )
 
     # TidyBot3D environments with different scenes and object counts

@@ -5,7 +5,7 @@ from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
 
 import prbench
-from prbench.envs.pushpullhook2d import ObjectCentricPushPullHook2DEnv
+from prbench.envs.geom2d.pushpullhook2d import ObjectCentricPushPullHook2DEnv
 
 
 def test_object_centric_pushpullhook2d_env():

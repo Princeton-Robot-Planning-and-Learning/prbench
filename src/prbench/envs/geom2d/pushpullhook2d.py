@@ -17,6 +17,7 @@ from geom2drobotenvs.utils import (
     CRVRobotActionSpace,
     SE2Pose,
     create_walls_from_world_boundaries,
+    move_objects_in_contact,
     sample_se2_pose,
     state_has_collision,
 )
@@ -398,29 +399,12 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
     def step(
         self, action: NDArray[np.float32]
     ) -> tuple[ObjectCentricState, float, bool, bool, dict]:
-        # For any button in contact with either the robot or the stick, change
-        # color to pressed.
         super().step(action)
-        # self.push_movable_button()
         assert self._current_state is not None
         assert self._initial_constant_state is not None
         obj_name_to_obj = {o.name: o for o in self._current_state}
-        robot = obj_name_to_obj["robot"]
-        hook = obj_name_to_obj["hook"]
         movable_button = obj_name_to_obj["movable_button"]
         target_button = obj_name_to_obj["target_button"]
-        full_state = self.full_state
-
-        if state_has_collision(
-            full_state,
-            {movable_button},
-            {robot, hook},
-            self._static_object_body_cache,
-            ignore_z_orders=False,
-        ):
-            self.press_button(movable_button)
-        else:
-            self.release_button(movable_button)
 
         # Check if movable button is in contact with target button (success)
         button_to_target = np.array(
@@ -441,6 +425,20 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         observation = self._get_obs()
         info = self._get_info()
         return observation, reward, terminated, truncated, info
+
+    def get_objects_to_move(
+        self,
+        state: ObjectCentricState,
+        suctioned_objs: list[tuple[Object, SE2Pose]],
+    ) -> tuple[ObjectCentricState, set[Object]]:
+        """Get the set of objects that should be moved based on the current state and
+        robot actions."""
+        robots = [o for o in state if o.is_instance(CRVRobotType)]
+        assert len(robots) == 1, "Multi-robot not yet supported"
+        robot = robots[0]
+
+        state, moved_objects = move_objects_in_contact(state, robot, suctioned_objs)
+        return state, moved_objects
 
     def _get_reward_and_done(self) -> tuple[float, bool]:
         # Success if both buttons are pressed
