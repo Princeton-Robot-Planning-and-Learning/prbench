@@ -6,11 +6,15 @@ from typing import Any
 
 import gymnasium
 import numpy as np
+import math
+import re
 from gymnasium import spaces
 from numpy.typing import NDArray
 
-from prbench.envs.tidybot.tidybot_mujoco_env import MujocoEnv
+import prbench.envs.tidybot.utils as utils
 from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
+
+from prbench.envs.tidybot.tidybot_robot_env import TidyBotRobotEnv
 
 
 class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
@@ -24,7 +28,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         num_objects: int = 3,
         render_mode: str | None = None,
         custom_grasp: bool = False,
-        render_images: bool = True,
+        render_images: bool = True, # TODO(VS)
         seed: int | None = None,
         show_viewer: bool = False,
         show_images: bool = False,
@@ -35,21 +39,19 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.num_objects = num_objects
         self.render_mode = render_mode
         self.custom_grasp = custom_grasp
-        self.show_viewer = show_viewer
         self.show_images = show_images
         self.render_images = render_images
         self._render_camera_name: str | None = None
 
-        # Initialize random number generator
-        if seed is not None:
-            self.np_random, _ = gymnasium.utils.seeding.np_random(seed)
-        else:
-            self.np_random = np.random.default_rng()
-
         # Initialize TidyBot environment
-        self._tidybot_env = self._create_tidybot_env()
+        self._tidybot_robot_env = self._create_robot_tidybot_env(
+            seed=seed, camera_names=["overview"], show_viewer=show_viewer
+        )
 
-        self._reward_calculator = create_reward_calculator(
+        # Set random number generator
+        self.np_random = self._tidybot_robot_env.np_random
+
+        self._reward_calculator = create_reward_calculator(  # TODO(VS)
             self.scene_type, self.num_objects
         )
 
@@ -69,77 +71,26 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             }
         )
 
-    def _create_tidybot_env(self) -> MujocoEnv:
-        """Create the underlying TidyBot MuJoCo environment."""
-        # Set model path to local models directory
-        model_base_path = Path(__file__).parent / "models" / "stanford_tidybot"
-        if self.scene_type == "cupboard":
-            model_file = "cupboard_scene.xml"
-        elif self.scene_type == "table":
-            model_file = "table_scene.xml"
-        else:
-            model_file = "ground_scene.xml"
-        # Construct absolute path to model file
-        absolute_model_path = model_base_path / model_file
+    def _create_robot_tidybot_env(
+        self, seed: int | None = None, camera_names=None, show_viewer: bool = False
+    ) -> TidyBotRobotEnv:
+        """Create the underlying TidyBot Robot MuJoCo environment."""
 
-        # --- Dynamic object insertion logic ---
-        needs_dynamic_objects = self.scene_type in ["ground", "table"]
-        if needs_dynamic_objects:
-            tree = ET.parse(str(absolute_model_path))
-            root = tree.getroot()
-            worldbody = root.find("worldbody")
-            if worldbody is not None:
-                # Remove all existing cube bodies
-                for body in list(worldbody):
-                    if body.tag == "body" and body.attrib.get("name", "").startswith(
-                        "cube"
-                    ):
-                        worldbody.remove(body)
-                # Insert new cubes
-                for i in range(self.num_objects):
-                    name = f"cube{i+1}"
-                    pos = f"{0} {0} {0}"
-                    body = ET.Element("body", name=name, pos=pos)
-                    ET.SubElement(body, "freejoint")
-                    ET.SubElement(
-                        body,
-                        "geom",
-                        type="box",
-                        size="0.02 0.02 0.02",
-                        rgba=".5 .7 .5 1",
-                        mass="0.1",
-                    )
-                    worldbody.append(body)
-                # Write to a file in the models directory
-                dynamic_model_filename = (
-                    f"auto_{self.scene_type}_{self.num_objects}_objs.xml"
-                )
-                dynamic_model_path = model_base_path / dynamic_model_filename
-                tree.write(str(dynamic_model_path))
-            else:
-                dynamic_model_path = absolute_model_path
-        else:
-            dynamic_model_path = absolute_model_path
-
-        kwargs = {
-            "render_images": self.render_images,
-            "show_viewer": self.show_viewer,
-            "show_images": self.show_images,
-            "mjcf_path": str(dynamic_model_path),
-        }
-
-        if self.scene_type == "cupboard":
-            kwargs["cupboard_scene"] = True
-        elif self.scene_type == "table":
-            kwargs["table_scene"] = True
-
-        return MujocoEnv(**kwargs)  # type: ignore
+        return TidyBotRobotEnv(
+            control_frequency=20,
+            seed=seed,
+            camera_names=camera_names,
+            show_viewer=show_viewer,
+        )
 
     def _create_observation_space(self) -> spaces.Box:
         """Create observation space based on TidyBot's observation structure."""
         # Get example observation to determine dimensions
-        self._tidybot_env.reset()
-        example_obs = self._tidybot_env.get_obs()
+        # self._tidybot_robot_env.reset()
+        self._tidybot_robot_env.reset(
+            self._create_scene_xml()
+        )  # TODO pass dummy xml_string?
+        example_obs = self._tidybot_robot_env.get_obs()
 
         # Calculate total observation dimension (all values are ndarrays)
         obs_dim = sum(value.size for value in example_obs.values())
@@ -174,17 +125,91 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             "gripper_pos": action_vector[10:11],
         }
 
-    def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
+    def _create_scene_xml(self) -> str:
+        """Create the MuJoCo XML string for the current scene configuration."""
+
+        # Set model path to local models directory
+        model_base_path = Path(__file__).parent / "models" / "stanford_tidybot"
+        if self.scene_type == "cupboard":
+            model_file = "cupboard_scene.xml"
+        elif self.scene_type == "table":
+            model_file = "table_scene.xml"
+        else:
+            model_file = "ground_scene.xml"
+        # Construct absolute path to model file
+        absolute_model_path = model_base_path / model_file
+
+        # --- Dynamic object insertion logic ---
+        needs_dynamic_objects = self.scene_type in ["ground", "table"]
+        if needs_dynamic_objects:
+            tree = ET.parse(str(absolute_model_path))
+            root = tree.getroot()
+            worldbody = root.find("worldbody")
+            if worldbody is not None:
+                # Remove all existing cube bodies
+                for body in list(worldbody):
+                    if body.tag == "body" and body.attrib.get("name", "").startswith(
+                        "cube"
+                    ):
+                        worldbody.remove(body)
+                # Insert new cubes
+                for i in range(self.num_objects):
+                    name = f"cube{i+1}"
+                    body = ET.Element("body", name=name, pos="0 0 0")
+                    ET.SubElement(body, "freejoint")
+                    pos = "0 0 0"
+                    if self.scene_type == "cupboard":
+                        pass  # no position randomization for cupboard scene
+                    elif self.scene_type == "table":
+                        # Randomize position within a reasonable range for the table environment
+                        x = round(self.np_random.uniform(0.2, 0.8), 3)
+                        y = round(self.np_random.uniform(-0.15, 0.15), 3)
+                        z = 0.44
+                        pos = f"{x} {y} {z}"
+                    else:
+                        # Randomize position within a reasonable range for the ground environment
+                        x = round(self.np_random.uniform(0.4, 0.8), 3)
+                        y = round(self.np_random.uniform(-0.3, 0.3), 3)
+                        z = 0.02
+                        pos = f"{x} {y} {z}"
+                    # Randomize orientation around Z-axis (yaw)
+                    theta = self.np_random.uniform(-math.pi, math.pi)
+                    quat = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
+                    quat = " ".join(map(str, quat))
+                    ET.SubElement(
+                        body,
+                        "geom",
+                        type="box",
+                        size="0.02 0.02 0.02",
+                        rgba=".5 .7 .5 1",
+                        mass="0.1",
+                        pos=pos,
+                        quat=quat,
+                    )
+                    worldbody.append(body)
+
+                # Get XML string from tree
+                xml_string = ET.tostring(root, encoding="unicode")
+            else:
+                # dynamic_model_path = absolute_model_path
+                raise NotImplementedError
+        else:
+            # dynamic_model_path = absolute_model_path
+            raise NotImplementedError
+
+        return xml_string
+
+    def reset(self, *args, **kwargs) -> NDArray[np.float32]:
         """Reset the environment."""
-        # Capture seed from kwargs if provided
-        seed = kwargs.get("seed", None)
+        # TODO(VS) handle seed properly for multiple envs -- how does gymnasium create multiple environments with different seeds?
 
         super().reset(*args, **kwargs)
 
-        # Pass the seed to the TidyBot environment
-        self._tidybot_env.reset(seed=seed)
+        xml_string = self._create_scene_xml()
 
-        obs = self._tidybot_env.get_obs()
+        # reset the underlying TidyBot robot environment
+        obs, rewards, done, info = self._tidybot_robot_env.reset(xml_string)
+
         vec_obs = self._vectorize_observation(obs)
         return vec_obs, {}
 
@@ -193,10 +218,10 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
         """Execute action and return next observation."""
         action_dict = self._dict_to_action(action)
-        self._tidybot_env.step(action_dict)
+        self._tidybot_robot_env.step(action_dict)
 
         # Get observation
-        obs = self._tidybot_env.get_obs()
+        obs = self._tidybot_robot_env.get_obs()
         vec_obs = self._vectorize_observation(obs)
 
         # Calculate reward and termination
@@ -217,7 +242,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def render(self):
         """Render the environment."""
         if self.render_mode == "rgb_array":
-            obs = self._tidybot_env.get_obs()
+            obs = self._tidybot_robot_env.get_obs()
             # If a specific camera is requested, use it.
             if self._render_camera_name:
                 key = f"{self._render_camera_name}_image"
@@ -232,7 +257,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def close(self) -> None:
         """Close the environment."""
-        self._tidybot_env.close()
+        self._tidybot_robot_env.close()
 
     def set_render_camera(self, camera_name: str | None) -> None:
         """Set the camera to use for rendering."""
