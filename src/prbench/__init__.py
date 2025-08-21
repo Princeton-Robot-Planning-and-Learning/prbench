@@ -65,6 +65,12 @@ def register_all_environments() -> None:
             kwargs={"num_buttons": num_button},
         )
 
+    # PushPullHook2D environment
+    register(
+        id="prbench/PushPullHook2D-v0",
+        entry_point="prbench.envs.geom2d.pushpullhook2d:PushPullHook2DEnv",
+    )
+
     # TidyBot3D environments with different scenes and object counts
     scene_configs = [
         ("ground", [3, 5, 7]),  # Ground/scene.xml with different object counts
