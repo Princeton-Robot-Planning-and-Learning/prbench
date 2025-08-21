@@ -29,15 +29,18 @@ class Motion3DEnvSpec:
     # Robot.
     robot_name: str = "kinova-gen3"
     robot_base_pose: Pose = Pose.identity()
+    # NOTE: the robot joints include 7 DOF for the arm and 6 DOF for the fingers. We
+    # don't need to change the fingers this in the environment.
     initial_joints: JointPositions = field(
         default_factory=lambda: [
-            -4.3,
-            -1.6,
-            -4.8,
-            -1.8,
-            -1.4,
-            -1.1,
-            1.6,
+            -4.3,  # "joint_1", starting at the robot base and going up to the gripper
+            -1.6,  # "joint_2"
+            -4.8,  # "joint_3"
+            -1.8,  # "joint_4"
+            -1.4,  # "joint_5"
+            -1.1,  # "joint_6"
+            1.6,  # "joint_7"
+            # Finger joints (not used in this environment).
             0.0,
             0.0,
             0.0,
@@ -88,7 +91,9 @@ class Motion3DAction:
     NOTE: the environment enforces a limit on the magnitude of the deltas.
     """
 
-    delta_joints: JointPositions  # change in joint positions, not including fingers
+    # NOTE: this is only a delta on the 7 DOF of the arm, not the fingers, which do not
+    # need to change in this environment.
+    delta_arm_joints: JointPositions
 
 
 class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
@@ -224,7 +229,9 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
         self, action: Motion3DAction
     ) -> tuple[Motion3DState, float, bool, bool, dict]:
         delta_joints = np.clip(
-            action.delta_joints, -self._spec.max_action_mag, self._spec.max_action_mag
+            action.delta_arm_joints,
+            -self._spec.max_action_mag,
+            self._spec.max_action_mag,
         )
         current_joints = self.robot.get_joint_positions()
         current_joints_fingers = current_joints[7:]
