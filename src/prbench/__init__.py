@@ -65,6 +65,12 @@ def register_all_environments() -> None:
             kwargs={"num_buttons": num_button},
         )
 
+    # Motion3D environment.
+    _register(
+        id="prbench/Motion3D-v0",
+        entry_point="prbench.envs.geom3d.motion3d:Motion3DEnv",
+    )
+
     # TidyBot3D environments with different scenes and object counts
     scene_configs = [
         ("ground", [3, 5, 7]),  # Ground/scene.xml with different object counts
