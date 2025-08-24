@@ -7,6 +7,7 @@ from typing import Any
 import gymnasium
 import numpy as np
 from numpy.typing import NDArray
+from prpl_utils.utils import wrap_angle
 from relational_structs import (
     Array,
     Object,
@@ -14,7 +15,6 @@ from relational_structs import (
     ObjectCentricStateSpace,
 )
 from relational_structs.spaces import ObjectCentricBoxSpace
-from tomsutils.utils import wrap_angle
 
 from prbench.envs.geom2d.object_types import (
     CRVRobotType,

@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from gymnasium.spaces import Box
 from numpy.typing import NDArray
+from prpl_utils.motion_planning import BiRRT
+from prpl_utils.utils import fig2data, get_signed_angle_distance, wrap_angle
 from relational_structs import (
     Array,
     Object,
@@ -13,8 +15,6 @@ from relational_structs import (
 )
 from tomsgeoms2d.structs import Circle, Geom2D, Lobject, Rectangle
 from tomsgeoms2d.utils import find_closest_points, geom2ds_intersect
-from tomsutils.motion_planning import BiRRT
-from tomsutils.utils import fig2data, get_signed_angle_distance, wrap_angle
 
 from prbench.envs.geom2d.object_types import (
     CircleType,
