@@ -9,10 +9,10 @@ from geom2drobotenvs.object_types import (
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
 )
-from geom2drobotenvs.structs import ZOrder
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
+from prbench.envs.geom2d.structs import ZOrder
 from prbench.envs.geom2d.utils import (
     PURPLE,
     ConstantObjectGeom2DEnv,

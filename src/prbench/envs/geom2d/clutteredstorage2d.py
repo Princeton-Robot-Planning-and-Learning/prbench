@@ -10,11 +10,11 @@ from geom2drobotenvs.object_types import (
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
 )
-from geom2drobotenvs.structs import ZOrder
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 from tomsgeoms2d.structs import Rectangle
 
+from prbench.envs.geom2d.structs import ZOrder
 from prbench.envs.geom2d.utils import (
     BLACK,
     PURPLE,
@@ -366,7 +366,10 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         blocks = self._current_state.get_objects(TargetBlockType)
         terminated = all(
             is_inside_shelf(
-                self._current_state, block, shelf, self._static_object_body_cache
+                self._current_state,
+                block,
+                shelf,
+                self._static_object_body_cache,  # type: ignore
             )
             for block in blocks
         )
