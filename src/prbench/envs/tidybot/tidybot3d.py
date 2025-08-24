@@ -2,13 +2,14 @@
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional, Tuple
 
 import gymnasium
 import numpy as np
 from gymnasium import spaces
 from numpy.typing import NDArray
 
+from prbench.envs.tidybot.policies import MotionPlannerPolicyMPWrapper
 from prbench.envs.tidybot.tidybot_mujoco_env import MujocoEnv
 from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
 
@@ -22,6 +23,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self,
         scene_type: str = "ground",
         num_objects: int = 3,
+        policy_type: str = "mp",
         render_mode: str | None = None,
         custom_grasp: bool = False,
         render_images: bool = True,
@@ -33,6 +35,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         self.scene_type = scene_type
         self.num_objects = num_objects
+        self.policy_type = policy_type
         self.render_mode = render_mode
         self.custom_grasp = custom_grasp
         self.show_viewer = show_viewer
@@ -48,6 +51,9 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         # Initialize TidyBot environment
         self._tidybot_env = self._create_tidybot_env()
+
+        # Initialize policy
+        self._policy = self._create_policy()
 
         self._reward_calculator = create_reward_calculator(
             self.scene_type, self.num_objects
@@ -135,6 +141,10 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         return MujocoEnv(**kwargs)  # type: ignore
 
+    def _create_policy(self) -> MotionPlannerPolicyMPWrapper:
+        """Create appropriate policy based on policy_type."""
+        return MotionPlannerPolicyMPWrapper(custom_grasp=self.custom_grasp)
+
     def _create_observation_space(self) -> spaces.Box:
         """Create observation space based on TidyBot's observation structure."""
         # Get example observation to determine dimensions
@@ -183,6 +193,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         # Pass the seed to the TidyBot environment
         self._tidybot_env.reset(seed=seed)
+        self._policy.reset()
 
         obs = self._tidybot_env.get_obs()
         vec_obs = self._vectorize_observation(obs)
@@ -202,6 +213,42 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # Calculate reward and termination
         reward = self._calculate_reward(obs)
         terminated = self._is_terminated(obs)
+        truncated = False
+
+        return vec_obs, reward, terminated, truncated, {}
+
+    def step_with_policy(
+        self, obs: Optional[Dict[str, Any]] = None
+    ) -> Tuple[NDArray[np.float32], float, bool, bool, dict]:
+        """Execute step using the internal policy."""
+        if obs is None:
+            obs = self._tidybot_env.get_obs()
+
+        # Get action from policy
+        action = self._policy.step(obs)
+
+        if self._policy.episode_ended:
+            # Policy signaled episode end
+            return self._vectorize_observation(obs), 0.0, True, False, {}
+
+        if action is None:
+            # Policy returned no action
+            return self._vectorize_observation(obs), -0.01, False, False, {}
+
+        if action == "reset_env":
+            # Policy signaled reset
+            return self.reset()[0], 0.0, False, True, {}
+
+        # Execute action
+        self._tidybot_env.step(action)
+
+        # Get new observation
+        new_obs = self._tidybot_env.get_obs()
+        vec_obs = self._vectorize_observation(new_obs)
+
+        # Calculate reward and termination
+        reward = self._calculate_reward(new_obs)
+        terminated = self._is_terminated(new_obs)
         truncated = False
 
         return vec_obs, reward, terminated, truncated, {}

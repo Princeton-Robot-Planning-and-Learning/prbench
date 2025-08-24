@@ -70,6 +70,25 @@ img = env.render()
 env.close()
 ```
 
+Ground environment with Policy
+```python
+import prbench
+prbench.register_all_environments()
+env = prbench.make_unwrapped(
+    "prbench/TidyBot3D-ground-o3-mp-v0",
+    render_images=True,
+    show_viewer=True,
+    show_images=True,
+    )
+obs, info = env.reset()
+for _ in range(1000):
+    obs, reward, terminated, truncated, info = env.step_with_policy()
+    print(f"Reward: {reward:.3f}")
+    if terminated or truncated:
+        break
+env.close()
+```
+
 ### Action Space
 
 The action space is 11-dimensional:
