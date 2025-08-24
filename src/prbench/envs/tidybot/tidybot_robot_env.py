@@ -46,10 +46,30 @@ class TidyBotRobotEnv(MujocoEnv):
         xml_string = self._insert_robot_into_xml(xml_string)
         super().reset(xml_string)
 
+        # Randomize the base pose of the robot in the sim
+        self._randomize_base_pose()
+
         # Setup controllers after resetting the environment
         self._setup_controllers()
 
-        return self.get_obs(), None, None, None  # TODO reward, done, info
+        return self.get_obs(), None, None, None  # reward, done, info
+
+    def _randomize_base_pose(self) -> None:
+        """Randomize the base pose of the robot within defined limits."""
+        # Define limits for x, y, and theta
+        x_limit = (-1.0, 1.0)
+        y_limit = (-1.0, 1.0)
+        theta_limit = (-np.pi, np.pi)
+        # Sample random values within the limits
+        x = self.np_random.uniform(*x_limit)
+        y = self.np_random.uniform(*y_limit)
+        theta = self.np_random.uniform(*theta_limit)
+        print(f"[DEBUG] Randomized base pose: x={x:.2f}, y={y:.2f}, theta={theta:.2f} rad")
+        # Set the base position and orientation in the simulation
+        self.sim.data.qpos[0] = x  # x position
+        self.sim.data.qpos[1] = y  # y position
+        self.sim.data.qpos[2] = theta  # orientation (theta)
+        self.sim.forward()  # Update the simulation state
 
     def _insert_robot_into_xml(self, xml_string: str) -> str:
         """Insert the robot model into the provided XML string."""
