@@ -4,14 +4,6 @@ from typing import Any, Iterable
 
 import matplotlib.pyplot as plt
 import numpy as np
-from geom2drobotenvs.object_types import (
-    CircleType,
-    CRVRobotType,
-    DoubleRectType,
-    Geom2DType,
-    LObjectType,
-    RectangleType,
-)
 from geom2drobotenvs.utils import CRVRobotActionSpace
 from gymnasium.spaces import Box
 from numpy.typing import NDArray
@@ -25,6 +17,14 @@ from tomsgeoms2d.utils import find_closest_points, geom2ds_intersect
 from tomsutils.motion_planning import BiRRT
 from tomsutils.utils import fig2data, get_signed_angle_distance, wrap_angle
 
+from prbench.envs.geom2d.object_types import (
+    CircleType,
+    CRVRobotType,
+    DoubleRectType,
+    Geom2DType,
+    LObjectType,
+    RectangleType,
+)
 from prbench.envs.geom2d.structs import (
     Body2D,
     MultiBody2D,

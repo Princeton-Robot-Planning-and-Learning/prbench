@@ -6,8 +6,6 @@ from typing import Any
 
 import gymnasium
 import numpy as np
-from geom2drobotenvs.envs.obstruction_2d_env import Geom2DRobotEnvTypeFeatures
-from geom2drobotenvs.object_types import CRVRobotType, RectangleType
 from numpy.typing import NDArray
 from relational_structs import (
     Array,
@@ -18,6 +16,11 @@ from relational_structs import (
 from relational_structs.spaces import ObjectCentricBoxSpace
 from tomsutils.utils import wrap_angle
 
+from prbench.envs.geom2d.object_types import (
+    CRVRobotType,
+    Geom2DRobotEnvTypeFeatures,
+    RectangleType,
+)
 from prbench.envs.geom2d.structs import MultiBody2D, SE2Pose
 from prbench.envs.geom2d.utils import (
     CRVRobotActionSpace,

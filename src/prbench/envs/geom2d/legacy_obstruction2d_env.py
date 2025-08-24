@@ -3,15 +3,15 @@
 from dataclasses import dataclass
 
 import numpy as np
-from geom2drobotenvs.object_types import (
-    CRVRobotType,
-    Geom2DRobotEnvTypeFeatures,
-    RectangleType,
-)
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
 from prbench.envs.geom2d.base_env import Geom2DRobotEnv, Geom2DRobotEnvSpec
+from prbench.envs.geom2d.object_types import (
+    CRVRobotType,
+    Geom2DRobotEnvTypeFeatures,
+    RectangleType,
+)
 from prbench.envs.geom2d.structs import MultiBody2D, ZOrder
 from prbench.envs.geom2d.utils import (
     PURPLE,

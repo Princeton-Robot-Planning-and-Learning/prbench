@@ -3,12 +3,6 @@
 from dataclasses import dataclass
 
 import numpy as np
-from geom2drobotenvs.object_types import (
-    CRVRobotType,
-    DoubleRectType,
-    Geom2DRobotEnvTypeFeatures,
-    RectangleType,
-)
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 from tomsgeoms2d.structs import Rectangle
@@ -17,6 +11,12 @@ from prbench.envs.geom2d.base_env import (
     ConstantObjectGeom2DEnv,
     Geom2DRobotEnv,
     Geom2DRobotEnvSpec,
+)
+from prbench.envs.geom2d.object_types import (
+    CRVRobotType,
+    DoubleRectType,
+    Geom2DRobotEnvTypeFeatures,
+    RectangleType,
 )
 from prbench.envs.geom2d.structs import ZOrder
 from prbench.envs.geom2d.utils import (
