@@ -34,7 +34,6 @@ class BaseController:
         qpos: Current base pose/state vector, typically ``[x, y, theta]``.
         qvel: Current base velocity vector, typically ``[vx, vy, omega]``.
         ctrl: Actuator target for the base state (same shape as ``qpos``).
-        # last_command_time: Timestamp (seconds since epoch) of the last received command.
         otg: Ruckig trajectory generator instance for the base.
         otg_inp: Ruckig input parameters buffer (contains target/current states and
             motion limits such as ``max_velocity`` and ``max_acceleration``).
@@ -55,8 +54,6 @@ class BaseController:
         num_dofs: int = 3,
         max_velocity: Optional[Sequence[float]] = None,
         max_acceleration: Optional[Sequence[float]] = None,
-        command_timeout_factor: float = 2.5,
-        reset_qpos: Optional[NDArray[np.float64]] = None,
     ) -> None:
         self.qpos = qpos
         self.qvel = qvel
