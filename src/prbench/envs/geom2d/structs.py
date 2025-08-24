@@ -9,8 +9,8 @@ from enum import Enum
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
+from prpl_utils.utils import wrap_angle
 from tomsgeoms2d.structs import Geom2D
-from tomsutils.utils import wrap_angle
 
 
 class ZOrder(Enum):
