@@ -1,13 +1,13 @@
 import os
-import math
-import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional, Tuple
 
-from prbench.envs.tidybot.mujoco_utils import MujocoEnv
+import numpy as np
+
 from prbench.envs.tidybot.arm_controller import ArmController
 from prbench.envs.tidybot.base_controller import BaseController
+from prbench.envs.tidybot.mujoco_utils import MujocoEnv
 
 
 class TidyBotRobotEnv(MujocoEnv):
@@ -64,7 +64,6 @@ class TidyBotRobotEnv(MujocoEnv):
         x = self.np_random.uniform(*x_limit)
         y = self.np_random.uniform(*y_limit)
         theta = self.np_random.uniform(*theta_limit)
-        print(f"[DEBUG] Randomized base pose: x={x:.2f}, y={y:.2f}, theta={theta:.2f} rad")
         # Set the base position and orientation in the simulation
         self.sim.data.qpos[0] = x  # x position
         self.sim.data.qpos[1] = y  # y position
@@ -80,7 +79,7 @@ class TidyBotRobotEnv(MujocoEnv):
             / "stanford_tidybot"
             / "tidybot.xml",
             output_filename="tidybot_robot_env.xml",
-            body_pos=(0.0, 0.0, 0.0),  # Default position
+            body_pos=(0.0, 0.0, 0.0),  # robot base frame is always at the origin
             name_prefix="robot_1",
         )
         return xml_string
@@ -236,11 +235,6 @@ class TidyBotRobotEnv(MujocoEnv):
             str(merged_output_path), encoding="utf-8", xml_declaration=True
         )
 
-        print(
-            f"\nSuccessfully merged additional model into scene: {merged_output_path}"
-        )
-        # return str(merged_output_path.resolve())
-
         # return the modified XML string
         return ET.tostring(scene_root, encoding="unicode")
 
@@ -252,8 +246,6 @@ class TidyBotRobotEnv(MujocoEnv):
 
     def step(self, action: Optional[object] = None) -> None:
         """Step the environment."""
-        # TODO: implement control logic here, that computes the
-        # values to be set for self.sim.data.ctrl[:], using the controllers
         super().step(action)
 
     def get_obs(self) -> object:
@@ -302,4 +294,4 @@ class TidyBotRobotEnv(MujocoEnv):
 
         # Reset controllers
         self.base_controller.reset()
-        self.arm_controller.reset() # also resets arm to retract position
+        self.arm_controller.reset()  # also resets arm to retract position
