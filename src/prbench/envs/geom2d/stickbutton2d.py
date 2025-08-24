@@ -11,7 +11,12 @@ from geom2drobotenvs.object_types import (
     RectangleType,
 )
 from geom2drobotenvs.structs import ZOrder
-from geom2drobotenvs.utils import (
+from numpy.typing import NDArray
+from relational_structs import Object, ObjectCentricState
+from relational_structs.utils import create_state_from_dict
+
+from prbench.envs.geom2d.geom2d_utils import ConstantObjectGeom2DEnv
+from prbench.envs.geom2d.utils import (
     BLACK,
     CRVRobotActionSpace,
     SE2Pose,
@@ -19,11 +24,6 @@ from geom2drobotenvs.utils import (
     sample_se2_pose,
     state_has_collision,
 )
-from numpy.typing import NDArray
-from relational_structs import Object, ObjectCentricState
-from relational_structs.utils import create_state_from_dict
-
-from prbench.envs.geom2d.geom2d_utils import ConstantObjectGeom2DEnv
 
 
 @dataclass(frozen=True)

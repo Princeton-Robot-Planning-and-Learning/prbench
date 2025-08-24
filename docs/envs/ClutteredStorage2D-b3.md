@@ -1,18 +1,18 @@
-# prbench/ClutteredStorage2D-b7-v0
-![random action GIF](assets/random_action_gifs/ClutteredStorage2D-b7.gif)
+# prbench/ClutteredStorage2D-b3-v0
+![random action GIF](assets/random_action_gifs/ClutteredStorage2D-b3.gif)
 
 ### Description
 A 2D environment where the goal is to put all blocks inside a shelf.
 
-There are always 7 blocks in this environment.
+There are always 3 blocks in this environment.
 
 The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
 
 ### Initial State Distribution
-![initial state GIF](assets/initial_state_gifs/ClutteredStorage2D-b7.gif)
+![initial state GIF](assets/initial_state_gifs/ClutteredStorage2D-b3.gif)
 
 ### Example Demonstration
-![demo GIF](assets/demo_gifs/ClutteredStorage2D-b7.gif)
+![demo GIF](assets/demo_gifs/ClutteredStorage2D-b3.gif)
 
 ### Observation Space
 The entries of an array in this Box space correspond to the following object features:
@@ -76,46 +76,6 @@ The entries of an array in this Box space correspond to the following object fea
 | 55 | block2 | z_order |
 | 56 | block2 | width |
 | 57 | block2 | height |
-| 58 | block3 | x |
-| 59 | block3 | y |
-| 60 | block3 | theta |
-| 61 | block3 | static |
-| 62 | block3 | color_r |
-| 63 | block3 | color_g |
-| 64 | block3 | color_b |
-| 65 | block3 | z_order |
-| 66 | block3 | width |
-| 67 | block3 | height |
-| 68 | block4 | x |
-| 69 | block4 | y |
-| 70 | block4 | theta |
-| 71 | block4 | static |
-| 72 | block4 | color_r |
-| 73 | block4 | color_g |
-| 74 | block4 | color_b |
-| 75 | block4 | z_order |
-| 76 | block4 | width |
-| 77 | block4 | height |
-| 78 | block5 | x |
-| 79 | block5 | y |
-| 80 | block5 | theta |
-| 81 | block5 | static |
-| 82 | block5 | color_r |
-| 83 | block5 | color_g |
-| 84 | block5 | color_b |
-| 85 | block5 | z_order |
-| 86 | block5 | width |
-| 87 | block5 | height |
-| 88 | block6 | x |
-| 89 | block6 | y |
-| 90 | block6 | theta |
-| 91 | block6 | static |
-| 92 | block6 | color_r |
-| 93 | block6 | color_g |
-| 94 | block6 | color_b |
-| 95 | block6 | z_order |
-| 96 | block6 | width |
-| 97 | block6 | height |
 
 
 ### Action Space

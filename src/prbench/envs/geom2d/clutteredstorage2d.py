@@ -12,7 +12,12 @@ from geom2drobotenvs.object_types import (
     RectangleType,
 )
 from geom2drobotenvs.structs import ZOrder
-from geom2drobotenvs.utils import (
+from relational_structs import Object, ObjectCentricState, Type
+from relational_structs.utils import create_state_from_dict
+from tomsgeoms2d.structs import Rectangle
+
+from prbench.envs.geom2d.geom2d_utils import ConstantObjectGeom2DEnv
+from prbench.envs.geom2d.utils import (
     BLACK,
     PURPLE,
     CRVRobotActionSpace,
@@ -21,11 +26,6 @@ from geom2drobotenvs.utils import (
     sample_se2_pose,
     state_has_collision,
 )
-from relational_structs import Object, ObjectCentricState, Type
-from relational_structs.utils import create_state_from_dict
-from tomsgeoms2d.structs import Rectangle
-
-from prbench.envs.geom2d.geom2d_utils import ConstantObjectGeom2DEnv
 
 # NOTE: unlike some other environments, there are multiple target blocks here.
 TargetBlockType = Type("target_block", parent=RectangleType)

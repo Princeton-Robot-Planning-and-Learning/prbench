@@ -37,16 +37,25 @@ The entries of an array in this Box space correspond to the following object fea
 | 16 | shelf | z_order |
 | 17 | shelf | width |
 | 18 | shelf | height |
-| 19 | block0 | x |
-| 20 | block0 | y |
-| 21 | block0 | theta |
-| 22 | block0 | static |
-| 23 | block0 | color_r |
-| 24 | block0 | color_g |
-| 25 | block0 | color_b |
-| 26 | block0 | z_order |
-| 27 | block0 | width |
-| 28 | block0 | height |
+| 19 | shelf | x1 |
+| 20 | shelf | y1 |
+| 21 | shelf | theta1 |
+| 22 | shelf | width1 |
+| 23 | shelf | height1 |
+| 24 | shelf | z_order1 |
+| 25 | shelf | color_r1 |
+| 26 | shelf | color_g1 |
+| 27 | shelf | color_b1 |
+| 28 | block0 | x |
+| 29 | block0 | y |
+| 30 | block0 | theta |
+| 31 | block0 | static |
+| 32 | block0 | color_r |
+| 33 | block0 | color_g |
+| 34 | block0 | color_b |
+| 35 | block0 | z_order |
+| 36 | block0 | width |
+| 37 | block0 | height |
 
 
 ### Action Space
