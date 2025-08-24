@@ -33,7 +33,9 @@ elif PYOPENGL_PLATFORM.lower() != "egl":
     )
 
 from mujoco.egl import egl_ext as EGL  # pylint: disable=wrong-import-position
-from OpenGL import error  # type: ignore[import-untyped] # pylint: disable=wrong-import-position
+from OpenGL import (  # type: ignore[import-untyped] # pylint: disable=wrong-import-position
+    error,
+)
 
 
 def create_initialized_egl_device_display(device_id: int = 0) -> int:

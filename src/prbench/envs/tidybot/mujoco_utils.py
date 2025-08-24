@@ -14,7 +14,7 @@ import platform
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from threading import Lock
-from typing import Dict, Tuple, Any
+from typing import Any, Dict, Tuple
 
 import mujoco
 import mujoco.viewer
@@ -128,7 +128,9 @@ class MujocoEnv:
                 )
             self.sim.data.ctrl[:] = action
 
-    def _post_action(self, action: np.ndarray | dict[str, Any]) -> tuple[float, bool, dict]:
+    def _post_action(
+        self, action: np.ndarray | dict[str, Any]
+    ) -> tuple[float, bool, dict]:
         """Do any housekeeping after taking an action.
 
         Args:
@@ -153,7 +155,9 @@ class MujocoEnv:
         """
         raise NotImplementedError
 
-    def step(self, action: np.ndarray | dict[str, Any]) -> tuple[dict, float, bool, dict]:
+    def step(
+        self, action: np.ndarray | dict[str, Any]
+    ) -> tuple[dict, float, bool, dict]:
         """Step the environment.
 
         Args:
@@ -562,8 +566,9 @@ class MjRenderContext:
                 )
             # fmt: off
             # pylint: disable=import-outside-toplevel
+            # isort: off
             if _SYSTEM == "Linux" and _MUJOCO_GL == "osmesa":
-                from prbench.envs.tidybot.renderers.context.osmesa_context import (  # type: ignore[assignment]
+                from prbench.envs.tidybot.renderers.context.osmesa_context import (
                     OSMesaGLContext as GLContext,)
 
                 # TODO this needs testing on a Linux machine  # pylint: disable=fixme
@@ -575,6 +580,7 @@ class MjRenderContext:
             else:
                 from prbench.envs.tidybot.renderers.context.glfw_context import (  # type: ignore[assignment]
                     GLFWGLContext as GLContext,)
+            # isort: on
             # fmt: on
 
         assert offscreen, "only offscreen supported for now"
