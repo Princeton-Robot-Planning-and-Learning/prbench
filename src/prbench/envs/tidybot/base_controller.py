@@ -34,8 +34,7 @@ class BaseController:
         qpos: Current base pose/state vector, typically ``[x, y, theta]``.
         qvel: Current base velocity vector, typically ``[vx, vy, omega]``.
         ctrl: Actuator target for the base state (same shape as ``qpos``).
-        last_command_time: Timestamp (seconds since epoch) of the last received
-            command.
+        # last_command_time: Timestamp (seconds since epoch) of the last received command.
         otg: Ruckig trajectory generator instance for the base.
         otg_inp: Ruckig input parameters buffer (contains target/current states and
             motion limits such as ``max_velocity`` and ``max_acceleration``).
@@ -62,7 +61,7 @@ class BaseController:
         self.qpos = qpos
         self.qvel = qvel
         self.ctrl = ctrl
-        self.last_command_time: Optional[float] = None
+        # Use Ruckig for online trajectory generation
         self.otg = Ruckig(num_dofs, timestep)
         self.otg_inp = InputParameter(num_dofs)
         self.otg_out = OutputParameter(num_dofs)
@@ -74,42 +73,28 @@ class BaseController:
         self.otg_inp.max_acceleration = list(max_acceleration)
         self.otg_res = None
         self.motion3d_spec = Motion3DEnvSpec()
-        self.command_timeout_factor = command_timeout_factor
-        self.reset_qpos = (
-            reset_qpos
-            if reset_qpos is not None
-            else np.zeros(num_dofs, dtype=np.float64)
-        )
 
     def reset(self) -> None:
         """Reset the base controller to origin position."""
-        # Initialize base at origin
-        self.qpos[:] = self.reset_qpos
         self.ctrl[:] = self.qpos
         # Initialize OTG
-        self.last_command_time = time.time()
         self.otg_inp.current_position = self.qpos
         self.otg_inp.current_velocity = self.qvel
         self.otg_inp.target_position = self.qpos
         self.otg_res = Result.Finished
 
-    def control_callback(self, command: dict) -> None:
-        """Process control commands and update base trajectory."""
-        if command is not None:
-            self.last_command_time = time.time()
-            if "base_pose" in command:
-                # Set target base qpos
-                self.otg_inp.target_position = command["base_pose"]
-                self.otg_res = Result.Working
-        # Maintain current pose if command stream is disrupted
-        if (
-            time.time() - self.last_command_time
-            > self.command_timeout_factor * self.motion3d_spec.policy_control_period
-        ):
-            self.otg_inp.target_position = self.qpos
-            self.otg_res = Result.Working
-        # Update OTG
-        if self.otg_res == Result.Working:
-            self.otg_res = self.otg.update(self.otg_inp, self.otg_out)
-            self.otg_out.pass_to_input(self.otg_inp)
-            self.ctrl[:] = self.otg_out.new_position
+    def run_controller(self, action) -> None:
+        """Run the controller to update the base position based on OTG."""
+
+        # Set target base qpos
+        self.otg_inp.target_position = action["base_pose"]
+        self.otg_res = Result.Working
+
+        # Generate the next step in the trajectory
+        self.otg_res = self.otg.update(self.otg_inp, self.otg_out)
+
+        # Pass output back to input for next iteration
+        self.otg_out.pass_to_input(self.otg_inp)
+
+        # Apply the smoothed position to the controller
+        self.ctrl[:] = self.otg_out.new_position
