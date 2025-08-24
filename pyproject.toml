@@ -11,7 +11,10 @@ requires-python = ">=3.10"
 dependencies = [
    "matplotlib",
    "numpy",
-   "geom2drobotenvs@git+https://github.com/tomsilver/geom2d-robot-envs",
+   "relational_structs@git+https://github.com/tomsilver/relational-structs.git",
+   "prpl_utils@git+https://github.com/Princeton-Robot-Planning-and-Learning/prpl-utils",
+   # Geom2D dependencies
+   "tomsgeoms2d@git+https://github.com/tomsilver/toms-geoms-2d.git",
    # TidyBot dependencies
    "mujoco==3.2.4",
    "pin>=2.7.0", 
@@ -26,6 +29,9 @@ dependencies = [
    "h5py>=3.11.0",
    "tqdm>=4.66.2",
    "threadpoolctl>=3.5.0",
+   # PyBullet dependencies
+   "pybullet==3.2.7",
+   "pybullet-helpers@git+https://github.com/tomsilver/pybullet-helpers.git",
 ]
 
 [project.optional-dependencies]
@@ -82,5 +88,6 @@ module = [
     "redis.*",
     "phoenix6.*",
     "cv2.*",
+    "pybullet.*",
 ]
 ignore_missing_imports = true
