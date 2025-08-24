@@ -19,6 +19,7 @@
 import atexit
 import ctypes
 import os
+from typing import Optional
 
 PYOPENGL_PLATFORM = os.environ.get("PYOPENGL_PLATFORM")
 
@@ -27,16 +28,23 @@ if not PYOPENGL_PLATFORM:
 elif PYOPENGL_PLATFORM.lower() != "egl":
     raise ImportError(
         "Cannot use EGL rendering platform. "
-        "The PYOPENGL_PLATFORM environment variable is set to {!r} "
-        "(should be either unset or 'egl').".format(PYOPENGL_PLATFORM)
+        f"The PYOPENGL_PLATFORM environment variable is set to {PYOPENGL_PLATFORM!r} "
+        "(should be either unset or 'egl')."
     )
 
-from mujoco.egl import egl_ext as EGL
-from OpenGL import error
+from mujoco.egl import egl_ext as EGL  # pylint: disable=wrong-import-position
+from OpenGL import error  # pylint: disable=wrong-import-position
 
 
-def create_initialized_egl_device_display(device_id=0):
-    """Creates an initialized EGL display directly on a device."""
+def create_initialized_egl_device_display(device_id: int = 0) -> int:
+    """Creates an initialized EGL display directly on a device.
+
+    Args:
+        device_id: The device ID to use for EGL display creation.
+
+    Returns:
+        EGL display handle or EGL_NO_DISPLAY on failure.
+    """
     all_devices = EGL.eglQueryDevicesEXT()
     selected_device = (
         os.environ.get("CUDA_VISIBLE_DEVICES", None)
@@ -85,10 +93,11 @@ def create_initialized_egl_device_display(device_id=0):
     return EGL.EGL_NO_DISPLAY
 
 
-global EGL_DISPLAY  # pylint: disable=global-at-module-level
-EGL_DISPLAY = None
+# Module-level EGL display
+_EGL_DISPLAY: Optional[int] = None
 
-EGL_ATTRIBUTES = (
+# EGL configuration attributes
+_EGL_ATTRIBUTES = (
     EGL.EGL_RED_SIZE,
     8,
     EGL.EGL_GREEN_SIZE,
@@ -121,28 +130,28 @@ class EGLGLContext:
         config_size = 1
         config_ptr = EGL.EGLConfig()  # Makes an opaque pointer
         EGL.eglReleaseThread()
-        global EGL_DISPLAY  # pylint: disable=global-statement
-        if EGL_DISPLAY is None:
+        global _EGL_DISPLAY  # pylint: disable=global-statement
+        if _EGL_DISPLAY is None:
             # only initialize for the first time
-            EGL_DISPLAY = create_initialized_egl_device_display(device_id=device_id)
-            if EGL_DISPLAY == EGL.EGL_NO_DISPLAY:
+            _EGL_DISPLAY = create_initialized_egl_device_display(device_id=device_id)
+            if _EGL_DISPLAY == EGL.EGL_NO_DISPLAY:
                 raise ImportError(
-                    "Cannot initialize a EGL device display. This likely means that your EGL "
-                    "driver does not support the PLATFORM_DEVICE extension, which is "
-                    "required for creating a headless rendering context."
+                    "Cannot initialize a EGL device display. This likely means that "
+                    "your EGL driver does not support the PLATFORM_DEVICE extension, "
+                    "which is required for creating a headless rendering context."
                 )
-            atexit.register(EGL.eglTerminate, EGL_DISPLAY)
+            atexit.register(EGL.eglTerminate, _EGL_DISPLAY)
         EGL.eglChooseConfig(
-            EGL_DISPLAY, EGL_ATTRIBUTES, config_ptr, config_size, num_configs
+            _EGL_DISPLAY, _EGL_ATTRIBUTES, config_ptr, config_size, num_configs
         )
         if num_configs.value < 1:
             raise RuntimeError(
                 "EGL failed to find a framebuffer configuration that matches the "
-                "desired attributes: {}".format(EGL_ATTRIBUTES)
+                f"desired attributes: {_EGL_ATTRIBUTES}"
             )
         EGL.eglBindAPI(EGL.EGL_OPENGL_API)
         self._context = EGL.eglCreateContext(
-            EGL_DISPLAY, config_ptr, EGL.EGL_NO_CONTEXT, None
+            _EGL_DISPLAY, config_ptr, EGL.EGL_NO_CONTEXT, None
         )
         if not self._context:
             raise RuntimeError("Cannot create an EGL context.")
@@ -150,7 +159,7 @@ class EGLGLContext:
     def make_current(self):
         """Makes this context current."""
         if not EGL.eglMakeCurrent(
-            EGL_DISPLAY, EGL.EGL_NO_SURFACE, EGL.EGL_NO_SURFACE, self._context
+            _EGL_DISPLAY, EGL.EGL_NO_SURFACE, EGL.EGL_NO_SURFACE, self._context
         ):
             raise RuntimeError("Failed to make the EGL context current.")
 
@@ -160,12 +169,12 @@ class EGLGLContext:
             current_context = EGL.eglGetCurrentContext()
             if current_context and self._context.address == current_context.address:
                 EGL.eglMakeCurrent(
-                    EGL_DISPLAY,
+                    _EGL_DISPLAY,
                     EGL.EGL_NO_SURFACE,
                     EGL.EGL_NO_SURFACE,
                     EGL.EGL_NO_CONTEXT,
                 )
-            EGL.eglDestroyContext(EGL_DISPLAY, self._context)
+            EGL.eglDestroyContext(_EGL_DISPLAY, self._context)
             EGL.eglReleaseThread()
         self._context = None
 
