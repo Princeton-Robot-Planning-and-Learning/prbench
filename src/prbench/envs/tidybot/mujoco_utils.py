@@ -14,6 +14,7 @@ import platform
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from threading import Lock
+from typing import Dict, Tuple
 
 import mujoco
 import mujoco.viewer
@@ -28,7 +29,9 @@ SIMULATION_TIMESTEP = 0.002  # (in seconds)
 # Set macros needed for MuJoCo rendering
 _SYSTEM = platform.system()
 if _SYSTEM == "Windows":
-    ctypes.WinDLL(os.path.join(os.path.dirname(__file__), "mujoco.dll"))
+    ctypes.WinDLL(  # type: ignore[attr-defined]
+        os.path.join(os.path.dirname(__file__), "mujoco.dll")
+    )  # type: ignore[attr-defined]
 CUDA_VISIBLE_DEVICES = os.environ.get("CUDA_VISIBLE_DEVICES", "")
 if CUDA_VISIBLE_DEVICES != "":
     MUJOCO_EGL_DEVICE_ID = os.environ.get("MUJOCO_EGL_DEVICE_ID", None)
@@ -95,10 +98,10 @@ class MujocoEnv:
         Args:
             seed: The seed value to set. If None, a random seed is used.
         """
-        self.np_random = utils.get_rng(seed)
+        self.np_random = utils.get_rng(seed)  # type: ignore[no-untyped-call]
         return self.np_random
 
-    def reset(self, xml_string: str):
+    def reset(self, xml_string: str) -> Tuple[Dict[str, np.ndarray], None, None, None]:
         """Reset the environment using xml string."""
 
         # Destroy the current simulation if it exists.
@@ -107,9 +110,10 @@ class MujocoEnv:
         # Initialize the simulation with the provided XML string.
         self._create_sim(xml_string)
 
+        assert self.sim is not None, "Simulation must be initialized after _create_sim"
         self.sim.reset()
         self.sim.forward()
-        return self.get_obs()
+        return self.get_obs(), None, None, None
 
     def _pre_action(self, action: np.ndarray | None) -> None:
         """Do any preprocessing before taking an action.
@@ -117,7 +121,7 @@ class MujocoEnv:
         Args:
             action (np.array): Action to execute within the environment.
         """
-        if action is not None:
+        if action is not None and self.sim is not None:
             self.sim.data.ctrl[:] = action
 
     def _post_action(self, action: np.ndarray | None) -> tuple[float, bool, dict]:
@@ -133,7 +137,7 @@ class MujocoEnv:
         """
         reward = self.reward(action=action)
         done = False  # Default to not done unless overridden
-        info = {}
+        info: dict[str, object] = {}
         return reward, done, info
 
     @abc.abstractmethod
@@ -162,6 +166,7 @@ class MujocoEnv:
 
         assert self.sim is not None, "Simulation must be initialized before stepping."
 
+        assert self.timestep is not None, "Timestep must be initialized."
         self.timestep += 1
 
         # Step the simulation with the same action until the control frequency is reached
@@ -181,6 +186,8 @@ class MujocoEnv:
 
     def get_obs(self) -> dict[str, np.ndarray]:
         """Get the current observation."""
+        assert self.sim is not None, "Simulation must be initialized."
+
         # add a copy of qpos and qvel to observation
         di: dict[str, np.ndarray] = {
             "qpos": np.copy(self.sim.data.qpos),
@@ -188,9 +195,6 @@ class MujocoEnv:
         }
 
         # render images and update di
-        assert (
-            self.sim is not None
-        ), "Simulation must be initialized before getting camera images."
         images: dict[str, np.ndarray] | None = self._get_camera_images()
         if images is not None:
             di.update(images)
@@ -199,18 +203,23 @@ class MujocoEnv:
 
     def _get_camera_images(self) -> dict[str, np.ndarray] | None:
         """Get images from cameras in simulation."""
-        if not self.camera_names:
+        if not self.camera_names or self.sim is None:
             return None
 
         images: OrderedDict[str, np.ndarray] = OrderedDict()
         for camera_name in self.camera_names:
-            images[f"{camera_name}_image"] = self.sim.render(
+            rendered_image = self.sim.render(
                 width=self.camera_width,
                 height=self.camera_height,
                 camera_name=camera_name,
                 depth=False,
                 mode="offscreen",
             )
+            # Handle both single image and tuple return types
+            if isinstance(rendered_image, tuple):
+                images[f"{camera_name}_image"] = rendered_image[0]
+            else:
+                images[f"{camera_name}_image"] = rendered_image
         return images
 
     def _close_sim(self) -> None:
@@ -231,9 +240,13 @@ class MujocoEnv:
         Args:
             xml_string: A string containing the MuJoCo XML model.
         """
-        self.sim: MjSim = MjSim(xml_string, self.camera_width, self.camera_height)
-        self.timestep: int = 0
-        self.done: bool = False
+        self.sim: MjSim = MjSim(  # type: ignore[misc,no-redef]
+            xml_string,
+            self.camera_width,
+            self.camera_height,
+        )  # type: ignore[misc]
+        self.timestep: int = 0  # type: ignore[misc,no-redef]
+        self.done: bool = False  # type: ignore[misc,no-redef]
 
         if self.show_viewer:
             mujoco.viewer.launch(
@@ -264,90 +277,90 @@ class MjModel:
 
     def _make_mappings(self) -> None:
         """Make some useful internal mappings that mujoco-py supported."""
-        self.body_names: tuple[str, ...]
-        self._body_name2id: dict[str, int]
-        self._body_id2name: dict[int, str]
+        self.body_names: tuple[str | None, ...]
+        self._body_name2id: dict[str | None, int]
+        self._body_id2name: dict[int, str | None]
         self.body_names, self._body_name2id, self._body_id2name = (
             self._extract_mj_names(
                 self._model.nbody,
                 mujoco.mjtObj.mjOBJ_BODY,
             )
         )
-        self.joint_names: tuple[str, ...]
-        self._joint_name2id: dict[str, int]
-        self._joint_id2name: dict[int, str]
+        self.joint_names: tuple[str | None, ...]
+        self._joint_name2id: dict[str | None, int]
+        self._joint_id2name: dict[int, str | None]
         self.joint_names, self._joint_name2id, self._joint_id2name = (
             self._extract_mj_names(
                 self._model.njnt,
                 mujoco.mjtObj.mjOBJ_JOINT,
             )
         )
-        self.geom_names: tuple[str, ...]
-        self._geom_name2id: dict[str, int]
-        self._geom_id2name: dict[int, str]
+        self.geom_names: tuple[str | None, ...]
+        self._geom_name2id: dict[str | None, int]
+        self._geom_id2name: dict[int, str | None]
         self.geom_names, self._geom_name2id, self._geom_id2name = (
             self._extract_mj_names(
                 self._model.ngeom,
                 mujoco.mjtObj.mjOBJ_GEOM,
             )
         )
-        self.site_names: tuple[str, ...]
-        self._site_name2id: dict[str, int]
-        self._site_id2name: dict[int, str]
+        self.site_names: tuple[str | None, ...]
+        self._site_name2id: dict[str | None, int]
+        self._site_id2name: dict[int, str | None]
         self.site_names, self._site_name2id, self._site_id2name = (
             self._extract_mj_names(
                 self._model.nsite,
                 mujoco.mjtObj.mjOBJ_SITE,
             )
         )
-        self.light_names: tuple[str, ...]
-        self._light_name2id: dict[str, int]
-        self._light_id2name: dict[int, str]
+        self.light_names: tuple[str | None, ...]
+        self._light_name2id: dict[str | None, int]
+        self._light_id2name: dict[int, str | None]
         self.light_names, self._light_name2id, self._light_id2name = (
             self._extract_mj_names(
                 self._model.nlight,
                 mujoco.mjtObj.mjOBJ_LIGHT,
             )
         )
-        self.camera_names: tuple[str, ...]
-        self._camera_name2id: dict[str, int]
-        self._camera_id2name: dict[int, str]
+        self.camera_names: tuple[str | None, ...]
+        self._camera_name2id: dict[str | None, int]
+        self._camera_id2name: dict[int, str | None]
         self.camera_names, self._camera_name2id, self._camera_id2name = (
             self._extract_mj_names(
                 self._model.ncam,
                 mujoco.mjtObj.mjOBJ_CAMERA,
             )
         )
-        self.actuator_names: tuple[str, ...]
-        self._actuator_name2id: dict[str, int]
-        self._actuator_id2name: dict[int, str]
+        self.actuator_names: tuple[str | None, ...]
+        self._actuator_name2id: dict[str | None, int]
+        self._actuator_id2name: dict[int, str | None]
         self.actuator_names, self._actuator_name2id, self._actuator_id2name = (
             self._extract_mj_names(
                 self._model.nu,
                 mujoco.mjtObj.mjOBJ_ACTUATOR,
             )
         )
-        self.sensor_names: tuple[str, ...]
-        self._sensor_name2id: dict[str, int]
-        self._sensor_id2name: dict[int, str]
+        self.sensor_names: tuple[str | None, ...]
+        self._sensor_name2id: dict[str | None, int]
+        self._sensor_id2name: dict[int, str | None]
         self.sensor_names, self._sensor_name2id, self._sensor_id2name = (
             self._extract_mj_names(
                 self._model.nsensor,
                 mujoco.mjtObj.mjOBJ_SENSOR,
             )
         )
-        self.tendon_names: tuple[str, ...]
-        self._tendon_name2id: dict[str, int]
-        self._tendon_id2name: dict[int, str]
+        self.tendon_names: tuple[str | None, ...]
+        self._tendon_name2id: dict[str | None, int]
+        self._tendon_id2name: dict[int, str | None]
         self.tendon_names, self._tendon_name2id, self._tendon_id2name = (
             self._extract_mj_names(
                 self._model.ntendon,
                 mujoco.mjtObj.mjOBJ_TENDON,
             )
         )
-        self.mesh_names: tuple[str, ...]
-        self._mesh_name2id: dict[str, int]
-        self._mesh_id2name: dict[int, str]
+        self.mesh_names: tuple[str | None, ...]
+        self._mesh_name2id: dict[str | None, int]
+        self._mesh_id2name: dict[int, str | None]
         self.mesh_names, self._mesh_name2id, self._mesh_id2name = (
             self._extract_mj_names(
                 self._model.nmesh,
@@ -355,14 +368,16 @@ class MjModel:
             )
         )
 
-    def camera_name2id(self, name):
+    def camera_name2id(self, name: str) -> int:
         """Get camera id from  camera name."""
         if name == "free":
             return -1
         if name not in self._camera_name2id:
+            # Filter out None names for display
+            available_names = [n for n in self.camera_names if n is not None]
             raise ValueError(
                 f'No "camera" with name {name} exists. '
-                f'Available "camera" names = {self.camera_names}.'
+                f'Available "camera" names = {available_names}.'
             )
         return self._camera_name2id[name]
 
@@ -464,7 +479,7 @@ class MjSim:
         depth: bool = False,
         mode: str = "offscreen",
         segmentation: bool = False,
-    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    ) -> np.ndarray | tuple[np.ndarray, np.ndarray | None]:
         """Renders view from a camera and returns image as an `numpy.ndarray`.
 
         Args:
@@ -485,17 +500,21 @@ class MjSim:
         else:
             camera_id = self.model.camera_name2id(camera_name)
 
+        # Use default dimensions if not provided
+        render_width = width or self._render_context_offscreen.con.offWidth
+        render_height = height or self._render_context_offscreen.con.offHeight
+
         assert mode == "offscreen", "only offscreen supported for now"
         assert self._render_context_offscreen is not None
         with _MjSim_render_lock:
             self._render_context_offscreen.render(
-                width=width,
-                height=height,
+                width=render_width,
+                height=render_height,
                 camera_id=camera_id,
                 segmentation=segmentation,
             )
             return self._render_context_offscreen.read_pixels(
-                width, height, depth=depth, segmentation=segmentation
+                render_width, render_height, depth=depth, segmentation=segmentation
             )
 
     def free(self) -> None:
@@ -528,11 +547,11 @@ class MjRenderContext:
         if _MUJOCO_GL not in ("disable", "disabled", "off", "false", "0"):
             _VALID_MUJOCO_GL = ("enable", "enabled", "on", "true", "1", "glfw", "")
             if _SYSTEM == "Linux":
-                _VALID_MUJOCO_GL += ("glx", "egl", "osmesa")
+                _VALID_MUJOCO_GL += ("glx", "egl", "osmesa")  # type: ignore[assignment]
             elif _SYSTEM == "Windows":
-                _VALID_MUJOCO_GL += ("wgl",)
+                _VALID_MUJOCO_GL += ("wgl",)  # type: ignore[assignment]
             elif _SYSTEM == "Darwin":
-                _VALID_MUJOCO_GL += ("cgl",)
+                _VALID_MUJOCO_GL += ("cgl",)  # type: ignore[assignment]
             if _MUJOCO_GL not in _VALID_MUJOCO_GL:
                 raise RuntimeError(
                     f"invalid value for environment variable MUJOCO_GL: {_MUJOCO_GL}"
@@ -541,17 +560,17 @@ class MjRenderContext:
             # pylint: disable=import-outside-toplevel
             if _SYSTEM == "Linux" and _MUJOCO_GL == "osmesa":
                 from prbench.envs.tidybot.renderers.context.osmesa_context import (
-                    OSMesaGLContext as GLContext,)
+                    OSMesaGLContext as GLContext,)  # type: ignore[assignment]
 
                 # TODO this needs testing on a Linux machine  # pylint: disable=fixme
             elif _SYSTEM == "Linux" and _MUJOCO_GL == "egl":
                 from prbench.envs.tidybot.renderers.context.egl_context import (
-                    EGLGLContext as GLContext,)
+                    EGLGLContext as GLContext,)  # type: ignore[assignment]
 
                 # TODO this needs testing on a Linux machine  # pylint: disable=fixme
             else:
                 from prbench.envs.tidybot.renderers.context.glfw_context import (
-                    GLFWGLContext as GLContext,)
+                    GLFWGLContext as GLContext,)  # type: ignore[assignment]
             # fmt: on
 
         assert offscreen, "only offscreen supported for now"
@@ -560,8 +579,10 @@ class MjRenderContext:
         self.device_id: int = device_id
 
         # setup GL context with defaults for now
-        self.gl_ctx = GLContext(  # pylint: disable=possibly-used-before-assignment
-            max_width=max_width, max_height=max_height, device_id=self.device_id
+        self.gl_ctx = GLContext(  # type: ignore[no-untyped-call] # pylint: disable=possibly-used-before-assignment
+            max_width=max_width,
+            max_height=max_height,
+            device_id=self.device_id,
         )
         self.gl_ctx.make_current()
 
@@ -661,8 +682,13 @@ class MjRenderContext:
         height: int,
         depth: bool = False,
         segmentation: bool = False,
-    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-        """Read the pixels from the current rendering context."""
+    ) -> np.ndarray | tuple[np.ndarray, np.ndarray | None]:
+        """Read the pixels from the current rendering context.
+
+        Returns:
+            np.ndarray if depth is False,
+            tuple of (np.ndarray, np.ndarray or None) if depth is True.
+        """
         viewport = mujoco.MjrRect(0, 0, width, height)
         rgb_img: np.ndarray = np.empty((height, width, 3), dtype=np.uint8)
         depth_img: np.ndarray | None = (

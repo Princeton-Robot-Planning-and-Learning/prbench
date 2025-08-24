@@ -52,6 +52,7 @@ class TidyBotRobotEnv(MujocoEnv):
 
         Args:
             xml_string: A string containing the MuJoCo XML model.
+
         Returns:
             observation: The observation from the environment.
             reward: None (placeholder for compatibility).
@@ -72,6 +73,10 @@ class TidyBotRobotEnv(MujocoEnv):
 
     def _randomize_base_pose(self) -> None:
         """Randomize the base pose of the robot within defined limits."""
+        assert (
+            self.sim is not None
+        ), "Simulation must be initialized before randomizing base pose."
+
         # Define limits for x, y, and theta
         x_limit = (-1.0, 1.0)
         y_limit = (-1.0, 1.0)
@@ -103,7 +108,7 @@ class TidyBotRobotEnv(MujocoEnv):
     def _update_element_references(
         self,
         element: ET.Element,
-        rename_map: dict[str, str],
+        rename_map: Dict[str, str],
     ) -> None:
         """Recursively update asset references in an element and its children."""
         for attr_ref in ["material", "mesh", "texture"]:
@@ -136,6 +141,8 @@ class TidyBotRobotEnv(MujocoEnv):
         scene_tree = ET.ElementTree(ET.fromstring(xml_string))
         scene_root = scene_tree.getroot()
 
+        assert scene_root is not None, "Scene XML root element is missing."
+
         # scene_output_dir = Path(scene_xml_path).parent
 
         # Ensure required roots exist in the scene
@@ -152,8 +159,9 @@ class TidyBotRobotEnv(MujocoEnv):
             scene_worldbody = ET.SubElement(scene_root, "worldbody")
 
         # Parse the additional model
-        add_tree: ET.ElementTree = ET.parse(additional_model_xml_path)
-        add_root: ET.Element = add_tree.getroot()
+        add_tree = ET.parse(additional_model_xml_path)
+        add_root = add_tree.getroot()
+        assert add_root is not None, "Additional model XML root element is missing."
 
         # Determine name prefix for all elements from the additional model
         model_name: str = Path(additional_model_xml_path).stem
@@ -291,6 +299,10 @@ class TidyBotRobotEnv(MujocoEnv):
 
     def _setup_controllers(self) -> None:
         """Setup the controllers for the robot."""
+
+        assert (
+            self.sim is not None
+        ), "Simulation must be initialized before setting up controllers."
 
         # Cache references to array slices
         base_dofs: int = self.sim.model._model.body(  # pylint: disable=protected-access
