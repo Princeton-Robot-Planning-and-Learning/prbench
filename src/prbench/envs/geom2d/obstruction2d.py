@@ -7,8 +7,11 @@ import numpy as np
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
-from prbench.envs.geom2d.base_env import ConstantObjectGeom2DEnv, Geom2DRobotEnv, \
-    Geom2DRobotEnvSpec
+from prbench.envs.geom2d.base_env import (
+    ConstantObjectGeom2DEnv,
+    Geom2DRobotEnv,
+    Geom2DRobotEnvSpec,
+)
 from prbench.envs.geom2d.object_types import (
     CRVRobotType,
     Geom2DRobotEnvTypeFeatures,
