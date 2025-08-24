@@ -4,7 +4,7 @@ TidyBot robot in simulation."""
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 
@@ -47,7 +47,17 @@ class TidyBotRobotEnv(MujocoEnv):
         self.base_controller: Optional[BaseController] = None
         self.arm_controller: Optional[ArmController] = None
 
-    def reset(self, xml_string: str) -> Tuple[object, None, None, None]:
+    def reset(self, xml_string: str) -> Tuple[Dict[str, np.ndarray], None, None, None]:
+        """Reset the environment using xml string.
+
+        Args:
+            xml_string: A string containing the MuJoCo XML model.
+        Returns:
+            observation: The observation from the environment.
+            reward: None (placeholder for compatibility).
+            done: None (placeholder for compatibility).
+            info: None (placeholder for compatibility).
+        """
         # Insert robot in the xml_string
         xml_string = self._insert_robot_into_xml(xml_string)
         super().reset(xml_string)
@@ -107,7 +117,7 @@ class TidyBotRobotEnv(MujocoEnv):
     def _merge_additional_model_into_scene(
         self,
         xml_string: str,
-        additional_model_xml_path: str,
+        additional_model_xml_path: Union[str, Path],
         output_filename: str,
         body_pos: Optional[Tuple[float, float, float]] = None,
         name_prefix: Optional[str] = None,
@@ -142,12 +152,12 @@ class TidyBotRobotEnv(MujocoEnv):
             scene_worldbody = ET.SubElement(scene_root, "worldbody")
 
         # Parse the additional model
-        add_tree = ET.parse(additional_model_xml_path)
-        add_root = add_tree.getroot()
+        add_tree: ET.ElementTree = ET.parse(additional_model_xml_path)
+        add_root: ET.Element = add_tree.getroot()
 
         # Determine name prefix for all elements from the additional model
-        model_name = Path(additional_model_xml_path).stem
-        prefix = name_prefix if name_prefix is not None else model_name
+        model_name: str = Path(additional_model_xml_path).stem
+        prefix: str = name_prefix if name_prefix is not None else model_name
 
         # 1) Merge defaults (append all children of <default>)
         add_default = add_root.find("default")
@@ -156,35 +166,39 @@ class TidyBotRobotEnv(MujocoEnv):
                 scene_default.append(child)
 
         # 2) Merge assets with name prefixing and file path rewriting
-        rename_map = {}
+        rename_map: Dict[str, str] = {}
 
-        add_asset = add_root.find("asset")
+        add_asset: Optional[ET.Element] = add_root.find("asset")
         if add_asset is not None:
-            add_xml_dir = Path(additional_model_xml_path).parent
+            add_xml_dir: Path = Path(additional_model_xml_path).parent
             # Resolve meshdir if specified in additional model compiler
-            add_compiler = add_root.find("compiler")
-            meshdir = add_compiler.get("meshdir") if add_compiler is not None else None
-            base_asset_dir = (
+            add_compiler: Optional[ET.Element] = add_root.find("compiler")
+            meshdir: Optional[str] = (
+                add_compiler.get("meshdir") if add_compiler is not None else None
+            )
+            base_asset_dir: Path = (
                 (add_xml_dir / meshdir).resolve() if meshdir else add_xml_dir.resolve()
             )
             for asset_elem in list(add_asset):
                 # Determine original asset name
-                original_name = asset_elem.get("name")
+                original_name: Optional[str] = asset_elem.get("name")
                 if original_name is None:
                     # Infer from file basename if available
-                    file_attr = asset_elem.get("file")
+                    file_attr: Optional[str] = asset_elem.get("file")
                     if file_attr:
                         original_name = Path(file_attr).stem
                 # If we still don't have a name, skip renaming for this asset
                 if original_name:
-                    new_name = f"{prefix}_{original_name}"
+                    new_name: str = f"{prefix}_{original_name}"
                     rename_map[original_name] = new_name
                     asset_elem.set("name", new_name)
 
                 # Rewrite file path to be the absolute path
                 if "file" in asset_elem.attrib:
-                    original_file = asset_elem.attrib["file"]
-                    abs_asset_file_path = (base_asset_dir / original_file).resolve()
+                    original_file: str = asset_elem.attrib["file"]
+                    abs_asset_file_path: Path = (
+                        base_asset_dir / original_file
+                    ).resolve()
                     asset_elem.set("file", str(abs_asset_file_path))
 
                 # Update intra-asset references (e.g., texture/material/mesh)
@@ -198,12 +212,12 @@ class TidyBotRobotEnv(MujocoEnv):
 
         # 3) Merge worldbody: copy the first top-level body from additional model,
         # update references, set pos
-        add_worldbody = add_root.find("worldbody")
+        add_worldbody: Optional[ET.Element] = add_root.find("worldbody")
         if add_worldbody is not None:
-            add_top_body = add_worldbody.find("body")
+            add_top_body: Optional[ET.Element] = add_worldbody.find("body")
             if add_top_body is not None:
                 # Deep-copy the body
-                new_body = ET.fromstring(ET.tostring(add_top_body))
+                new_body: ET.Element = ET.fromstring(ET.tostring(add_top_body))
                 # Update material/mesh/texture references according to rename_map
                 self._update_element_references(new_body, rename_map)
                 # Set position if provided
@@ -212,7 +226,7 @@ class TidyBotRobotEnv(MujocoEnv):
                 scene_worldbody.append(new_body)
 
         # 4) Merge contact / tendon / equality / actuator sections
-        def _merge_section(tag_name: str):
+        def _merge_section(tag_name: str) -> None:
             scene_sec = scene_root.find(tag_name)
             add_sec = add_root.find(tag_name)
             if add_sec is None:
@@ -228,7 +242,9 @@ class TidyBotRobotEnv(MujocoEnv):
             _merge_section(tag)
 
         # Write merged model
-        merged_output_path = os.path.join(os.path.dirname(__file__), output_filename)
+        merged_output_path: str = os.path.join(
+            os.path.dirname(__file__), output_filename
+        )
         ET.indent(scene_tree, space="  ")
         scene_tree.write(
             str(merged_output_path), encoding="utf-8", xml_declaration=True
@@ -237,16 +253,36 @@ class TidyBotRobotEnv(MujocoEnv):
         # return the modified XML string
         return ET.tostring(scene_root, encoding="unicode")
 
-    def _pre_action(self, action: np.ndarray) -> np.ndarray:
-        self.base_controller.run_controller(action)
-        self.arm_controller.run_controller(action)
+    def _pre_action(self, action: np.ndarray | None) -> None:
+        """Do any preprocessing before taking an action.
 
-    def step(self, action: Optional[object] = None) -> None:
-        """Step the environment."""
-        super().step(action)
+        Args:
+            action: Action to execute within the environment.
+        """
+        if self.base_controller is not None and action is not None:
+            self.base_controller.run_controller(action)
+        if self.arm_controller is not None and action is not None:
+            self.arm_controller.run_controller(action)
 
-    def get_obs(self) -> object:
-        """Get the current observation."""
+    def step(
+        self, action: Optional[np.ndarray] = None
+    ) -> Tuple[Dict[str, np.ndarray], float, bool, Dict[str, Any]]:
+        """Step the environment.
+
+        Args:
+            action: Optional action to apply before stepping.
+
+        Returns:
+            Tuple of (observation, reward, done, info).
+        """
+        return super().step(action)
+
+    def get_obs(self) -> Dict[str, np.ndarray]:
+        """Get the current observation.
+
+        Returns:
+            Dictionary containing the current observation.
+        """
         return super().get_obs()
 
     def reward(self, **kwargs) -> float:
@@ -257,24 +293,24 @@ class TidyBotRobotEnv(MujocoEnv):
         """Setup the controllers for the robot."""
 
         # Cache references to array slices
-        base_dofs = self.sim.model._model.body(  # pylint: disable=protected-access
+        base_dofs: int = self.sim.model._model.body(  # pylint: disable=protected-access
             "base_link"
         ).jntnum.item()
         # VS: maybe "base_link" should include a prefix, such as "robot_1_base_link"
-        arm_dofs = 7
+        arm_dofs: int = 7
         # buffers for base
-        qpos_base = self.sim.data.qpos[:base_dofs]
-        qvel_base = self.sim.data.qvel[:base_dofs]
-        ctrl_base = self.sim.data.ctrl[:base_dofs]
+        qpos_base: np.ndarray = self.sim.data.qpos[:base_dofs]
+        qvel_base: np.ndarray = self.sim.data.qvel[:base_dofs]
+        ctrl_base: np.ndarray = self.sim.data.ctrl[:base_dofs]
         # buffers for arm
-        qpos_arm = self.sim.data.qpos[base_dofs : (base_dofs + arm_dofs)]
-        qvel_arm = self.sim.data.qvel[base_dofs : (base_dofs + arm_dofs)]
-        ctrl_arm = self.sim.data.ctrl[base_dofs : (base_dofs + arm_dofs)]
+        qpos_arm: np.ndarray = self.sim.data.qpos[base_dofs : (base_dofs + arm_dofs)]
+        qvel_arm: np.ndarray = self.sim.data.qvel[base_dofs : (base_dofs + arm_dofs)]
+        ctrl_arm: np.ndarray = self.sim.data.ctrl[base_dofs : (base_dofs + arm_dofs)]
         # buffers for gripper
-        qpos_gripper = self.sim.data.qpos[
+        qpos_gripper: np.ndarray = self.sim.data.qpos[
             (base_dofs + arm_dofs) : (base_dofs + arm_dofs + 1)
         ]
-        ctrl_gripper = self.sim.data.ctrl[
+        ctrl_gripper: np.ndarray = self.sim.data.ctrl[
             (base_dofs + arm_dofs) : (base_dofs + arm_dofs + 1)
         ]
 
