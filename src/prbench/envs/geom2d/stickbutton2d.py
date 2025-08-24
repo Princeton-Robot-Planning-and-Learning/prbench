@@ -317,7 +317,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
                 full_state,
                 {button},
                 {robot, stick},
-                self._static_object_body_cache,  # type: ignore
+                self._static_object_body_cache,
                 ignore_z_orders=True,
             ):
                 newly_pressed_buttons.add(button)

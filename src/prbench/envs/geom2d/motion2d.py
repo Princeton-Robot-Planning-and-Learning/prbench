@@ -284,7 +284,7 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         target_region_geom = rectangle_object_to_geom(
             self._current_state,
             target_region,
-            self._static_object_body_cache,  # type: ignore
+            self._static_object_body_cache,
         )
         terminated = target_region_geom.contains_point(x, y)
         return -1.0, terminated

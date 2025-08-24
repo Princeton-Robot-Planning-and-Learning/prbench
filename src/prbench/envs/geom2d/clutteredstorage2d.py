@@ -372,7 +372,7 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
                 self._current_state,
                 block,
                 shelf,
-                self._static_object_body_cache,  # type: ignore
+                self._static_object_body_cache,
             )
             for block in blocks
         )
