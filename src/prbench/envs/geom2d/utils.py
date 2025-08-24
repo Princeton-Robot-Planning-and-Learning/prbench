@@ -1,9 +1,13 @@
 """Utilities."""
 
-from typing import Iterable
+import abc
+from typing import Any, Iterable
 
+import gymnasium
 import matplotlib.pyplot as plt
 import numpy as np
+from geom2drobotenvs.envs.base_env import Geom2DRobotEnv
+from geom2drobotenvs.envs.obstruction_2d_env import Geom2DRobotEnvTypeFeatures
 from geom2drobotenvs.object_types import (
     CircleType,
     CRVRobotType,
@@ -12,21 +16,28 @@ from geom2drobotenvs.object_types import (
     LObjectType,
     RectangleType,
 )
-from geom2drobotenvs.structs import (
+from geom2drobotenvs.utils import CRVRobotActionSpace
+from gymnasium.spaces import Box
+from numpy.typing import NDArray
+from relational_structs import (
+    Array,
+    Object,
+    ObjectCentricState,
+    ObjectCentricStateSpace,
+)
+from relational_structs.spaces import ObjectCentricBoxSpace
+from tomsgeoms2d.structs import Circle, Geom2D, Lobject, Rectangle
+from tomsgeoms2d.utils import find_closest_points, geom2ds_intersect
+from tomsutils.motion_planning import BiRRT
+from tomsutils.utils import fig2data, get_signed_angle_distance, wrap_angle
+
+from prbench.envs.geom2d.structs import (
     Body2D,
     MultiBody2D,
     SE2Pose,
     ZOrder,
     z_orders_may_collide,
 )
-from geom2drobotenvs.utils import CRVRobotActionSpace
-from gymnasium.spaces import Box
-from numpy.typing import NDArray
-from relational_structs import Array, Object, ObjectCentricState
-from tomsgeoms2d.structs import Circle, Geom2D, Lobject, Rectangle
-from tomsgeoms2d.utils import find_closest_points, geom2ds_intersect
-from tomsutils.motion_planning import BiRRT
-from tomsutils.utils import fig2data, get_signed_angle_distance, wrap_angle
 
 PURPLE: tuple[float, float, float] = (128 / 255, 0 / 255, 128 / 255)
 BLACK: tuple[float, float, float] = (0.1, 0.1, 0.1)
@@ -822,3 +833,213 @@ def crv_pose_plan_to_action_plan(
         action[4] = 1.0 if vacuum_while_moving else 0.0
         action_plan.append(action)
     return action_plan
+
+
+def is_inside(
+    state: ObjectCentricState,
+    inner: Object,
+    outer: Object,
+    static_object_cache: dict[Object, MultiBody2D],
+) -> bool:
+    """Checks if the inner object is completely inside the outer one.
+
+    Only rectangles are currently supported.
+    """
+    inner_geom = rectangle_object_to_geom(state, inner, static_object_cache)
+    outer_geom = rectangle_object_to_geom(state, outer, static_object_cache)
+    for x, y in inner_geom.vertices:
+        if not outer_geom.contains_point(x, y):
+            return False
+    return True
+
+
+def is_inside_shelf(
+    state: ObjectCentricState,
+    inner: Object,
+    outer: Object,
+    static_object_cache: dict[Object, MultiBody2D],
+) -> bool:
+    """Checks if the inner object is completely inside the outer shelf.
+
+    The outer object is assumed to be a double rectangle type. (shelf)
+    """
+    assert outer.is_instance(
+        DoubleRectType
+    ), "Outer object must be a shelf (DoubleRectType)."
+    inner_geom = rectangle_object_to_geom(state, inner, static_object_cache)
+    outer_geom = double_rectangle_object_to_part_geom(state, outer, static_object_cache)
+    for x, y in inner_geom.vertices:
+        if not outer_geom.contains_point(x, y):
+            return False
+    return True
+
+
+def is_on(
+    state: ObjectCentricState,
+    top: Object,
+    bottom: Object,
+    static_object_cache: dict[Object, MultiBody2D],
+    tol: float = 0.025,
+) -> bool:
+    """Checks top object is completely on the bottom one.
+
+    Only rectangles are currently supported.
+
+    Assumes that "up" is positive y.
+    """
+    top_geom = rectangle_object_to_geom(state, top, static_object_cache)
+    bottom_geom = rectangle_object_to_geom(state, bottom, static_object_cache)
+    # The bottom-most vertices of top_geom should be contained within the bottom
+    # geom when those vertices are offset by tol.
+    sorted_vertices = sorted(top_geom.vertices, key=lambda v: v[1])
+    for x, y in sorted_vertices[:2]:
+        offset_y = y - tol
+        if not bottom_geom.contains_point(x, offset_y):
+            return False
+    return True
+
+
+def is_movable_rectangle(state: ObjectCentricState, obj: Object) -> bool:
+    """Checks if an object is a movable rectangle."""
+    return obj.is_instance(RectangleType) and state.get(obj, "static") < 0.5
+
+
+def get_geom2d_crv_robot_action_from_gui_input(
+    action_space: CRVRobotActionSpace, gui_input: dict[str, Any]
+) -> NDArray[np.float32]:
+    """Get the mapping from human inputs to actions, derived from action space."""
+    # Unpack the input.
+    keys_pressed = gui_input["keys"]
+    right_x, right_y = gui_input["right_stick"]
+    left_x, _ = gui_input["left_stick"]
+
+    # Initialize the action.
+    low = action_space.low
+    high = action_space.high
+    action = np.zeros(action_space.shape, action_space.dtype)
+
+    def _rescale(x: float, lb: float, ub: float) -> float:
+        """Rescale from [-1, 1] to [lb, ub]."""
+        return lb + (x + 1) * (ub - lb) / 2
+
+    # The right stick controls the x, y movement of the base.
+    action[0] = _rescale(right_x, low[0], high[0])
+    action[1] = _rescale(right_y, low[1], high[1])
+
+    # The left stick controls the rotation of the base. Only the x axis
+    # is used right now.
+    action[2] = _rescale(left_x, low[2], high[2])
+
+    # The w/s mouse keys are used to adjust the robot arm.
+    if "w" in keys_pressed:
+        action[3] = low[3]
+    if "s" in keys_pressed:
+        action[3] = high[3]
+
+    # The space bar is used to turn on the vacuum.
+    if "space" in keys_pressed:
+        action[4] = 1.0
+
+    return action
+
+
+class ConstantObjectGeom2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
+    """Defined by an object-centric Geom2D environment and a constant object set.
+
+    The point of this pattern is to allow implementing object-centric environments with
+    variable numbers of objects, but then also create versions of the environment with a
+    constant number of objects so it is easy to apply, e.g., RL approaches that use
+    fixed-dimensional observation and action spaces.
+    """
+
+    # NOTE: we need to define render_modes in the class instead of the instance because
+    # gym.make extracts render_modes from the class (entry_point) before instantiation.
+    metadata: dict[str, Any] = {"render_modes": ["rgb_array"]}
+
+    def __init__(self, *args, render_mode: str | None = None, **kwargs) -> None:
+        super().__init__()
+        self._geom2d_env = self._create_object_centric_geom2d_env(*args, **kwargs)
+        # Create a Box version of the observation space by extracting the constant
+        # objects from an exemplar state.
+        assert isinstance(self._geom2d_env.observation_space, ObjectCentricStateSpace)
+        exemplar_object_centric_state, _ = self._geom2d_env.reset()
+        obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
+        obj_names = self._get_constant_object_names(exemplar_object_centric_state)
+        self._constant_objects = [obj_name_to_obj[o] for o in obj_names]
+        # This is a Box space with some extra functionality to allow easy vectorizing.
+        self.observation_space = self._geom2d_env.observation_space.to_box(
+            self._constant_objects, Geom2DRobotEnvTypeFeatures
+        )
+        self.action_space = self._geom2d_env.action_space
+        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
+        # The action space already inherits from Box, so we don't need to change it.
+        assert isinstance(self.action_space, CRVRobotActionSpace)
+        # Add descriptions to metadata for doc generation.
+        obs_md = self.observation_space.create_markdown_description()
+        act_md = self.action_space.create_markdown_description()
+        env_md = self._create_env_markdown_description()
+        reward_md = self._create_reward_markdown_description()
+        references_md = self._create_references_markdown_description()
+        # Update the metadata. Note that we need to define the render_modes in the class
+        # rather than in the instance because gym.make() extracts render_modes from cls.
+        self.metadata = self.metadata.copy()
+        self.metadata.update(
+            {
+                "description": env_md,
+                "observation_space_description": obs_md,
+                "action_space_description": act_md,
+                "reward_description": reward_md,
+                "references": references_md,
+                "render_fps": self._geom2d_env.metadata.get("render_fps", 20),
+            }
+        )
+        self.render_mode = render_mode
+
+    @abc.abstractmethod
+    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom2DRobotEnv:
+        """Create the underlying object-centric environment."""
+
+    @abc.abstractmethod
+    def _get_constant_object_names(
+        self, exemplar_state: ObjectCentricState
+    ) -> list[str]:
+        """The ordered names of the constant objects extracted from the observations."""
+
+    @abc.abstractmethod
+    def _create_env_markdown_description(self) -> str:
+        """Create a markdown description of the overall environment."""
+
+    @abc.abstractmethod
+    def _create_reward_markdown_description(self) -> str:
+        """Create a markdown description of the environment rewards."""
+
+    @abc.abstractmethod
+    def _create_references_markdown_description(self) -> str:
+        """Create a markdown description of the reference (e.g. papers) for this env."""
+
+    def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
+        super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
+        obs, info = self._geom2d_env.reset(*args, **kwargs)
+        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
+        vec_obs = self.observation_space.vectorize(obs)
+        return vec_obs, info
+
+    def step(
+        self, *args, **kwargs
+    ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
+        obs, reward, terminated, truncated, done = self._geom2d_env.step(
+            *args, **kwargs
+        )
+        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
+        vec_obs = self.observation_space.vectorize(obs)
+        return vec_obs, reward, terminated, truncated, done
+
+    def render(self):
+        return self._geom2d_env.render()
+
+    def get_action_from_gui_input(
+        self, gui_input: dict[str, Any]
+    ) -> NDArray[np.float32]:
+        """Get the mapping from human inputs to actions."""
+        assert isinstance(self.action_space, CRVRobotActionSpace)
+        return get_geom2d_crv_robot_action_from_gui_input(self.action_space, gui_input)

@@ -9,14 +9,14 @@ from geom2drobotenvs.object_types import (
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
 )
-from geom2drobotenvs.structs import ZOrder
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
-from prbench.envs.geom2d.geom2d_utils import ConstantObjectGeom2DEnv
+from prbench.envs.geom2d.structs import ZOrder
 from prbench.envs.geom2d.utils import (
     BLACK,
     PURPLE,
+    ConstantObjectGeom2DEnv,
     CRVRobotActionSpace,
     SE2Pose,
     create_walls_from_world_boundaries,
@@ -277,8 +277,11 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         x = self._current_state.get(robot, "x")
         y = self._current_state.get(robot, "y")
         target_region = self._current_state.get_objects(TargetRegionType)[0]
+        # NOTE: the type: ignore can be removed after refactor.
         target_region_geom = rectangle_object_to_geom(
-            self._current_state, target_region, self._static_object_body_cache
+            self._current_state,
+            target_region,
+            self._static_object_body_cache,  # type: ignore
         )
         terminated = target_region_geom.contains_point(x, y)
         return -1.0, terminated

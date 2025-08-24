@@ -10,14 +10,14 @@ from geom2drobotenvs.object_types import (
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
 )
-from geom2drobotenvs.structs import ZOrder
 from numpy.typing import NDArray
 from relational_structs import Object, ObjectCentricState
 from relational_structs.utils import create_state_from_dict
 
-from prbench.envs.geom2d.geom2d_utils import ConstantObjectGeom2DEnv
+from prbench.envs.geom2d.structs import ZOrder
 from prbench.envs.geom2d.utils import (
     BLACK,
+    ConstantObjectGeom2DEnv,
     CRVRobotActionSpace,
     SE2Pose,
     create_walls_from_world_boundaries,
@@ -314,7 +314,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
                 full_state,
                 {button},
                 {robot, stick},
-                self._static_object_body_cache,
+                self._static_object_body_cache,  # type: ignore
                 ignore_z_orders=True,
             ):
                 newly_pressed_buttons.add(button)
