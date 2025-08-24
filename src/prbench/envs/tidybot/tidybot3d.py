@@ -1,19 +1,18 @@
 """TidyBot 3D environment wrapper for PRBench."""
 
+import math
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
 import gymnasium
 import numpy as np
-import math
-import re
 from gymnasium import spaces
 from numpy.typing import NDArray
 
 import prbench.envs.tidybot.utils as utils
 from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
-
 from prbench.envs.tidybot.tidybot_robot_env import TidyBotRobotEnv
 
 
@@ -28,7 +27,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         num_objects: int = 3,
         render_mode: str | None = None,
         custom_grasp: bool = False,
-        render_images: bool = True, # TODO(VS)
+        render_images: bool = True,  # unused; kept for API compatibility
         seed: int | None = None,
         show_viewer: bool = False,
         show_images: bool = False,
@@ -51,7 +50,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # Set random number generator
         self.np_random = self._tidybot_robot_env.np_random
 
-        self._reward_calculator = create_reward_calculator(  # TODO(VS)
+        self._reward_calculator = create_reward_calculator(
             self.scene_type, self.num_objects
         )
 

@@ -42,8 +42,8 @@ def test_reset(arm_controller):
 
 
 def test_run_controller_sets_target(arm_controller):
-    """Test that run_controller sets the target position using real TidybotIKSolver
-    and updates OTG state."""
+    """Test that run_controller sets the target position using real TidybotIKSolver and
+    updates OTG state."""
     arm_controller.reset()
     command = {
         "arm_pos": np.array([1.0, 2.0, 3.0]),
