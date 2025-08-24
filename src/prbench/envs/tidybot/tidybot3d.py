@@ -116,7 +116,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             obs_vector.extend(value.flatten())
         return np.array(obs_vector, dtype=np.float32)
 
-    def _dict_to_action(self, action_vector: NDArray[np.float32]) -> dict[str, Any]:
+    def _action_to_dict(self, action_vector: NDArray[np.float32]) -> dict[str, Any]:
         """Convert action vector to TidyBot action dict."""
         return {
             "base_pose": action_vector[:3],
@@ -220,7 +220,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self, action: NDArray[np.float32]
     ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
         """Execute action and return next observation."""
-        action_dict = self._dict_to_action(action)
+        action_dict = self._action_to_dict(action)
         self._tidybot_robot_env.step(action_dict)
 
         # Get observation
