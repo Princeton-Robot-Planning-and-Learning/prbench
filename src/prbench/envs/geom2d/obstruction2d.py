@@ -2,12 +2,12 @@
 
 import inspect
 
-from geom2drobotenvs.concepts import is_on
 from geom2drobotenvs.envs.base_env import Geom2DRobotEnv
 from geom2drobotenvs.envs.obstruction_2d_env import Obstruction2DEnv as G2DOE
 from relational_structs import ObjectCentricState
 
 from prbench.envs.geom2d.geom2d_utils import ConstantObjectGeom2DEnv
+from prbench.envs.geom2d.utils import is_on
 
 
 class Obstruction2DEnv(ConstantObjectGeom2DEnv):

@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 
 import numpy as np
-from geom2drobotenvs.concepts import is_inside_shelf
 from geom2drobotenvs.envs.base_env import Geom2DRobotEnv, Geom2DRobotEnvSpec
 from geom2drobotenvs.object_types import (
     CRVRobotType,
@@ -23,6 +22,7 @@ from prbench.envs.geom2d.utils import (
     CRVRobotActionSpace,
     SE2Pose,
     create_walls_from_world_boundaries,
+    is_inside_shelf,
     sample_se2_pose,
     state_has_collision,
 )
