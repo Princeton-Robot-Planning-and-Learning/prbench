@@ -9,10 +9,11 @@ from geom2drobotenvs.envs.base_env import Geom2DRobotEnv
 from geom2drobotenvs.envs.obstruction_2d_env import (
     Geom2DRobotEnvTypeFeatures,
 )
-from geom2drobotenvs.utils import CRVRobotActionSpace
 from numpy.typing import NDArray
 from relational_structs import ObjectCentricState, ObjectCentricStateSpace
 from relational_structs.spaces import ObjectCentricBoxSpace
+
+from prbench.envs.geom2d.utils import CRVRobotActionSpace
 
 
 class ConstantObjectGeom2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
