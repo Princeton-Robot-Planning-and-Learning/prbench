@@ -527,17 +527,20 @@ class MjRenderContext:
                 )
             if _SYSTEM == "Linux" and _MUJOCO_GL == "osmesa":
                 from prbench.envs.tidybot.renderers.context.osmesa_context import (
-                    OSMesaGLContext as GLContext,)
+                    OSMesaGLContext as GLContext,
+                )
 
                 # TODO this needs testing on a Linux machine
             elif _SYSTEM == "Linux" and _MUJOCO_GL == "egl":
                 from prbench.envs.tidybot.renderers.context.egl_context import (
-                    EGLGLContext as GLContext,)
+                    EGLGLContext as GLContext,
+                )
 
                 # TODO this needs testing on a Linux machine
             else:
                 from prbench.envs.tidybot.renderers.context.glfw_context import (
-                    GLFWGLContext as GLContext,)
+                    GLFWGLContext as GLContext,
+                )
 
         assert offscreen, "only offscreen supported for now"
         self.sim: MjSim = sim
