@@ -191,11 +191,11 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 # Get XML string from tree
                 xml_string = ET.tostring(root, encoding="unicode")
             else:
-                # dynamic_model_path = absolute_model_path
-                raise NotImplementedError
+                with open(absolute_model_path, "r") as f:
+                    xml_string = f.read()
         else:
-            # dynamic_model_path = absolute_model_path
-            raise NotImplementedError
+            with open(absolute_model_path, "r") as f:
+                xml_string = f.read()
 
         return xml_string
 
