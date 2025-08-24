@@ -15,10 +15,10 @@ from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 from tomsgeoms2d.structs import Rectangle
 
-from prbench.envs.geom2d.geom2d_utils import ConstantObjectGeom2DEnv
 from prbench.envs.geom2d.utils import (
     BLACK,
     PURPLE,
+    ConstantObjectGeom2DEnv,
     CRVRobotActionSpace,
     SE2Pose,
     create_walls_from_world_boundaries,
