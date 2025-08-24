@@ -573,12 +573,12 @@ class MjRenderContext:
 
                 # TODO this needs testing on a Linux machine  # pylint: disable=fixme
             elif _SYSTEM == "Linux" and _MUJOCO_GL == "egl":
-                from prbench.envs.tidybot.renderers.context.egl_context import (  # type: ignore[assignment]
+                from prbench.envs.tidybot.renderers.context.egl_context import (  # type: ignore[assignment] # pylint: disable=line-too-long
                     EGLGLContext as GLContext,)
 
                 # TODO this needs testing on a Linux machine  # pylint: disable=fixme
             else:
-                from prbench.envs.tidybot.renderers.context.glfw_context import (  # type: ignore[assignment]
+                from prbench.envs.tidybot.renderers.context.glfw_context import (  # type: ignore[assignment] # pylint: disable=line-too-long
                     GLFWGLContext as GLContext,)
             # isort: on
             # fmt: on
