@@ -1,3 +1,5 @@
+"""Utility functions for the TidyBot environment."""
+
 import numpy as np
 
 
@@ -17,5 +19,4 @@ def get_rng(seed=None):
         seed_seq = np.random.SeedSequence(entropy=seed)
         rng = np.random.Generator(np.random.PCG64(seed_seq.entropy))
         return rng
-    else:
-        return np.random.default_rng()
+    return np.random.default_rng()

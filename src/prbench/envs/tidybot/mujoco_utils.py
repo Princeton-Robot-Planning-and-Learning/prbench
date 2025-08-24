@@ -15,7 +15,7 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 
-import prbench.envs.tidybot.utils as utils
+from prbench.envs.tidybot import utils
 
 # This value is then used by the physics engine to determine how much time
 # to simulate for each step.
@@ -37,7 +37,8 @@ if CUDA_VISIBLE_DEVICES != "":
     if MUJOCO_EGL_DEVICE_ID is not None:
         assert MUJOCO_EGL_DEVICE_ID.isdigit() and (
             MUJOCO_EGL_DEVICE_ID in CUDA_VISIBLE_DEVICES
-        ), "MUJOCO_EGL_DEVICE_ID needs to be set to one of the device id specified in CUDA_VISIBLE_DEVICES"
+        ), "MUJOCO_EGL_DEVICE_ID needs to be set to one of the device \
+            id specified in CUDA_VISIBLE_DEVICES"
 if os.environ.get("MUJOCO_GL", None) not in [
     "osmesa",
     "glx",
@@ -252,15 +253,15 @@ class MujocoEnv:
 class MjModel:
     """A simplified MjModel class for MuJoCo model."""
 
+    # pylint: disable=no-member
+
     def __init__(self, xml_string: str) -> None:
         """
         Args:
             xml_string: A string containing the MuJoCo XML model.
         """
 
-        self._model = mujoco.MjModel.from_xml_string(  # pylint: disable=no-member
-            xml_string
-        )
+        self._model = mujoco.MjModel.from_xml_string(xml_string)
         self._make_mappings()
 
     def _make_mappings(self) -> None:
@@ -270,7 +271,9 @@ class MjModel:
         self._body_id2name: dict[int, str]
         self.body_names, self._body_name2id, self._body_id2name = (
             self._extract_mj_names(
-                self._model.name_bodyadr, self._model.nbody, mujoco.mjtObj.mjOBJ_BODY
+                self._model.name_bodyadr,
+                self._model.nbody,
+                mujoco.mjtObj.mjOBJ_BODY,
             )
         )
         self.joint_names: tuple[str, ...]
@@ -278,7 +281,9 @@ class MjModel:
         self._joint_id2name: dict[int, str]
         self.joint_names, self._joint_name2id, self._joint_id2name = (
             self._extract_mj_names(
-                self._model.name_jntadr, self._model.njnt, mujoco.mjtObj.mjOBJ_JOINT
+                self._model.name_jntadr,
+                self._model.njnt,
+                mujoco.mjtObj.mjOBJ_JOINT,
             )
         )
         self.geom_names: tuple[str, ...]
@@ -286,7 +291,9 @@ class MjModel:
         self._geom_id2name: dict[int, str]
         self.geom_names, self._geom_name2id, self._geom_id2name = (
             self._extract_mj_names(
-                self._model.name_geomadr, self._model.ngeom, mujoco.mjtObj.mjOBJ_GEOM
+                self._model.name_geomadr,
+                self._model.ngeom,
+                mujoco.mjtObj.mjOBJ_GEOM,
             )
         )
         self.site_names: tuple[str, ...]
@@ -294,7 +301,9 @@ class MjModel:
         self._site_id2name: dict[int, str]
         self.site_names, self._site_name2id, self._site_id2name = (
             self._extract_mj_names(
-                self._model.name_siteadr, self._model.nsite, mujoco.mjtObj.mjOBJ_SITE
+                self._model.name_siteadr,
+                self._model.nsite,
+                mujoco.mjtObj.mjOBJ_SITE,
             )
         )
         self.light_names: tuple[str, ...]
@@ -302,7 +311,9 @@ class MjModel:
         self._light_id2name: dict[int, str]
         self.light_names, self._light_name2id, self._light_id2name = (
             self._extract_mj_names(
-                self._model.name_lightadr, self._model.nlight, mujoco.mjtObj.mjOBJ_LIGHT
+                self._model.name_lightadr,
+                self._model.nlight,
+                mujoco.mjtObj.mjOBJ_LIGHT,
             )
         )
         self.camera_names: tuple[str, ...]
@@ -310,7 +321,9 @@ class MjModel:
         self._camera_id2name: dict[int, str]
         self.camera_names, self._camera_name2id, self._camera_id2name = (
             self._extract_mj_names(
-                self._model.name_camadr, self._model.ncam, mujoco.mjtObj.mjOBJ_CAMERA
+                self._model.name_camadr,
+                self._model.ncam,
+                mujoco.mjtObj.mjOBJ_CAMERA,
             )
         )
         self.actuator_names: tuple[str, ...]
@@ -348,7 +361,9 @@ class MjModel:
         self._mesh_id2name: dict[int, str]
         self.mesh_names, self._mesh_name2id, self._mesh_id2name = (
             self._extract_mj_names(
-                self._model.name_meshadr, self._model.nmesh, mujoco.mjtObj.mjOBJ_MESH
+                self._model.name_meshadr,
+                self._model.nmesh,
+                mujoco.mjtObj.mjOBJ_MESH,
             )
         )
 
@@ -370,14 +385,16 @@ class MjModel:
         obj_type: int,
     ) -> tuple[tuple[str | None, ...], dict[str | None, int], dict[int, str | None]]:
         """
-        See https://github.com/openai/mujoco-py/blob/ab86d331c9a77ae412079c6e58b8771fe63747fc/mujoco_py/generated/wrappers.pxi#L1127
+        See https://github.com/openai/mujoco-py/blob/ab86d331c9a77ae412079c6e58b8771fe63747fc/mujoco_py/generated/wrappers.pxi#L1127  # pylint: disable=line-too-long
         """
 
         # objects don't need to be named in the XML, so name might be None
         id2name: dict[int, str | None] = {i: None for i in range(num_obj)}
         name2id: dict[str | None, int] = {}
         for i in range(num_obj):
-            name: str | None = mujoco.mj_id2name(self._model, obj_type, i)
+            name: str | None = mujoco.mj_id2name(
+                self._model, obj_type, i
+            )  # pylint: disable=no-member
             name2id[name] = i
             id2name[i] = name
 
@@ -504,6 +521,8 @@ class MjRenderContext:
     https://github.com/openai/mujoco-py/blob/4830435a169c1f3e3b5f9b58a7c3d9c39bdf4acb/mujoco_py/mjrendercontext.pyx
     """
 
+    # pylint: disable=no-member
+
     def __init__(
         self,
         sim: MjSim,
@@ -547,7 +566,7 @@ class MjRenderContext:
         self.device_id: int = device_id
 
         # setup GL context with defaults for now
-        self.gl_ctx = GLContext(
+        self.gl_ctx = GLContext(  # pylint: disable=possibly-used-before-assignment
             max_width=max_width, max_height=max_height, device_id=self.device_id
         )
         self.gl_ctx.make_current()
@@ -570,7 +589,8 @@ class MjRenderContext:
         self.cam.fixedcamid = 0
         self.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
 
-        # options for visual / collision mesh can be set externally, e.g. vopt.geomgroup[0], vopt.geomgroup[1]
+        # options for visual / collision mesh can be set externally,
+        # e.g. vopt.geomgroup[0], vopt.geomgroup[1]
         self.vopt: mujoco.MjvOption = mujoco.MjvOption()
 
         self.pert: mujoco.MjvPerturb = mujoco.MjvPerturb()
@@ -630,12 +650,7 @@ class MjRenderContext:
             self.scn.flags[mujoco.mjtRndFlag.mjRND_SEGMENT] = 1
             self.scn.flags[mujoco.mjtRndFlag.mjRND_IDCOLOR] = 1
 
-        # for marker_params in self._markers:
-        #     self._add_marker_to_scene(marker_params)
-
         mujoco.mjr_render(viewport=viewport, scn=self.scn, con=self.con)
-        # for gridpos, (text1, text2) in self._overlay.items():
-        #     mjr_overlay(const.FONTSCALE_150, gridpos, rect, text1.encode(), text2.encode(), &self._con)
 
         if segmentation:
             self.scn.flags[mujoco.mjtRndFlag.mjRND_SEGMENT] = 0

@@ -9,7 +9,6 @@ The current controller is part of the environment.
 """
 
 import math
-import time
 from typing import Optional, Sequence
 
 import numpy as np
