@@ -9,7 +9,6 @@ The current controller is part of the environment.
 """
 
 import math
-import time
 from typing import Optional, Sequence
 
 import numpy as np
@@ -75,7 +74,6 @@ class ArmController:
         self.ctrl_gripper = ctrl_gripper
         self.ik_solver = TidybotIKSolver(ee_offset=ee_offset)
         # Ruckig (online trajectory generation)
-        self.last_command_time: Optional[float] = None
         self.otg = Ruckig(num_dofs, timestep)
         self.otg_inp = InputParameter(num_dofs)
         self.otg_out = OutputParameter(num_dofs)
@@ -112,41 +110,38 @@ class ArmController:
         self.ctrl[:] = self.qpos
         self.ctrl_gripper[:] = 0.0
         # Initialize OTG
-        self.last_command_time = time.time()
         self.otg_inp.current_position = self.qpos
         self.otg_inp.current_velocity = self.qvel
         self.otg_inp.target_position = self.qpos
         self.otg_res = Result.Finished
 
-    def control_callback(self, command: dict) -> None:
-        """Process control commands and update arm trajectory."""
-        if command is not None:
-            self.last_command_time = time.time()
-            if "arm_pos" in command:
-                # Run inverse kinematics on new target pose
-                qpos = self.ik_solver.solve(
-                    command["arm_pos"], command["arm_quat"], self.qpos
-                )
-                qpos = (
-                    self.qpos + np.mod((qpos - self.qpos) + np.pi, 2 * np.pi) - np.pi
-                )  # Unwrapped joint angles
-                # Set target arm qpos
-                self.otg_inp.target_position = qpos
-                self.otg_res = Result.Working
-            if "gripper_pos" in command:
-                # Set target gripper pos
-                self.ctrl_gripper[:] = (
-                    self.gripper_scale * command["gripper_pos"]
-                )  # fingers_actuator, ctrlrange [0, 255]
-        # Maintain current pose if command stream is disrupted
-        if (
-            time.time() - self.last_command_time
-            > self.command_timeout_factor * self.motion3d_spec.policy_control_period
-        ):
-            self.otg_inp.target_position = self.otg_out.new_position
+    def run_controller(self, action) -> None:
+        """Run the controller to update the arm position based on OTG."""
+
+        # Update arm actuators
+        if "arm_pos" in action:
+            # Run inverse kinematics on new target pose
+            qpos = self.ik_solver.solve(
+                action["arm_pos"], action["arm_quat"], self.qpos
+            )
+            qpos = (
+                self.qpos + np.mod((qpos - self.qpos) + np.pi, 2 * np.pi) - np.pi
+            )  # Unwrapped joint angles
+
+            # Set target arm qpos
+            self.otg_inp.target_position = qpos
             self.otg_res = Result.Working
-        # Update OTG
-        if self.otg_res == Result.Working:
+
+            # Generate the next step in the trajectory
             self.otg_res = self.otg.update(self.otg_inp, self.otg_out)
+
+            # Pass output back to input for next iteration
             self.otg_out.pass_to_input(self.otg_inp)
+
+            # Apply the smoothed position to the controller
             self.ctrl[:] = self.otg_out.new_position
+
+        # Update gripper actuator
+        if "gripper_pos" in action:
+            # Set target gripper pos
+            self.ctrl_gripper[:] = self.gripper_scale * action["gripper_pos"]

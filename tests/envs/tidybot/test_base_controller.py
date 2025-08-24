@@ -33,10 +33,10 @@ def test_reset(base_controller):
     assert base_controller.otg_res is not None
 
 
-def test_control_callback_sets_target(base_controller):
-    """Test that control_callback sets the target position and updates OTG state."""
+def test_run_controller_sets_target(base_controller):
+    """Test that run_controller sets the target position and updates OTG state."""
     base_controller.reset()
     command = {"base_pose": np.array([1.0, 2.0, 3.0])}
-    base_controller.control_callback(command)
+    base_controller.run_controller(command)
     assert np.allclose(base_controller.otg_inp.target_position, [1.0, 2.0, 3.0])
     assert base_controller.otg_res is not None
