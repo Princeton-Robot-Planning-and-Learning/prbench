@@ -85,7 +85,7 @@ def create_initialized_egl_device_display(device_id=0):
     return EGL.EGL_NO_DISPLAY
 
 
-global EGL_DISPLAY
+global EGL_DISPLAY  # pylint: disable=global-at-module-level
 EGL_DISPLAY = None
 
 EGL_ATTRIBUTES = (
@@ -117,11 +117,11 @@ class EGLGLContext:
     def __init__(self, max_width, max_height, device_id=0):
 
         del max_width, max_height  # unused
-        num_configs = ctypes.c_long()
+        num_configs = ctypes.c_long()  # pylint: disable=no-value-for-parameter
         config_size = 1
         config_ptr = EGL.EGLConfig()  # Makes an opaque pointer
         EGL.eglReleaseThread()
-        global EGL_DISPLAY
+        global EGL_DISPLAY  # pylint: disable=global-statement
         if EGL_DISPLAY is None:
             # only initialize for the first time
             EGL_DISPLAY = create_initialized_egl_device_display(device_id=device_id)
@@ -173,6 +173,6 @@ class EGLGLContext:
         """Frees resources associated with this context."""
         try:
             self.free()
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             # avoid getting OpenGL.error.GLError
             pass

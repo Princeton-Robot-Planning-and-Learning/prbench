@@ -363,8 +363,7 @@ class MjModel:
             return -1
         if name not in self._camera_name2id:
             raise ValueError(
-                'No "camera" with name %s exists. Available "camera" names = %s.'
-                % (name, self.camera_names)
+                f'No "camera" with name {name} exists. Available "camera" names = {self.camera_names}.'
             )
         return self._camera_name2id[name]
 
@@ -442,21 +441,21 @@ class MjSim:
 
     def reset(self) -> None:
         """Reset the simulation."""
-        mujoco.mj_resetData(
-            self.model._model, self.data
-        )  # pylint: disable=no-member,protected-access
+        mujoco.mj_resetData(  # pylint: disable=no-member
+            self.model._model, self.data  # pylint: disable=protected-access
+        )
 
     def forward(self) -> None:
         """Synchronize derived quantities."""
-        mujoco.mj_forward(
-            self.model._model, self.data
-        )  # pylint: disable=no-member,protected-access
+        mujoco.mj_forward(  # pylint: disable=no-member
+            self.model._model, self.data  # pylint: disable=protected-access
+        )
 
     def step(self) -> None:
         """Step the simulation."""
-        mujoco.mj_step(
-            self.model._model, self.data
-        )  # pylint: disable=no-member,protected-access
+        mujoco.mj_step(  # pylint: disable=no-member
+            self.model._model, self.data  # pylint: disable=protected-access
+        )
 
     def render(
         self,
@@ -544,12 +543,12 @@ class MjRenderContext:
                 from prbench.envs.tidybot.renderers.context.osmesa_context import (
                     OSMesaGLContext as GLContext,)
 
-                # TODO this needs testing on a Linux machine
+                # TODO this needs testing on a Linux machine  # pylint: disable=fixme
             elif _SYSTEM == "Linux" and _MUJOCO_GL == "egl":
                 from prbench.envs.tidybot.renderers.context.egl_context import (
                     EGLGLContext as GLContext,)
 
-                # TODO this needs testing on a Linux machine
+                # TODO this needs testing on a Linux machine  # pylint: disable=fixme
             else:
                 from prbench.envs.tidybot.renderers.context.glfw_context import (
                     GLFWGLContext as GLContext,)
@@ -598,12 +597,14 @@ class MjRenderContext:
         self._set_mujoco_context_and_buffers()
 
     def _set_mujoco_context_and_buffers(self) -> None:
+        """Set up the mujoco rendering context and buffers."""
         self.con: mujoco.MjrContext = mujoco.MjrContext(
             self.model, mujoco.mjtFontScale.mjFONTSCALE_150
         )
         mujoco.mjr_setBuffer(mujoco.mjtFramebuffer.mjFB_OFFSCREEN, self.con)
 
     def update_offscreen_size(self, width: int, height: int) -> None:
+        """Update the offscreen rendering context size if necessary."""
         if (width != self.con.offWidth) or (height != self.con.offHeight):
             self.model.vis.global_.offwidth = width
             self.model.vis.global_.offheight = height
@@ -618,6 +619,7 @@ class MjRenderContext:
         camera_id: int | None = None,
         segmentation: bool = False,
     ) -> None:
+        """Render the scene."""
         viewport = mujoco.MjrRect(0, 0, width, height)
 
         # update width and height of rendering context if necessary
@@ -660,6 +662,7 @@ class MjRenderContext:
         depth: bool = False,
         segmentation: bool = False,
     ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+        """Read the pixels from the current rendering context."""
         viewport = mujoco.MjrRect(0, 0, width, height)
         rgb_img: np.ndarray = np.empty((height, width, 3), dtype=np.uint8)
         depth_img: np.ndarray | None = (
@@ -705,7 +708,7 @@ class MjRenderContext:
         self.con.free()
         try:
             self.gl_ctx.free()
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             # avoid getting OpenGL.error.GLError
             pass
         del self.con

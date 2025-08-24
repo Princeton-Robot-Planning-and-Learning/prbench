@@ -1,3 +1,6 @@
+"""This module defines the TidyBotRobotEnv class, which is the base class for the
+TidyBot robot in simulation."""
+
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -112,8 +115,10 @@ class TidyBotRobotEnv(MujocoEnv):
         """Merge another MuJoCo model XML (e.g., tidybot) into an existing scene XML by:
 
         - Merging <default> classes
-        - Merging <asset> entries while prefixing names to avoid collisions and rewriting file paths relative to the scene
-        - Appending the top-level body from the additional model's <worldbody> into the scene's <worldbody>
+        - Merging <asset> entries while prefixing names to avoid collisions and
+        rewriting file paths relative to the scene
+        - Appending the top-level body from the additional model's <worldbody>
+        into the scene's <worldbody>
         - Merging <contact>, <tendon>, <equality>, and <actuator> sections
 
         Returns absolute path to the newly written merged XML.
@@ -182,7 +187,8 @@ class TidyBotRobotEnv(MujocoEnv):
                     abs_asset_file_path = (base_asset_dir / original_file).resolve()
                     asset_elem.set("file", str(abs_asset_file_path))
 
-                # Update intra-asset references (e.g., texture/material/mesh) within the asset element itself
+                # Update intra-asset references (e.g., texture/material/mesh)
+                # within the asset element itself
                 for attr_ref in ["texture", "material", "mesh"]:
                     ref = asset_elem.get(attr_ref)
                     if ref and ref in rename_map:
@@ -190,7 +196,8 @@ class TidyBotRobotEnv(MujocoEnv):
 
                 scene_asset.append(asset_elem)
 
-        # 3) Merge worldbody: copy the first top-level body from additional model, update references, set pos
+        # 3) Merge worldbody: copy the first top-level body from additional model,
+        # update references, set pos
         add_worldbody = add_root.find("worldbody")
         if add_worldbody is not None:
             add_top_body = add_worldbody.find("body")
