@@ -1,7 +1,6 @@
 """TidyBot 3D environment wrapper for PRBench."""
 
 import math
-import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
@@ -11,7 +10,6 @@ import numpy as np
 from gymnasium import spaces
 from numpy.typing import NDArray
 
-import prbench.envs.tidybot.utils as utils
 from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
 from prbench.envs.tidybot.tidybot_robot_env import TidyBotRobotEnv
 
@@ -86,9 +84,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Create observation space based on TidyBot's observation structure."""
         # Get example observation to determine dimensions
         # self._tidybot_robot_env.reset()
-        self._tidybot_robot_env.reset(
-            self._create_scene_xml()
-        )  # TODO pass dummy xml_string?
+        self._tidybot_robot_env.reset(self._create_scene_xml())
         example_obs = self._tidybot_robot_env.get_obs()
 
         # Calculate total observation dimension (all values are ndarrays)
@@ -160,13 +156,15 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                     if self.scene_type == "cupboard":
                         pass  # no position randomization for cupboard scene
                     elif self.scene_type == "table":
-                        # Randomize position within a reasonable range for the table environment
+                        # Randomize position within a reasonable range
+                        # for the table environment
                         x = round(self.np_random.uniform(0.2, 0.8), 3)
                         y = round(self.np_random.uniform(-0.15, 0.15), 3)
                         z = 0.44
                         pos = f"{x} {y} {z}"
                     else:
-                        # Randomize position within a reasonable range for the ground environment
+                        # Randomize position within a reasonable range
+                        # for the ground environment
                         x = round(self.np_random.uniform(0.4, 0.8), 3)
                         y = round(self.np_random.uniform(-0.3, 0.3), 3)
                         z = 0.02
@@ -190,10 +188,10 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 # Get XML string from tree
                 xml_string = ET.tostring(root, encoding="unicode")
             else:
-                with open(absolute_model_path, "r") as f:
+                with open(absolute_model_path, "r", encoding="utf-8") as f:
                     xml_string = f.read()
         else:
-            with open(absolute_model_path, "r") as f:
+            with open(absolute_model_path, "r", encoding="utf-8") as f:
                 xml_string = f.read()
 
         return xml_string
@@ -210,7 +208,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         xml_string = self._create_scene_xml()
 
         # reset the underlying TidyBot robot environment
-        obs, rewards, done, info = self._tidybot_robot_env.reset(xml_string)
+        obs, _, _, _ = self._tidybot_robot_env.reset(xml_string)
 
         vec_obs = self._vectorize_observation(obs)
         return vec_obs, {}

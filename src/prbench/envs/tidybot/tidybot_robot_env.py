@@ -41,6 +41,9 @@ class TidyBotRobotEnv(MujocoEnv):
             show_viewer=show_viewer,
         )
 
+        self.base_controller: Optional[BaseController] = None
+        self.arm_controller: Optional[ArmController] = None
+
     def reset(self, xml_string: str) -> Tuple[object, None, None, None]:
         # Insert robot in the xml_string
         xml_string = self._insert_robot_into_xml(xml_string)
@@ -162,13 +165,11 @@ class TidyBotRobotEnv(MujocoEnv):
             for asset_elem in list(add_asset):
                 # Determine original asset name
                 original_name = asset_elem.get("name")
-                inferred = False
                 if original_name is None:
                     # Infer from file basename if available
                     file_attr = asset_elem.get("file")
                     if file_attr:
                         original_name = Path(file_attr).stem
-                        inferred = True
                 # If we still don't have a name, skip renaming for this asset
                 if original_name:
                     new_name = f"{prefix}_{original_name}"
@@ -179,16 +180,6 @@ class TidyBotRobotEnv(MujocoEnv):
                 if "file" in asset_elem.attrib:
                     original_file = asset_elem.attrib["file"]
                     abs_asset_file_path = (base_asset_dir / original_file).resolve()
-                    # # Always compute relative path from the scene output directory, without requiring Python 3.12's Path.is_relative_to
-                    # try:
-                    #     rel_path = abs_asset_file_path.relative_to(
-                    #         scene_output_dir.resolve()
-                    #     )
-                    # except Exception:
-                    #     rel_path = Path(
-                    #         os.path.relpath(abs_asset_file_path, scene_output_dir)
-                    #     )
-                    # asset_elem.set("file", str(rel_path))
                     asset_elem.set("file", str(abs_asset_file_path))
 
                 # Update intra-asset references (e.g., texture/material/mesh) within the asset element itself
@@ -239,8 +230,6 @@ class TidyBotRobotEnv(MujocoEnv):
         return ET.tostring(scene_root, encoding="unicode")
 
     def _pre_action(self, action: np.ndarray) -> np.ndarray:
-        base_dofs = self.sim.model._model.body("base_link").jntnum.item()
-        # VS: maybe "base_link" should include a prefix, such as "robot_1_base_link"
         self.base_controller.run_controller(action)
         self.arm_controller.run_controller(action)
 
@@ -260,7 +249,9 @@ class TidyBotRobotEnv(MujocoEnv):
         """Setup the controllers for the robot."""
 
         # Cache references to array slices
-        base_dofs = self.sim.model._model.body("base_link").jntnum.item()
+        base_dofs = self.sim.model._model.body(  # pylint: disable=protected-access
+            "base_link"
+        ).jntnum.item()
         # VS: maybe "base_link" should include a prefix, such as "robot_1_base_link"
         arm_dofs = 7
         # buffers for base
@@ -281,7 +272,10 @@ class TidyBotRobotEnv(MujocoEnv):
 
         # Initialize controllers
         self.base_controller = BaseController(
-            qpos_base, qvel_base, ctrl_base, self.sim.model._model.opt.timestep
+            qpos_base,
+            qvel_base,
+            ctrl_base,
+            self.sim.model._model.opt.timestep,  # pylint: disable=protected-access
         )
         self.arm_controller = ArmController(
             qpos_arm,
@@ -289,7 +283,7 @@ class TidyBotRobotEnv(MujocoEnv):
             ctrl_arm,
             qpos_gripper,
             ctrl_gripper,
-            self.sim.model._model.opt.timestep,
+            self.sim.model._model.opt.timestep,  # pylint: disable=protected-access
         )
 
         # Reset controllers

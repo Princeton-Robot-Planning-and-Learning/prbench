@@ -8,7 +8,6 @@ motion for the robot base.
 The current controller is part of the environment.
 """
 
-import time
 from typing import Optional, Sequence
 
 import numpy as np

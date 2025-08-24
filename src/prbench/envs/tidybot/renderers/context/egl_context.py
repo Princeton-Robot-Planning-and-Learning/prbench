@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""An EGL context for OpenGL rendering on GPU devices."""
+
 
 import atexit
 import ctypes
@@ -146,6 +148,7 @@ class EGLGLContext:
             raise RuntimeError("Cannot create an EGL context.")
 
     def make_current(self):
+        """Makes this context current."""
         if not EGL.eglMakeCurrent(
             EGL_DISPLAY, EGL.EGL_NO_SURFACE, EGL.EGL_NO_SURFACE, self._context
         ):
@@ -167,6 +170,7 @@ class EGLGLContext:
         self._context = None
 
     def __del__(self):
+        """Frees resources associated with this context."""
         try:
             self.free()
         except Exception:

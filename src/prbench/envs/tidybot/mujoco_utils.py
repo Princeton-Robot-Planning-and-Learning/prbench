@@ -239,7 +239,7 @@ class MujocoEnv:
 
         if self.show_viewer:
             mujoco.viewer.launch(
-                self.sim.model._model,
+                self.sim.model._model,  # pylint: disable=protected-access
                 self.sim.data,
                 show_left_ui=False,
                 show_right_ui=False,
@@ -271,7 +271,6 @@ class MjModel:
         self._body_id2name: dict[int, str]
         self.body_names, self._body_name2id, self._body_id2name = (
             self._extract_mj_names(
-                self._model.name_bodyadr,
                 self._model.nbody,
                 mujoco.mjtObj.mjOBJ_BODY,
             )
@@ -281,7 +280,6 @@ class MjModel:
         self._joint_id2name: dict[int, str]
         self.joint_names, self._joint_name2id, self._joint_id2name = (
             self._extract_mj_names(
-                self._model.name_jntadr,
                 self._model.njnt,
                 mujoco.mjtObj.mjOBJ_JOINT,
             )
@@ -291,7 +289,6 @@ class MjModel:
         self._geom_id2name: dict[int, str]
         self.geom_names, self._geom_name2id, self._geom_id2name = (
             self._extract_mj_names(
-                self._model.name_geomadr,
                 self._model.ngeom,
                 mujoco.mjtObj.mjOBJ_GEOM,
             )
@@ -301,7 +298,6 @@ class MjModel:
         self._site_id2name: dict[int, str]
         self.site_names, self._site_name2id, self._site_id2name = (
             self._extract_mj_names(
-                self._model.name_siteadr,
                 self._model.nsite,
                 mujoco.mjtObj.mjOBJ_SITE,
             )
@@ -311,7 +307,6 @@ class MjModel:
         self._light_id2name: dict[int, str]
         self.light_names, self._light_name2id, self._light_id2name = (
             self._extract_mj_names(
-                self._model.name_lightadr,
                 self._model.nlight,
                 mujoco.mjtObj.mjOBJ_LIGHT,
             )
@@ -321,7 +316,6 @@ class MjModel:
         self._camera_id2name: dict[int, str]
         self.camera_names, self._camera_name2id, self._camera_id2name = (
             self._extract_mj_names(
-                self._model.name_camadr,
                 self._model.ncam,
                 mujoco.mjtObj.mjOBJ_CAMERA,
             )
@@ -331,7 +325,6 @@ class MjModel:
         self._actuator_id2name: dict[int, str]
         self.actuator_names, self._actuator_name2id, self._actuator_id2name = (
             self._extract_mj_names(
-                self._model.name_actuatoradr,
                 self._model.nu,
                 mujoco.mjtObj.mjOBJ_ACTUATOR,
             )
@@ -341,7 +334,6 @@ class MjModel:
         self._sensor_id2name: dict[int, str]
         self.sensor_names, self._sensor_name2id, self._sensor_id2name = (
             self._extract_mj_names(
-                self._model.name_sensoradr,
                 self._model.nsensor,
                 mujoco.mjtObj.mjOBJ_SENSOR,
             )
@@ -351,7 +343,6 @@ class MjModel:
         self._tendon_id2name: dict[int, str]
         self.tendon_names, self._tendon_name2id, self._tendon_id2name = (
             self._extract_mj_names(
-                self._model.name_tendonadr,
                 self._model.ntendon,
                 mujoco.mjtObj.mjOBJ_TENDON,
             )
@@ -361,7 +352,6 @@ class MjModel:
         self._mesh_id2name: dict[int, str]
         self.mesh_names, self._mesh_name2id, self._mesh_id2name = (
             self._extract_mj_names(
-                self._model.name_meshadr,
                 self._model.nmesh,
                 mujoco.mjtObj.mjOBJ_MESH,
             )
@@ -380,7 +370,6 @@ class MjModel:
 
     def _extract_mj_names(
         self,
-        name_adr,
         num_obj: int,
         obj_type: int,
     ) -> tuple[tuple[str | None, ...], dict[str | None, int], dict[int, str | None]]:
@@ -417,7 +406,7 @@ class MjSim:
 
         self.model: MjModel = MjModel(xml_string)
         self.data: mujoco.MjData = mujoco.MjData(  # pylint: disable=no-member
-            self.model._model
+            self.model._model  # pylint: disable=protected-access
         )
 
         # Offscreen render context object
@@ -453,15 +442,21 @@ class MjSim:
 
     def reset(self) -> None:
         """Reset the simulation."""
-        mujoco.mj_resetData(self.model._model, self.data)  # pylint: disable=no-member
+        mujoco.mj_resetData(
+            self.model._model, self.data
+        )  # pylint: disable=no-member,protected-access
 
     def forward(self) -> None:
         """Synchronize derived quantities."""
-        mujoco.mj_forward(self.model._model, self.data)  # pylint: disable=no-member
+        mujoco.mj_forward(
+            self.model._model, self.data
+        )  # pylint: disable=no-member,protected-access
 
     def step(self) -> None:
         """Step the simulation."""
-        mujoco.mj_step(self.model._model, self.data)  # pylint: disable=no-member
+        mujoco.mj_step(
+            self.model._model, self.data
+        )  # pylint: disable=no-member,protected-access
 
     def render(
         self,
@@ -577,7 +572,9 @@ class MjRenderContext:
         # # make sure sim has this context
         # sim.add_render_context(self)
 
-        self.model: mujoco.MjModel = sim.model._model
+        self.model: mujoco.MjModel = (
+            sim.model._model
+        )  # pylint: disable=protected-access
         self.data: mujoco.MjData = sim.data
 
         # create default scene
@@ -704,7 +701,7 @@ class MjRenderContext:
         mujoco.mjr_uploadTexture(self.model, self.con, tex_id)
 
     def __del__(self) -> None:
-        # free mujoco rendering context and GL rendering context
+        """Free mujoco rendering context and GL rendering context."""
         self.con.free()
         try:
             self.gl_ctx.free()

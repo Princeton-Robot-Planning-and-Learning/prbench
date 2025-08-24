@@ -14,7 +14,6 @@
 # ==============================================================================
 """An OSMesa context for software-based OpenGL rendering."""
 
-import os
 
 from mujoco.osmesa import GLContext
 
@@ -22,5 +21,7 @@ from mujoco.osmesa import GLContext
 class OSMesaGLContext(GLContext):
     """An OSMesa context for software-based OpenGL rendering."""
 
-    def __init__(self, max_width, max_height, device_id=-1):
+    def __init__(
+        self, max_width, max_height, device_id=-1
+    ):  # pylint: disable=unused-argument
         super().__init__(max_width, max_height)

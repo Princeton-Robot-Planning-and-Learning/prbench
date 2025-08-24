@@ -20,5 +20,7 @@ from mujoco.glfw import GLContext
 class GLFWGLContext(GLContext):
     """An OpenGL context created via GLFW."""
 
-    def __init__(self, max_width, max_height, device_id=0):
+    def __init__(
+        self, max_width, max_height, device_id=0
+    ):  # pylint: disable=unused-argument
         super().__init__(max_width, max_height)
