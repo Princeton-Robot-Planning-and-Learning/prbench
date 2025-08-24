@@ -4,7 +4,6 @@ from typing import Any, Iterable
 
 import matplotlib.pyplot as plt
 import numpy as np
-from geom2drobotenvs.utils import CRVRobotActionSpace
 from gymnasium.spaces import Box
 from numpy.typing import NDArray
 from relational_structs import (
@@ -37,9 +36,7 @@ PURPLE: tuple[float, float, float] = (128 / 255, 0 / 255, 128 / 255)
 BLACK: tuple[float, float, float] = (0.1, 0.1, 0.1)
 
 
-# NOTE: this will be added back after we move the base environment into this repo.
-# The isinstance(action_space, RVRobotActionSpace) checks are failing otherwise.
-class _CRVRobotActionSpace(CRVRobotActionSpace, Box):
+class CRVRobotActionSpace(Box):
     """An action space for a CRV robot.
 
     Actions are bounded relative movements of the base and the arm, as well as an
@@ -59,23 +56,9 @@ class _CRVRobotActionSpace(CRVRobotActionSpace, Box):
         min_vac: float = 0.0,
         max_vac: float = 1.0,
     ) -> None:
-        # These lines will be added back, and the last one removed, after we resolve
-        # the issue noted above.
-        # low = np.array([min_dx, min_dy, min_dtheta, min_darm, min_vac])
-        # high = np.array([max_dx, max_dy, max_dtheta, max_darm, max_vac])
-        # super().__init__(low, high)
-        super().__init__(
-            min_dx,
-            max_dx,
-            min_dy,
-            max_dy,
-            min_dtheta,
-            max_dtheta,
-            min_darm,
-            max_darm,
-            min_vac,
-            max_vac,
-        )
+        low = np.array([min_dx, min_dy, min_dtheta, min_darm, min_vac])
+        high = np.array([max_dx, max_dy, max_dtheta, max_darm, max_vac])
+        super().__init__(low, high)
 
     def create_markdown_description(self) -> str:
         """Create a human-readable markdown description of this space."""
