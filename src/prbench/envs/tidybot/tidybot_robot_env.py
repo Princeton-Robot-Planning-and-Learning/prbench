@@ -220,7 +220,8 @@ class TidyBotRobotEnv(MujocoEnv):
             if scene_sec is None:
                 scene_sec = ET.SubElement(scene_root, tag_name)
             for child in list(add_sec):
-                # These sections typically reference bodies/joints by name; no renaming needed
+                # These sections typically reference bodies/joints by name;
+                # no renaming needed
                 scene_sec.append(child)
 
         for tag in ["contact", "tendon", "equality", "actuator"]:

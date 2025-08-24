@@ -6,7 +6,11 @@ MuJoCo simulation logic.
 """
 
 import abc
+import ctypes
+import ctypes.util
 import gc
+import os
+import platform
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from threading import Lock
@@ -20,12 +24,6 @@ from prbench.envs.tidybot import utils
 # This value is then used by the physics engine to determine how much time
 # to simulate for each step.
 SIMULATION_TIMESTEP = 0.002  # (in seconds)
-
-
-import ctypes
-import ctypes.util
-import os
-import platform
 
 # Set macros needed for MuJoCo rendering
 _SYSTEM = platform.system()
@@ -363,7 +361,8 @@ class MjModel:
             return -1
         if name not in self._camera_name2id:
             raise ValueError(
-                f'No "camera" with name {name} exists. Available "camera" names = {self.camera_names}.'
+                f'No "camera" with name {name} exists. '
+                f'Available "camera" names = {self.camera_names}.'
             )
         return self._camera_name2id[name]
 
@@ -539,6 +538,7 @@ class MjRenderContext:
                     f"invalid value for environment variable MUJOCO_GL: {_MUJOCO_GL}"
                 )
             # fmt: off
+            # pylint: disable=import-outside-toplevel
             if _SYSTEM == "Linux" and _MUJOCO_GL == "osmesa":
                 from prbench.envs.tidybot.renderers.context.osmesa_context import (
                     OSMesaGLContext as GLContext,)
@@ -695,8 +695,7 @@ class MjRenderContext:
 
         if depth:
             return (ret_img, depth_img)
-        else:
-            return ret_img
+        return ret_img
 
     def upload_texture(self, tex_id: int) -> None:
         """Uploads given texture to the GPU."""
