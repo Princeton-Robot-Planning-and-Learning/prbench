@@ -244,6 +244,12 @@ class TidyBotRobotEnv(MujocoEnv):
         # return the modified XML string
         return ET.tostring(scene_root, encoding="unicode")
 
+    def _pre_action(self, action: np.ndarray) -> np.ndarray:
+        base_dofs = self.sim.model._model.body("base_link").jntnum.item()
+        # VS: maybe "base_link" should include a prefix, such as "robot_1_base_link"
+        self.base_controller.run_controller(action)
+        self.arm_controller.run_controller(action)
+
     def step(self, action: Optional[object] = None) -> None:
         """Step the environment."""
         # TODO: implement control logic here, that computes the
