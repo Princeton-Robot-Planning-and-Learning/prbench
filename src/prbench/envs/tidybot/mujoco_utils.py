@@ -88,7 +88,16 @@ class MujocoEnv:
         self.camera_height: int = camera_height
 
         # Initialize random number generator
+        self.np_random = self.seed(seed)
+    
+    def seed(self, seed: int | None = None) -> np.random.Generator:
+        """Set the random seed for the environment.
+
+        Args:
+            seed: The seed value to set. If None, a random seed is used.
+        """
         self.np_random = utils.get_rng(seed)
+        return self.np_random
 
     def reset(self, xml_string: str):
         """Reset the environment using xml string."""

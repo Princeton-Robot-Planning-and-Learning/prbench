@@ -201,7 +201,10 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def reset(self, *args, **kwargs) -> NDArray[np.float32]:
         """Reset the environment."""
-        # TODO(VS) handle seed properly for multiple envs -- how does gymnasium create multiple environments with different seeds?
+
+        if "seed" in kwargs:
+            self._tidybot_robot_env.seed(kwargs.get("seed"))
+            self.np_random = self._tidybot_robot_env.np_random
 
         super().reset(*args, **kwargs)
 
