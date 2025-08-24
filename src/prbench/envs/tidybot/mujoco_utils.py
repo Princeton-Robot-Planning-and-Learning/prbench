@@ -42,7 +42,7 @@ if os.environ.get("MUJOCO_GL", None) not in [
     "osmesa",
     "glx",
 ]:
-    # TODO maybe this should be put behind a macro that toggles GPU rendering
+    # VS: maybe this should be put behind a macro that toggles GPU rendering
     if _SYSTEM == "Darwin":
         os.environ["MUJOCO_GL"] = "cgl"
     else:
@@ -525,22 +525,21 @@ class MjRenderContext:
                 raise RuntimeError(
                     f"invalid value for environment variable MUJOCO_GL: {_MUJOCO_GL}"
                 )
+            # fmt: off
             if _SYSTEM == "Linux" and _MUJOCO_GL == "osmesa":
                 from prbench.envs.tidybot.renderers.context.osmesa_context import (
-                    OSMesaGLContext as GLContext,
-                )
+                    OSMesaGLContext as GLContext,)
 
                 # TODO this needs testing on a Linux machine
             elif _SYSTEM == "Linux" and _MUJOCO_GL == "egl":
                 from prbench.envs.tidybot.renderers.context.egl_context import (
-                    EGLGLContext as GLContext,
-                )
+                    EGLGLContext as GLContext,)
 
                 # TODO this needs testing on a Linux machine
             else:
                 from prbench.envs.tidybot.renderers.context.glfw_context import (
-                    GLFWGLContext as GLContext,
-                )
+                    GLFWGLContext as GLContext,)
+            # fmt: on
 
         assert offscreen, "only offscreen supported for now"
         self.sim: MjSim = sim
