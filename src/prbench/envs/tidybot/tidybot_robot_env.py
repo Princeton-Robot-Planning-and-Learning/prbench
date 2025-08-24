@@ -261,7 +261,7 @@ class TidyBotRobotEnv(MujocoEnv):
         # return the modified XML string
         return ET.tostring(scene_root, encoding="unicode")
 
-    def _pre_action(self, action: np.ndarray | None) -> None:
+    def _pre_action(self, action: np.ndarray | dict[str, Any]) -> None:
         """Do any preprocessing before taking an action.
 
         Args:
@@ -273,7 +273,7 @@ class TidyBotRobotEnv(MujocoEnv):
             self.arm_controller.run_controller(action)
 
     def step(
-        self, action: Optional[np.ndarray] = None
+        self, action: np.ndarray | dict[str, Any]
     ) -> Tuple[Dict[str, np.ndarray], float, bool, Dict[str, Any]]:
         """Step the environment.
 
@@ -283,6 +283,7 @@ class TidyBotRobotEnv(MujocoEnv):
         Returns:
             Tuple of (observation, reward, done, info).
         """
+        assert isinstance(action, dict), "Action must be a dictionary."
         return super().step(action)
 
     def get_obs(self) -> Dict[str, np.ndarray]:

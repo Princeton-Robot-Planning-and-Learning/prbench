@@ -171,8 +171,8 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                         pos = f"{x} {y} {z}"
                     # Randomize orientation around Z-axis (yaw)
                     theta = self.np_random.uniform(-math.pi, math.pi)
-                    quat = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
-                    quat = " ".join(map(str, quat))
+                    quat_array = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
+                    quat = " ".join(map(str, quat_array))
                     ET.SubElement(
                         body,
                         "geom",
@@ -196,7 +196,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         return xml_string
 
-    def reset(self, *args, **kwargs) -> NDArray[np.float32]:
+    def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict[str, Any]]:
         """Reset the environment."""
 
         if "seed" in kwargs:

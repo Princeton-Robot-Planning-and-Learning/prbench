@@ -14,7 +14,7 @@ import platform
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from threading import Lock
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any
 
 import mujoco
 import mujoco.viewer
@@ -115,16 +115,20 @@ class MujocoEnv:
         self.sim.forward()
         return self.get_obs(), None, None, None
 
-    def _pre_action(self, action: np.ndarray | None) -> None:
+    def _pre_action(self, action: np.ndarray | dict[str, Any]) -> None:
         """Do any preprocessing before taking an action.
 
         Args:
             action (np.array): Action to execute within the environment.
         """
-        if action is not None and self.sim is not None:
+        if self.sim is not None:
+            if isinstance(action, dict):
+                raise NotImplementedError(
+                    "Dict actions not implemented in base MujocoEnv _pre_action"
+                )
             self.sim.data.ctrl[:] = action
 
-    def _post_action(self, action: np.ndarray | None) -> tuple[float, bool, dict]:
+    def _post_action(self, action: np.ndarray | dict[str, Any]) -> tuple[float, bool, dict]:
         """Do any housekeeping after taking an action.
 
         Args:
@@ -149,7 +153,7 @@ class MujocoEnv:
         """
         raise NotImplementedError
 
-    def step(self, action: np.ndarray | None = None) -> tuple[dict, float, bool, dict]:
+    def step(self, action: np.ndarray | dict[str, Any]) -> tuple[dict, float, bool, dict]:
         """Step the environment.
 
         Args:
@@ -559,18 +563,18 @@ class MjRenderContext:
             # fmt: off
             # pylint: disable=import-outside-toplevel
             if _SYSTEM == "Linux" and _MUJOCO_GL == "osmesa":
-                from prbench.envs.tidybot.renderers.context.osmesa_context import (
-                    OSMesaGLContext as GLContext,)  # type: ignore[assignment]
+                from prbench.envs.tidybot.renderers.context.osmesa_context import (  # type: ignore[assignment]
+                    OSMesaGLContext as GLContext,)
 
                 # TODO this needs testing on a Linux machine  # pylint: disable=fixme
             elif _SYSTEM == "Linux" and _MUJOCO_GL == "egl":
-                from prbench.envs.tidybot.renderers.context.egl_context import (
-                    EGLGLContext as GLContext,)  # type: ignore[assignment]
+                from prbench.envs.tidybot.renderers.context.egl_context import (  # type: ignore[assignment]
+                    EGLGLContext as GLContext,)
 
                 # TODO this needs testing on a Linux machine  # pylint: disable=fixme
             else:
-                from prbench.envs.tidybot.renderers.context.glfw_context import (
-                    GLFWGLContext as GLContext,)  # type: ignore[assignment]
+                from prbench.envs.tidybot.renderers.context.glfw_context import (  # type: ignore[assignment]
+                    GLFWGLContext as GLContext,)
             # fmt: on
 
         assert offscreen, "only offscreen supported for now"
