@@ -89,7 +89,7 @@ class MujocoEnv:
 
         # Initialize random number generator
         self.np_random = self.seed(seed)
-    
+
     def seed(self, seed: int | None = None) -> np.random.Generator:
         """Set the random seed for the environment.
 
@@ -146,9 +146,7 @@ class MujocoEnv:
         """
         raise NotImplementedError
 
-    def step(
-        self, action: np.ndarray | None = None
-    ) -> tuple[dict, float, bool, dict]:
+    def step(self, action: np.ndarray | None = None) -> tuple[dict, float, bool, dict]:
         """Step the environment.
 
         Args:
@@ -239,7 +237,7 @@ class MujocoEnv:
         self.done: bool = False
 
         if self.show_viewer:
-            mujoco.viewer.launch(  # pylint: disable=no-member
+            mujoco.viewer.launch(
                 self.sim.model._model,
                 self.sim.data,
                 show_left_ui=False,
@@ -401,11 +399,15 @@ class MjSim:
         xml_string = self._set_simulation_timestep(xml_string)
 
         self.model: MjModel = MjModel(xml_string)
-        self.data: mujoco.MjData = mujoco.MjData(self.model._model)  # pylint: disable=no-member
+        self.data: mujoco.MjData = mujoco.MjData(  # pylint: disable=no-member
+            self.model._model
+        )
 
         # Offscreen render context object
-        self._render_context_offscreen: MjRenderContextOffscreen = MjRenderContextOffscreen(
-            self, device_id=-1, max_width=camera_width, max_height=camera_height
+        self._render_context_offscreen: MjRenderContextOffscreen = (
+            MjRenderContextOffscreen(
+                self, device_id=-1, max_width=camera_width, max_height=camera_height
+            )
         )
 
     def _set_simulation_timestep(self, xml_string: str) -> str:
@@ -526,10 +528,12 @@ class MjRenderContext:
             if _SYSTEM == "Linux" and _MUJOCO_GL == "osmesa":
                 from prbench.envs.tidybot.renderers.context.osmesa_context import (
                     OSMesaGLContext as GLContext,)
+
                 # TODO this needs testing on a Linux machine
             elif _SYSTEM == "Linux" and _MUJOCO_GL == "egl":
                 from prbench.envs.tidybot.renderers.context.egl_context import (
                     EGLGLContext as GLContext,)
+
                 # TODO this needs testing on a Linux machine
             else:
                 from prbench.envs.tidybot.renderers.context.glfw_context import (
@@ -575,7 +579,9 @@ class MjRenderContext:
         self._set_mujoco_context_and_buffers()
 
     def _set_mujoco_context_and_buffers(self) -> None:
-        self.con: mujoco.MjrContext = mujoco.MjrContext(self.model, mujoco.mjtFontScale.mjFONTSCALE_150)
+        self.con: mujoco.MjrContext = mujoco.MjrContext(
+            self.model, mujoco.mjtFontScale.mjFONTSCALE_150
+        )
         mujoco.mjr_setBuffer(mujoco.mjtFramebuffer.mjFB_OFFSCREEN, self.con)
 
     def update_offscreen_size(self, width: int, height: int) -> None:
@@ -642,7 +648,9 @@ class MjRenderContext:
     ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         viewport = mujoco.MjrRect(0, 0, width, height)
         rgb_img: np.ndarray = np.empty((height, width, 3), dtype=np.uint8)
-        depth_img: np.ndarray | None = np.empty((height, width), dtype=np.float32) if depth else None
+        depth_img: np.ndarray | None = (
+            np.empty((height, width), dtype=np.float32) if depth else None
+        )
 
         mujoco.mjr_readPixels(
             rgb=rgb_img, depth=depth_img, viewport=viewport, con=self.con
@@ -657,7 +665,9 @@ class MjRenderContext:
                 + uint32_rgb_img[:, :, 2] * (2**16)
             )
             seg_img[seg_img >= (self.scn.ngeom + 1)] = 0
-            seg_ids: np.ndarray = np.full((self.scn.ngeom + 1, 2), fill_value=-1, dtype=np.int32)
+            seg_ids: np.ndarray = np.full(
+                (self.scn.ngeom + 1, 2), fill_value=-1, dtype=np.int32
+            )
 
             for i in range(self.scn.ngeom):
                 geom = self.scn.geoms[i]
