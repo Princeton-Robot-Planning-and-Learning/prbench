@@ -46,6 +46,9 @@ class TidyBotRobotEnv(MujocoEnv):
         xml_string = self._insert_robot_into_xml(xml_string)
         super().reset(xml_string)
 
+        # Setup controllers after resetting the environment
+        self._setup_controllers()
+
         return self.get_obs(), None, None, None  # TODO reward, done, info
 
     def _insert_robot_into_xml(self, xml_string: str) -> str:
@@ -234,3 +237,43 @@ class TidyBotRobotEnv(MujocoEnv):
     def reward(self, **kwargs) -> float:
         """Compute the reward for the current state and action."""
         return 0.0  # Placeholder reward
+
+    def _setup_controllers(self) -> None:
+        """Setup the controllers for the robot."""
+
+        # Cache references to array slices
+        base_dofs = self.sim.model._model.body("base_link").jntnum.item()
+        # VS: maybe "base_link" should include a prefix, such as "robot_1_base_link"
+        arm_dofs = 7
+        # buffers for base
+        qpos_base = self.sim.data.qpos[:base_dofs]
+        qvel_base = self.sim.data.qvel[:base_dofs]
+        ctrl_base = self.sim.data.ctrl[:base_dofs]
+        # buffers for arm
+        qpos_arm = self.sim.data.qpos[base_dofs : (base_dofs + arm_dofs)]
+        qvel_arm = self.sim.data.qvel[base_dofs : (base_dofs + arm_dofs)]
+        ctrl_arm = self.sim.data.ctrl[base_dofs : (base_dofs + arm_dofs)]
+        # buffers for gripper
+        qpos_gripper = self.sim.data.qpos[
+            (base_dofs + arm_dofs) : (base_dofs + arm_dofs + 1)
+        ]
+        ctrl_gripper = self.sim.data.ctrl[
+            (base_dofs + arm_dofs) : (base_dofs + arm_dofs + 1)
+        ]
+
+        # Initialize controllers
+        self.base_controller = BaseController(
+            qpos_base, qvel_base, ctrl_base, self.sim.model._model.opt.timestep
+        )
+        self.arm_controller = ArmController(
+            qpos_arm,
+            qvel_arm,
+            ctrl_arm,
+            qpos_gripper,
+            ctrl_gripper,
+            self.sim.model._model.opt.timestep,
+        )
+
+        # Reset controllers
+        self.base_controller.reset()
+        self.arm_controller.reset() # also resets arm to retract position
