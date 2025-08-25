@@ -4,7 +4,7 @@ TidyBot robot in simulation."""
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import numpy as np
 
@@ -47,7 +47,7 @@ class TidyBotRobotEnv(MujocoEnv):
         self.base_controller: Optional[BaseController] = None
         self.arm_controller: Optional[ArmController] = None
 
-    def reset(self, xml_string: str) -> Tuple[Dict[str, np.ndarray], None, None, None]:
+    def reset(self, xml_string: str) -> tuple[dict[str, np.ndarray], None, None, None]:
         """Reset the environment using xml string.
 
         Args:
@@ -108,7 +108,7 @@ class TidyBotRobotEnv(MujocoEnv):
     def _update_element_references(
         self,
         element: ET.Element,
-        rename_map: Dict[str, str],
+        rename_map: dict[str, str],
     ) -> None:
         """Recursively update asset references in an element and its children."""
         for attr_ref in ["material", "mesh", "texture"]:
@@ -124,7 +124,7 @@ class TidyBotRobotEnv(MujocoEnv):
         xml_string: str,
         additional_model_xml_path: Union[str, Path],
         output_filename: str,
-        body_pos: Optional[Tuple[float, float, float]] = None,
+        body_pos: Optional[tuple[float, float, float]] = None,
         name_prefix: Optional[str] = None,
     ) -> str:
         """Merge another MuJoCo model XML (e.g., tidybot) into an existing scene XML by:
@@ -174,7 +174,7 @@ class TidyBotRobotEnv(MujocoEnv):
                 scene_default.append(child)
 
         # 2) Merge assets with name prefixing and file path rewriting
-        rename_map: Dict[str, str] = {}
+        rename_map: dict[str, str] = {}
 
         add_asset: Optional[ET.Element] = add_root.find("asset")
         if add_asset is not None:
@@ -274,7 +274,7 @@ class TidyBotRobotEnv(MujocoEnv):
 
     def step(
         self, action: np.ndarray | dict[str, Any]
-    ) -> Tuple[Dict[str, np.ndarray], float, bool, Dict[str, Any]]:
+    ) -> tuple[dict[str, np.ndarray], float, bool, dict[str, Any]]:
         """Step the environment.
 
         Args:
@@ -286,7 +286,7 @@ class TidyBotRobotEnv(MujocoEnv):
         assert isinstance(action, dict), "Action must be a dictionary."
         return super().step(action)
 
-    def get_obs(self) -> Dict[str, np.ndarray]:
+    def get_obs(self) -> dict[str, np.ndarray]:
         """Get the current observation.
 
         Returns:

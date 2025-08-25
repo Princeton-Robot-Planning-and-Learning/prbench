@@ -14,7 +14,7 @@ import platform
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from threading import Lock
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import mujoco
 import mujoco.viewer
@@ -101,7 +101,7 @@ class MujocoEnv:
         self.np_random = utils.get_rng(seed)  # type: ignore[no-untyped-call]
         return self.np_random
 
-    def reset(self, xml_string: str) -> Tuple[Dict[str, np.ndarray], None, None, None]:
+    def reset(self, xml_string: str) -> tuple[dict[str, np.ndarray], None, None, None]:
         """Reset the environment using xml string."""
 
         # Destroy the current simulation if it exists.
