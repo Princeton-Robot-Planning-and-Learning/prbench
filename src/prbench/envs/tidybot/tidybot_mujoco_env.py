@@ -473,6 +473,43 @@ class MujocoEnv:
 
     suppress_render_warning: bool = True  # Class-level default
 
+    def _find_mjcf_path(
+        self, cupboard_scene: bool = False, table_scene: bool = False
+    ) -> str:
+        """Find the MJCF file path, trying multiple possible locations."""
+
+        # Determine the scene type
+        if cupboard_scene:
+            scene_name = "cupboard_scene.xml"
+        elif table_scene:
+            scene_name = "table_scene.xml"
+        else:
+            scene_name = "ground_scene.xml"
+
+        # List of possible paths to try (in order of preference)
+        possible_paths = [
+            # Current working directory relative paths
+            f"models/stanford_tidybot/{scene_name}",
+            # Try going up directories to find the files
+            os.path.join(
+                os.path.dirname(__file__), "models", "stanford_tidybot", scene_name
+            ),
+        ]
+
+        # Try each path until we find one that exists
+        for path in possible_paths:
+            if os.path.exists(path):
+                return path
+
+        # If no file is found, raise a more informative error
+        raise FileNotFoundError(
+            f"Could not find {scene_name} in any of the expected locations. "
+            f"Tried the following paths:\n"
+            + "\n".join(f"  - {path}" for path in possible_paths)
+            + f"\n\nCurrent working directory: {os.getcwd()}\n"
+            f"This file location: {__file__}"
+        )
+
     def __init__(
         self,
         render_images: bool = True,
@@ -484,12 +521,8 @@ class MujocoEnv:
     ) -> None:
         if mjcf_path is not None:
             self.mjcf_path = mjcf_path
-        elif cupboard_scene:
-            self.mjcf_path = "models/stanford_tidybot/cupboard_scene.xml"
-        elif table_scene:
-            self.mjcf_path = "models/stanford_tidybot/table_scene.xml"
         else:
-            self.mjcf_path = "models/stanford_tidybot/ground_scene.xml"
+            self.mjcf_path = self._find_mjcf_path(cupboard_scene, table_scene)
         self.render_images = render_images
         self.show_viewer = show_viewer
         self.show_images = show_images
