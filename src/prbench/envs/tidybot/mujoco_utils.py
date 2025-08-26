@@ -492,7 +492,6 @@ class MjSim:
         camera_name: str | None = None,
         depth: bool = False,
         mode: str = "offscreen",
-        segmentation: bool = False,
     ) -> NDArray[np.uint8] | tuple[NDArray[np.uint8], NDArray[np.float32] | None]:
         """Renders view from a camera and returns image as an `numpy.ndarray`.
 
@@ -525,10 +524,9 @@ class MjSim:
                 width=render_width,
                 height=render_height,
                 camera_id=camera_id,
-                segmentation=segmentation,
             )
             return self._render_context_offscreen.read_pixels(
-                render_width, render_height, depth=depth, segmentation=segmentation
+                render_width, render_height, depth=depth
             )
 
     def free(self) -> None:
@@ -652,7 +650,6 @@ class MjRenderContext:
         width: int,
         height: int,
         camera_id: int | None = None,
-        segmentation: bool = False,
     ) -> None:
         """Render the scene."""
         viewport = mujoco.MjrRect(0, 0, width, height)
@@ -680,22 +677,13 @@ class MjRenderContext:
             self.scn,
         )
 
-        if segmentation:
-            self.scn.flags[mujoco.mjtRndFlag.mjRND_SEGMENT] = 1
-            self.scn.flags[mujoco.mjtRndFlag.mjRND_IDCOLOR] = 1
-
         mujoco.mjr_render(viewport=viewport, scn=self.scn, con=self.con)
-
-        if segmentation:
-            self.scn.flags[mujoco.mjtRndFlag.mjRND_SEGMENT] = 0
-            self.scn.flags[mujoco.mjtRndFlag.mjRND_IDCOLOR] = 0
 
     def read_pixels(
         self,
         width: int,
         height: int,
         depth: bool = False,
-        segmentation: bool = False,
     ) -> NDArray[np.uint8] | tuple[NDArray[np.uint8], NDArray[np.float32] | None]:
         """Read the pixels from the current rendering context.
 
@@ -713,29 +701,9 @@ class MjRenderContext:
             rgb=rgb_img, depth=depth_img, viewport=viewport, con=self.con
         )
 
-        ret_img: NDArray[Any] = rgb_img
-        if segmentation:
-            uint32_rgb_img: NDArray[np.int32] = rgb_img.astype(np.int32)
-            seg_img: NDArray[np.int32] = (
-                uint32_rgb_img[:, :, 0]
-                + uint32_rgb_img[:, :, 1] * (2**8)
-                + uint32_rgb_img[:, :, 2] * (2**16)
-            )
-            seg_img[seg_img >= (self.scn.ngeom + 1)] = 0
-            seg_ids: NDArray[np.int32] = np.full(
-                (self.scn.ngeom + 1, 2), fill_value=-1, dtype=np.int32
-            )
-
-            for i in range(self.scn.ngeom):
-                geom = self.scn.geoms[i]
-                if geom.segid != -1:
-                    seg_ids[geom.segid + 1, 0] = geom.objtype
-                    seg_ids[geom.segid + 1, 1] = geom.objid
-            ret_img = seg_ids[seg_img]
-
         if depth:
-            return (ret_img, depth_img)
-        return ret_img
+            return (rgb_img, depth_img)
+        return rgb_img
 
     def upload_texture(self, tex_id: int) -> None:
         """Uploads given texture to the GPU."""
