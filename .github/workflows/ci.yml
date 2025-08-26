@@ -63,7 +63,8 @@ jobs:
         python-version: ["3.11"]
     runs-on: ${{ matrix.os }}
     steps:
-    - name: Install LAPACK BLAS, and OSMESA
+    - name: Install LAPACK, BLAS, OSMesa (Linux)
+      if: runner.os == 'Linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y liblapack-dev libblas-dev libosmesa6-dev libgl1 libglx-mesa0
