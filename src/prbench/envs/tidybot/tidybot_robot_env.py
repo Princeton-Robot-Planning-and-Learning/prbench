@@ -161,9 +161,11 @@ class TidyBotRobotEnv(MujocoEnv):
         ]
 
         # Buffers for gripper
-        gripper_ctrl_id = self.sim.model._actuator_name2id[
-            "fingers_actuator"
-        ]  # pylint: disable=protected-access
+        gripper_ctrl_id = (
+            self.sim.model._actuator_name2id[  # pylint: disable=protected-access
+                "fingers_actuator"
+            ]
+        )
         self.qpos_gripper: NDArray[np.float64] | None = None
         self.ctrl_gripper: NDArray[np.float64] = self.sim.data.ctrl[
             gripper_ctrl_id : gripper_ctrl_id + 1
