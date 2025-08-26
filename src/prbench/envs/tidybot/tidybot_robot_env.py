@@ -140,25 +140,13 @@ class TidyBotRobotEnv(MujocoEnv):
         )
         arm_ctrl_start, arm_ctrl_end = min(arm_ctrl_indices), max(arm_ctrl_indices) + 1
 
-        self.qpos_base = self.sim.data.qpos[
-            base_qpos_start:base_qpos_end
-        ]
-        self.qvel_base = self.sim.data.qvel[
-            base_qvel_start:base_qvel_end
-        ]
-        self.ctrl_base = self.sim.data.ctrl[
-            base_ctrl_start:base_ctrl_end
-        ]
+        self.qpos_base = self.sim.data.qpos[base_qpos_start:base_qpos_end]
+        self.qvel_base = self.sim.data.qvel[base_qvel_start:base_qvel_end]
+        self.ctrl_base = self.sim.data.ctrl[base_ctrl_start:base_ctrl_end]
 
-        self.qpos_arm = self.sim.data.qpos[
-            arm_qpos_start:arm_qpos_end
-        ]
-        self.qvel_arm = self.sim.data.qvel[
-            arm_qvel_start:arm_qvel_end
-        ]
-        self.ctrl_arm = self.sim.data.ctrl[
-            arm_ctrl_start:arm_ctrl_end
-        ]
+        self.qpos_arm = self.sim.data.qpos[arm_qpos_start:arm_qpos_end]
+        self.qvel_arm = self.sim.data.qvel[arm_qvel_start:arm_qvel_end]
+        self.ctrl_arm = self.sim.data.ctrl[arm_ctrl_start:arm_ctrl_end]
 
         # Buffers for gripper
         gripper_ctrl_id = (
@@ -167,9 +155,7 @@ class TidyBotRobotEnv(MujocoEnv):
             ]
         )
         self.qpos_gripper = None
-        self.ctrl_gripper = self.sim.data.ctrl[
-            gripper_ctrl_id : gripper_ctrl_id + 1
-        ]
+        self.ctrl_gripper = self.sim.data.ctrl[gripper_ctrl_id : gripper_ctrl_id + 1]
 
     def reset(
         self, xml_string: str
