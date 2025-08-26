@@ -32,6 +32,18 @@ def test_tidybot3d_reset_returns_valid_observation():
     env.close()
 
 
+def test_tidybot3d_reset_returns_valid_observation_with_rendering():
+    """Test that reset() returns an observation in the observation space when rendering
+    is enabled."""
+    env = TidyBot3DEnv(num_objects=3, render_images=True)
+    obs, info = env.reset()
+    assert env.observation_space.contains(
+        obs
+    ), "Reset observation not in observation space"
+    assert isinstance(info, dict)
+    env.close()
+
+
 def test_tidybot3d_step_returns_valid_outputs():
     """Test that step() returns valid outputs: obs in space, reward is float, done flags
     are bools."""

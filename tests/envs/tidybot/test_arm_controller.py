@@ -41,23 +41,23 @@ def test_reset(arm_controller):
     assert arm_controller.otg_res is not None
 
 
-def test_control_callback_sets_target(arm_controller):
-    """Test that control_callback sets the target position using real TidybotIKSolver
-    and updates OTG state."""
+def test_run_controller_sets_target(arm_controller):
+    """Test that run_controller sets the target position using real TidybotIKSolver and
+    updates OTG state."""
     arm_controller.reset()
     command = {
         "arm_pos": np.array([1.0, 2.0, 3.0]),
         "arm_quat": np.array([0.0, 0.0, 0.0, 1.0]),
     }
-    arm_controller.control_callback(command)
+    arm_controller.run_controller(command)
     # The target position should be set, but the exact value depends on TidybotIKSolver
     assert arm_controller.otg_inp.target_position is not None
     assert arm_controller.otg_res is not None
 
 
-def test_control_callback_sets_gripper(arm_controller):
-    """Test that control_callback sets the gripper position correctly."""
+def test_run_controller_sets_gripper(arm_controller):
+    """Test that run_controller sets the gripper position correctly."""
     arm_controller.reset()
     command = {"gripper_pos": 0.5}
-    arm_controller.control_callback(command)
+    arm_controller.run_controller(command)
     assert np.allclose(arm_controller.ctrl_gripper, 255.0 * 0.5)
