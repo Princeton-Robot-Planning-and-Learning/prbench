@@ -28,7 +28,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         render_images: bool = True,
         seed: int | None = None,
         show_viewer: bool = False,
-        show_images: bool = False,
+        show_images: bool = False,  # pylint: disable=unused-argument
     ) -> None:
         super().__init__()
 
