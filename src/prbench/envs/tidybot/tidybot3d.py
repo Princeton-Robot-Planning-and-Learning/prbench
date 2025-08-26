@@ -25,7 +25,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         num_objects: int = 3,
         render_mode: str | None = None,
         custom_grasp: bool = False,
-        render_images: bool = True,  # unused; kept for API compatibility
+        render_images: bool = True,
         seed: int | None = None,
         show_viewer: bool = False,
         show_images: bool = False,
@@ -36,13 +36,15 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.num_objects = num_objects
         self.render_mode = render_mode
         self.custom_grasp = custom_grasp
-        self.show_images = show_images
         self.render_images = render_images
         self._render_camera_name: str | None = None
 
         # Initialize TidyBot environment
+        camera_names = None
+        if render_images:
+            camera_names = ["overview"]
         self._tidybot_robot_env = self._create_robot_tidybot_env(
-            seed=seed, camera_names=["overview"], show_viewer=show_viewer
+            seed=seed, camera_names=camera_names, show_viewer=show_viewer
         )
 
         # Set random number generator
@@ -90,7 +92,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def _create_observation_space(self) -> spaces.Box:
         """Create observation space based on TidyBot's observation structure."""
         # Get example observation to determine dimensions
-        # self._tidybot_robot_env.reset()
         self._tidybot_robot_env.reset(self._create_scene_xml())
         example_obs = self._tidybot_robot_env.get_obs()
 

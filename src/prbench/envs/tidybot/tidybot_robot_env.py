@@ -146,8 +146,6 @@ class TidyBotRobotEnv(MujocoEnv):
 
         assert scene_root is not None, "Scene XML root element is missing."
 
-        # scene_output_dir = Path(scene_xml_path).parent
-
         # Ensure required roots exist in the scene
         scene_default = scene_root.find("default")
         if scene_default is None:
