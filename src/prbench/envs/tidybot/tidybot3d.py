@@ -39,7 +39,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.custom_grasp = custom_grasp
         self.render_images = render_images
         self.show_images = show_images
-        self._render_camera_name: str = "overview"
+        self._render_camera_name: str | None = "overview"
 
         # Cannot show images if not rendering images
         if self.show_images:
