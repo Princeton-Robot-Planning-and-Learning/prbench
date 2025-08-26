@@ -291,13 +291,20 @@ class TidyBotRobotEnv(MujocoEnv):
         model_name: str = Path(additional_model_xml_path).stem
         prefix: str = name_prefix if name_prefix is not None else model_name
 
-        # 1) Merge defaults (append all children of <default>)
+        # 1) Merge option tags (important for simulation stability)
+        add_option_tags = add_root.findall("option")
+        for option_tag in add_option_tags:
+            # Create a copy of the option tag to avoid modifying the original
+            option_copy = ET.fromstring(ET.tostring(option_tag))
+            scene_root.append(option_copy)
+
+        # 2) Merge defaults (append all children of <default>)
         add_default = add_root.find("default")
         if add_default is not None:
             for child in list(add_default):
                 scene_default.append(child)
 
-        # 2) Merge assets with name prefixing and file path rewriting
+        # 3) Merge assets with name prefixing and file path rewriting
         rename_map: dict[str, str] = {}
 
         add_asset: Optional[ET.Element] = add_root.find("asset")
@@ -342,7 +349,7 @@ class TidyBotRobotEnv(MujocoEnv):
 
                 scene_asset.append(asset_elem)
 
-        # 3) Merge worldbody: copy the first top-level body from additional model,
+        # 4) Merge worldbody: copy the first top-level body from additional model,
         # update references, set pos
         add_worldbody: Optional[ET.Element] = add_root.find("worldbody")
         if add_worldbody is not None:
@@ -357,7 +364,7 @@ class TidyBotRobotEnv(MujocoEnv):
                     new_body.set("pos", f"{body_pos[0]} {body_pos[1]} {body_pos[2]}")
                 scene_worldbody.append(new_body)
 
-        # 4) Merge contact / tendon / equality / actuator sections
+        # 5) Merge contact / tendon / equality / actuator sections
         def _merge_section(tag_name: str) -> None:
             scene_sec = scene_root.find(tag_name)
             add_sec = add_root.find(tag_name)
