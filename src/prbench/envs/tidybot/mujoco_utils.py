@@ -196,25 +196,25 @@ class MujocoEnv:
         """Get the current observation."""
         assert self.sim is not None, "Simulation must be initialized."
 
-        # add a copy of qpos and qvel to observation
-        di: dict[str, np.ndarray] = {
+        # Add a copy of qpos and qvel to observation
+        obs_dict: dict[str, np.ndarray] = {
             "qpos": np.copy(self.sim.data.qpos),
             "qvel": np.copy(self.sim.data.qvel),
         }
 
-        # render images and update di
+        # Render images and update obs_dict
         images: dict[str, np.ndarray] | None = self._get_camera_images()
         if images is not None:
-            di.update(images)
+            obs_dict.update(images)
 
-        return di
+        return obs_dict
 
     def _get_camera_images(self) -> dict[str, np.ndarray] | None:
         """Get images from cameras in simulation."""
         if not self.camera_names or self.sim is None:
             return None
 
-        images: OrderedDict[str, np.ndarray] = OrderedDict()
+        images: dict[str, np.ndarray] = dict()
         for camera_name in self.camera_names:
             rendered_image = self.sim.render(
                 width=self.camera_width,
@@ -377,7 +377,7 @@ class MjModel:
         )
 
     def camera_name2id(self, name: str) -> int:
-        """Get camera id from  camera name."""
+        """Get camera id from camera name."""
         if name == "free":
             return -1
         if name not in self._camera_name2id:
@@ -398,7 +398,7 @@ class MjModel:
         See https://github.com/openai/mujoco-py/blob/ab86d331c9a77ae412079c6e58b8771fe63747fc/mujoco_py/generated/wrappers.pxi#L1127  # pylint: disable=line-too-long
         """
 
-        # objects don't need to be named in the XML, so name might be None
+        # Objects don't need to be named in the XML, so name might be None
         id2name: dict[int, str | None] = {i: None for i in range(num_obj)}
         name2id: dict[str | None, int] = {}
         for i in range(num_obj):
@@ -408,7 +408,7 @@ class MjModel:
             name2id[name] = i
             id2name[i] = name
 
-        # sort names by increasing id to keep order deterministic
+        # Sort names by increasing id to keep order deterministic
         return tuple(id2name[nid] for nid in sorted(name2id.values())), name2id, id2name
 
 
@@ -588,7 +588,7 @@ class MjRenderContext:
         self.offscreen: bool = offscreen
         self.device_id: int = device_id
 
-        # setup GL context with defaults for now
+        # Setup GL context with defaults for now
         self.gl_ctx = GLContext(  # type: ignore[no-untyped-call] # pylint: disable=possibly-used-before-assignment
             max_width=max_width,
             max_height=max_height,
@@ -599,24 +599,22 @@ class MjRenderContext:
         # Ensure the model data has been updated so that there
         # is something to render
         sim.forward()
-        # # make sure sim has this context
-        # sim.add_render_context(self)
 
         self.model: mujoco.MjModel = (
             sim.model._model
         )  # pylint: disable=protected-access
         self.data: mujoco.MjData = sim.data
 
-        # create default scene
-        # set maxgeom to 10k to support large-scale scenes
+        # Create default scene
+        # Set maxgeom to 10k to support large-scale scenes
         self.scn: mujoco.MjvScene = mujoco.MjvScene(self.model, maxgeom=10000)
 
-        # camera
+        # Camera
         self.cam: mujoco.MjvCamera = mujoco.MjvCamera()
         self.cam.fixedcamid = 0
         self.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
 
-        # options for visual / collision mesh can be set externally,
+        # Options for visual / collision mesh can be set externally,
         # e.g. vopt.geomgroup[0], vopt.geomgroup[1]
         self.vopt: mujoco.MjvOption = mujoco.MjvOption()
 

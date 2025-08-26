@@ -209,7 +209,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         xml_string = self._create_scene_xml()
 
-        # reset the underlying TidyBot robot environment
+        # Reset the underlying TidyBot robot environment
         obs, _, _, _ = self._tidybot_robot_env.reset(xml_string)
 
         vec_obs = self._vectorize_observation(obs)

@@ -258,7 +258,7 @@ class TidyBotRobotEnv(MujocoEnv):
             str(merged_output_path), encoding="utf-8", xml_declaration=True
         )
 
-        # return the modified XML string
+        # Return the modified XML string
         return ET.tostring(scene_root, encoding="unicode")
 
     def _pre_action(self, action: np.ndarray | dict[str, Any]) -> None:
@@ -286,14 +286,6 @@ class TidyBotRobotEnv(MujocoEnv):
         assert isinstance(action, dict), "Action must be a dictionary."
         return super().step(action)
 
-    def get_obs(self) -> dict[str, np.ndarray]:
-        """Get the current observation.
-
-        Returns:
-            Dictionary containing the current observation.
-        """
-        return super().get_obs()
-
     def reward(self, **kwargs) -> float:
         """Compute the reward for the current state and action."""
         return 0.0  # Placeholder reward
@@ -311,15 +303,15 @@ class TidyBotRobotEnv(MujocoEnv):
         ).jntnum.item()
         # VS: maybe "base_link" should include a prefix, such as "robot_1_base_link"
         arm_dofs: int = 7
-        # buffers for base
+        # Buffers for base
         qpos_base: np.ndarray = self.sim.data.qpos[:base_dofs]
         qvel_base: np.ndarray = self.sim.data.qvel[:base_dofs]
         ctrl_base: np.ndarray = self.sim.data.ctrl[:base_dofs]
-        # buffers for arm
+        # Buffers for arm
         qpos_arm: np.ndarray = self.sim.data.qpos[base_dofs : (base_dofs + arm_dofs)]
         qvel_arm: np.ndarray = self.sim.data.qvel[base_dofs : (base_dofs + arm_dofs)]
         ctrl_arm: np.ndarray = self.sim.data.ctrl[base_dofs : (base_dofs + arm_dofs)]
-        # buffers for gripper
+        # Buffers for gripper
         qpos_gripper: np.ndarray = self.sim.data.qpos[
             (base_dofs + arm_dofs) : (base_dofs + arm_dofs + 1)
         ]
