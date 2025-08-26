@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 import numpy as np
+from numpy.typing import NDArray
 
 from prbench.envs.tidybot.arm_controller import ArmController
 from prbench.envs.tidybot.base_controller import BaseController
@@ -47,7 +48,9 @@ class TidyBotRobotEnv(MujocoEnv):
         self.base_controller: Optional[BaseController] = None
         self.arm_controller: Optional[ArmController] = None
 
-    def reset(self, xml_string: str) -> tuple[dict[str, np.ndarray], None, None, None]:
+    def reset(
+        self, xml_string: str
+    ) -> tuple[dict[str, NDArray[Any]], None, None, None]:
         """Reset the environment using xml string.
 
         Args:
@@ -261,7 +264,7 @@ class TidyBotRobotEnv(MujocoEnv):
         # Return the modified XML string
         return ET.tostring(scene_root, encoding="unicode")
 
-    def _pre_action(self, action: np.ndarray | dict[str, Any]) -> None:
+    def _pre_action(self, action: NDArray[Any] | dict[str, Any]) -> None:
         """Do any preprocessing before taking an action.
 
         Args:
@@ -273,8 +276,8 @@ class TidyBotRobotEnv(MujocoEnv):
             self.arm_controller.run_controller(action)
 
     def step(
-        self, action: np.ndarray | dict[str, Any]
-    ) -> tuple[dict[str, np.ndarray], float, bool, dict[str, Any]]:
+        self, action: NDArray[Any] | dict[str, Any]
+    ) -> tuple[dict[str, NDArray[Any]], float, bool, dict[str, Any]]:
         """Step the environment.
 
         Args:
@@ -286,7 +289,7 @@ class TidyBotRobotEnv(MujocoEnv):
         assert isinstance(action, dict), "Action must be a dictionary."
         return super().step(action)
 
-    def reward(self, **kwargs) -> float:
+    def reward(self, **kwargs: Any) -> float:
         """Compute the reward for the current state and action."""
         return 0.0  # Placeholder reward
 
@@ -304,18 +307,24 @@ class TidyBotRobotEnv(MujocoEnv):
         # VS: maybe "base_link" should include a prefix, such as "robot_1_base_link"
         arm_dofs: int = 7
         # Buffers for base
-        qpos_base: np.ndarray = self.sim.data.qpos[:base_dofs]
-        qvel_base: np.ndarray = self.sim.data.qvel[:base_dofs]
-        ctrl_base: np.ndarray = self.sim.data.ctrl[:base_dofs]
+        qpos_base: NDArray[np.float64] = self.sim.data.qpos[:base_dofs]
+        qvel_base: NDArray[np.float64] = self.sim.data.qvel[:base_dofs]
+        ctrl_base: NDArray[np.float64] = self.sim.data.ctrl[:base_dofs]
         # Buffers for arm
-        qpos_arm: np.ndarray = self.sim.data.qpos[base_dofs : (base_dofs + arm_dofs)]
-        qvel_arm: np.ndarray = self.sim.data.qvel[base_dofs : (base_dofs + arm_dofs)]
-        ctrl_arm: np.ndarray = self.sim.data.ctrl[base_dofs : (base_dofs + arm_dofs)]
+        qpos_arm: NDArray[np.float64] = self.sim.data.qpos[
+            base_dofs : (base_dofs + arm_dofs)
+        ]
+        qvel_arm: NDArray[np.float64] = self.sim.data.qvel[
+            base_dofs : (base_dofs + arm_dofs)
+        ]
+        ctrl_arm: NDArray[np.float64] = self.sim.data.ctrl[
+            base_dofs : (base_dofs + arm_dofs)
+        ]
         # Buffers for gripper
-        qpos_gripper: np.ndarray = self.sim.data.qpos[
+        qpos_gripper: NDArray[np.float64] = self.sim.data.qpos[
             (base_dofs + arm_dofs) : (base_dofs + arm_dofs + 1)
         ]
-        ctrl_gripper: np.ndarray = self.sim.data.ctrl[
+        ctrl_gripper: NDArray[np.float64] = self.sim.data.ctrl[
             (base_dofs + arm_dofs) : (base_dofs + arm_dofs + 1)
         ]
 

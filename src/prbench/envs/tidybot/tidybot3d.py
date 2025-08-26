@@ -60,8 +60,12 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.metadata.update(
             {
                 "description": self._create_env_markdown_description(),
-                "observation_space_description": self._create_obs_markdown_description(),
-                "action_space_description": self._create_action_markdown_description(),
+                "observation_space_description": (
+                    self._create_obs_markdown_description()
+                ),
+                "action_space_description": (
+                    self._create_action_markdown_description()
+                ),
                 "reward_description": self._create_reward_markdown_description(),
                 "references": self._create_references_markdown_description(),
                 "render_fps": 20,
@@ -69,7 +73,10 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         )
 
     def _create_robot_tidybot_env(
-        self, seed: int | None = None, camera_names=None, show_viewer: bool = False
+        self,
+        seed: int | None = None,
+        camera_names: list[str] | None = None,
+        show_viewer: bool = False,
     ) -> TidyBotRobotEnv:
         """Create the underlying TidyBot Robot MuJoCo environment."""
 
@@ -198,7 +205,9 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         return xml_string
 
-    def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict[str, Any]]:
+    def reset(
+        self, *args: Any, **kwargs: Any
+    ) -> tuple[NDArray[np.float32], dict[str, Any]]:
         """Reset the environment."""
 
         if "seed" in kwargs:
@@ -217,7 +226,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def step(
         self, action: NDArray[np.float32]
-    ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
+    ) -> tuple[NDArray[np.float32], float, bool, bool, dict[str, Any]]:
         """Execute action and return next observation."""
         action_dict = self._action_to_dict(action)
         self._tidybot_robot_env.step(action_dict)
@@ -241,7 +250,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Check if episode should terminate."""
         return self._reward_calculator.is_terminated(obs)
 
-    def render(self):
+    def render(self) -> Any:
         """Render the environment."""
         if self.render_mode == "rgb_array":
             obs = self._tidybot_robot_env.get_obs()
@@ -269,10 +278,13 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Create environment description (policy-agnostic)."""
         scene_description = ""
         if self.scene_type == "ground":
-            scene_description = """ In the 'ground' scene, objects are placed randomly on a flat ground plane."""  # pylint: disable=line-too-long
+            scene_description = (
+                " In the 'ground' scene, objects are placed randomly on a flat "
+                "ground plane."
+            )
 
         return f"""A 3D mobile manipulation environment using the TidyBot platform.
-        
+
 The robot has a holonomic mobile base with powered casters and a Kinova Gen3 arm.
 Scene type: {self.scene_type} with {self.num_objects} objects.{scene_description}
 
@@ -304,12 +316,18 @@ The robot can control:
     def _create_reward_markdown_description(self) -> str:
         """Create reward description."""
         if self.scene_type == "ground":
-            return """The primary reward is for successfully placing objects at their target locations. # pylint: disable=line-too-long
-- A reward of +1.0 is given for each object placed within a 5cm tolerance of its target.
-- A smaller positive reward is given for objects within a 10cm tolerance to guide the robot.
-- A small negative reward (-0.01) is applied at each timestep to encourage efficiency.
-The episode terminates when all objects are placed at their respective targets.
-"""
+            return (
+                "The primary reward is for successfully placing objects at their "
+                "target locations.\n"
+                "- A reward of +1.0 is given for each object placed within a 5cm "
+                "tolerance of its target.\n"
+                "- A smaller positive reward is given for objects within a 10cm "
+                "tolerance to guide the robot.\n"
+                "- A small negative reward (-0.01) is applied at each timestep to "
+                "encourage efficiency.\n"
+                "The episode terminates when all objects are placed at their "
+                "respective targets.\n"
+            )
         return """Reward function depends on the specific task:
 - Object stacking: Reward for successfully stacking objects
 - Drawer/cabinet tasks: Reward for opening/closing and placing objects
@@ -322,7 +340,7 @@ Currently returns a small negative reward (-0.01) per timestep to encourage expl
         """Create references description."""
         return """TidyBot++: An Open-Source Holonomic Mobile Manipulator
 for Robot Learning
-- Jimmy Wu, William Chong, Robert Holmberg, Aaditya Prasad, Yihuai Gao, 
+- Jimmy Wu, William Chong, Robert Holmberg, Aaditya Prasad, Yihuai Gao,
   Oussama Khatib, Shuran Song, Szymon Rusinkiewicz, Jeannette Bohg
 - Conference on Robot Learning (CoRL), 2024
 

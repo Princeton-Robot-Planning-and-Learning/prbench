@@ -12,13 +12,13 @@ import gc
 import os
 import platform
 import xml.etree.ElementTree as ET
-from collections import OrderedDict
 from threading import Lock
 from typing import Any
 
 import mujoco
 import mujoco.viewer
 import numpy as np
+from numpy.typing import NDArray
 
 from prbench.envs.tidybot import utils
 
@@ -31,7 +31,7 @@ _SYSTEM = platform.system()
 if _SYSTEM == "Windows":
     ctypes.WinDLL(  # type: ignore[attr-defined]
         os.path.join(os.path.dirname(__file__), "mujoco.dll")
-    )  # type: ignore[attr-defined]
+    )
 CUDA_VISIBLE_DEVICES = os.environ.get("CUDA_VISIBLE_DEVICES", "")
 if CUDA_VISIBLE_DEVICES != "":
     MUJOCO_EGL_DEVICE_ID = os.environ.get("MUJOCO_EGL_DEVICE_ID", None)
@@ -101,7 +101,9 @@ class MujocoEnv:
         self.np_random = utils.get_rng(seed)  # type: ignore[no-untyped-call]
         return self.np_random
 
-    def reset(self, xml_string: str) -> tuple[dict[str, np.ndarray], None, None, None]:
+    def reset(
+        self, xml_string: str
+    ) -> tuple[dict[str, NDArray[Any]], None, None, None]:
         """Reset the environment using xml string."""
 
         # Destroy the current simulation if it exists.
@@ -115,7 +117,7 @@ class MujocoEnv:
         self.sim.forward()
         return self.get_obs(), None, None, None
 
-    def _pre_action(self, action: np.ndarray | dict[str, Any]) -> None:
+    def _pre_action(self, action: NDArray[Any] | dict[str, Any]) -> None:
         """Do any preprocessing before taking an action.
 
         Args:
@@ -129,8 +131,8 @@ class MujocoEnv:
             self.sim.data.ctrl[:] = action
 
     def _post_action(
-        self, action: np.ndarray | dict[str, Any]
-    ) -> tuple[float, bool, dict]:
+        self, action: NDArray[Any] | dict[str, Any]
+    ) -> tuple[float, bool, dict[str, Any]]:
         """Do any housekeeping after taking an action.
 
         Args:
@@ -147,7 +149,7 @@ class MujocoEnv:
         return reward, done, info
 
     @abc.abstractmethod
-    def reward(self, **kwargs) -> float:
+    def reward(self, **kwargs: Any) -> float:
         """Compute the reward for the current state and action.
 
         Returns:
@@ -156,8 +158,8 @@ class MujocoEnv:
         raise NotImplementedError
 
     def step(
-        self, action: np.ndarray | dict[str, Any]
-    ) -> tuple[dict, float, bool, dict]:
+        self, action: NDArray[Any] | dict[str, Any]
+    ) -> tuple[dict[str, Any], float, bool, dict[str, Any]]:
         """Step the environment.
 
         Args:
@@ -177,7 +179,8 @@ class MujocoEnv:
         assert self.timestep is not None, "Timestep must be initialized."
         self.timestep += 1
 
-        # Step the simulation with the same action until the control frequency is reached
+        # Step the simulation with the same action until the control frequency
+        # is reached
         control_timestep = 1.0 / self.control_frequency
         for _ in range(int(control_timestep / SIMULATION_TIMESTEP)):
             self._pre_action(action)
@@ -192,29 +195,29 @@ class MujocoEnv:
 
         return self.get_obs(), reward, self.done, info
 
-    def get_obs(self) -> dict[str, np.ndarray]:
+    def get_obs(self) -> dict[str, NDArray[Any]]:
         """Get the current observation."""
         assert self.sim is not None, "Simulation must be initialized."
 
         # Add a copy of qpos and qvel to observation
-        obs_dict: dict[str, np.ndarray] = {
+        obs_dict: dict[str, NDArray[Any]] = {
             "qpos": np.copy(self.sim.data.qpos),
             "qvel": np.copy(self.sim.data.qvel),
         }
 
         # Render images and update obs_dict
-        images: dict[str, np.ndarray] | None = self._get_camera_images()
+        images: dict[str, NDArray[Any]] | None = self._get_camera_images()
         if images is not None:
             obs_dict.update(images)
 
         return obs_dict
 
-    def _get_camera_images(self) -> dict[str, np.ndarray] | None:
+    def _get_camera_images(self) -> dict[str, NDArray[np.uint8]] | None:
         """Get images from cameras in simulation."""
         if not self.camera_names or self.sim is None:
             return None
 
-        images: dict[str, np.ndarray] = dict()
+        images: dict[str, NDArray[np.uint8]] = {}
         for camera_name in self.camera_names:
             rendered_image = self.sim.render(
                 width=self.camera_width,
@@ -248,13 +251,13 @@ class MujocoEnv:
         Args:
             xml_string: A string containing the MuJoCo XML model.
         """
-        self.sim: MjSim = MjSim(  # type: ignore[misc,no-redef]
+        self.sim: MjSim = MjSim(  # type: ignore[no-redef]
             xml_string,
             self.camera_width,
             self.camera_height,
-        )  # type: ignore[misc]
-        self.timestep: int = 0  # type: ignore[misc,no-redef]
-        self.done: bool = False  # type: ignore[misc,no-redef]
+        )
+        self.timestep: int = 0  # type: ignore[no-redef]
+        self.done: bool = False  # type: ignore[no-redef]
 
         if self.show_viewer:
             mujoco.viewer.launch(
@@ -394,8 +397,11 @@ class MjModel:
         num_obj: int,
         obj_type: int,
     ) -> tuple[tuple[str | None, ...], dict[str | None, int], dict[int, str | None]]:
-        """
-        See https://github.com/openai/mujoco-py/blob/ab86d331c9a77ae412079c6e58b8771fe63747fc/mujoco_py/generated/wrappers.pxi#L1127  # pylint: disable=line-too-long
+        """Extract MuJoCo object names and create mappings.
+
+        See: https://github.com/openai/mujoco-py/blob/
+             ab86d331c9a77ae412079c6e58b8771fe63747fc/
+             mujoco_py/generated/wrappers.pxi#L1127
         """
 
         # Objects don't need to be named in the XML, so name might be None
@@ -487,7 +493,7 @@ class MjSim:
         depth: bool = False,
         mode: str = "offscreen",
         segmentation: bool = False,
-    ) -> np.ndarray | tuple[np.ndarray, np.ndarray | None]:
+    ) -> NDArray[np.uint8] | tuple[NDArray[np.uint8], NDArray[np.float32] | None]:
         """Renders view from a camera and returns image as an `numpy.ndarray`.
 
         Args:
@@ -690,16 +696,16 @@ class MjRenderContext:
         height: int,
         depth: bool = False,
         segmentation: bool = False,
-    ) -> np.ndarray | tuple[np.ndarray, np.ndarray | None]:
+    ) -> NDArray[np.uint8] | tuple[NDArray[np.uint8], NDArray[np.float32] | None]:
         """Read the pixels from the current rendering context.
 
         Returns:
-            np.ndarray if depth is False,
-            tuple of (np.ndarray, np.ndarray or None) if depth is True.
+            NDArray[np.uint8] if depth is False,
+            tuple of (NDArray[np.uint8], NDArray[np.float32] or None) if depth is True.
         """
         viewport = mujoco.MjrRect(0, 0, width, height)
-        rgb_img: np.ndarray = np.empty((height, width, 3), dtype=np.uint8)
-        depth_img: np.ndarray | None = (
+        rgb_img: NDArray[np.uint8] = np.empty((height, width, 3), dtype=np.uint8)
+        depth_img: NDArray[np.float32] | None = (
             np.empty((height, width), dtype=np.float32) if depth else None
         )
 
@@ -707,16 +713,16 @@ class MjRenderContext:
             rgb=rgb_img, depth=depth_img, viewport=viewport, con=self.con
         )
 
-        ret_img: np.ndarray = rgb_img
+        ret_img: NDArray[Any] = rgb_img
         if segmentation:
-            uint32_rgb_img: np.ndarray = rgb_img.astype(np.int32)
-            seg_img: np.ndarray = (
+            uint32_rgb_img: NDArray[np.int32] = rgb_img.astype(np.int32)
+            seg_img: NDArray[np.int32] = (
                 uint32_rgb_img[:, :, 0]
                 + uint32_rgb_img[:, :, 1] * (2**8)
                 + uint32_rgb_img[:, :, 2] * (2**16)
             )
             seg_img[seg_img >= (self.scn.ngeom + 1)] = 0
-            seg_ids: np.ndarray = np.full(
+            seg_ids: NDArray[np.int32] = np.full(
                 (self.scn.ngeom + 1, 2), fill_value=-1, dtype=np.int32
             )
 
