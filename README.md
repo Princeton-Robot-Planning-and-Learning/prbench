@@ -123,6 +123,9 @@ PRBench does not provide any models for TAMP. Users are welcome to engineer thei
 2. `pip install -e ".[develop]"`
 3. `pre-commit install`
 
+> **What does `pre-commit install` do?**  
+> This command installs a Git pre-commit hook that automatically runs scripts before each commit. In this repository, it runs `scripts/generate_env_docs.py` to regenerate environment documentation whenever relevant files are changed, ensuring the docs stay up-to-date automatically.
+
 ### :microscope: Check Installation
 Run `./run_ci_checks.sh`. It should complete with all green successes.
 
