@@ -140,23 +140,23 @@ class TidyBotRobotEnv(MujocoEnv):
         )
         arm_ctrl_start, arm_ctrl_end = min(arm_ctrl_indices), max(arm_ctrl_indices) + 1
 
-        self.qpos_base: NDArray[np.float64] = self.sim.data.qpos[
+        self.qpos_base = self.sim.data.qpos[
             base_qpos_start:base_qpos_end
         ]
-        self.qvel_base: NDArray[np.float64] = self.sim.data.qvel[
+        self.qvel_base = self.sim.data.qvel[
             base_qvel_start:base_qvel_end
         ]
-        self.ctrl_base: NDArray[np.float64] = self.sim.data.ctrl[
+        self.ctrl_base = self.sim.data.ctrl[
             base_ctrl_start:base_ctrl_end
         ]
 
-        self.qpos_arm: NDArray[np.float64] = self.sim.data.qpos[
+        self.qpos_arm = self.sim.data.qpos[
             arm_qpos_start:arm_qpos_end
         ]
-        self.qvel_arm: NDArray[np.float64] = self.sim.data.qvel[
+        self.qvel_arm = self.sim.data.qvel[
             arm_qvel_start:arm_qvel_end
         ]
-        self.ctrl_arm: NDArray[np.float64] = self.sim.data.ctrl[
+        self.ctrl_arm = self.sim.data.ctrl[
             arm_ctrl_start:arm_ctrl_end
         ]
 
@@ -166,8 +166,8 @@ class TidyBotRobotEnv(MujocoEnv):
                 "fingers_actuator"
             ]
         )
-        self.qpos_gripper: NDArray[np.float64] | None = None
-        self.ctrl_gripper: NDArray[np.float64] = self.sim.data.ctrl[
+        self.qpos_gripper = None
+        self.ctrl_gripper = self.sim.data.ctrl[
             gripper_ctrl_id : gripper_ctrl_id + 1
         ]
 
@@ -205,6 +205,8 @@ class TidyBotRobotEnv(MujocoEnv):
         assert (
             self.sim is not None
         ), "Simulation must be initialized before randomizing base pose."
+        assert self.qpos_base is not None, "Base qpos must be initialized first"
+        assert self.ctrl_base is not None, "Base ctrl must be initialized first"
 
         # Define limits for x, y, and theta
         x_limit = (-1.0, 1.0)
@@ -429,6 +431,15 @@ class TidyBotRobotEnv(MujocoEnv):
         assert (
             self.sim is not None
         ), "Simulation must be initialized before setting up controllers."
+
+        # Ensure robot references are properly initialized
+        assert self.qpos_base is not None, "Robot references must be set up first"
+        assert self.qvel_base is not None, "Robot references must be set up first"
+        assert self.ctrl_base is not None, "Robot references must be set up first"
+        assert self.qpos_arm is not None, "Robot references must be set up first"
+        assert self.qvel_arm is not None, "Robot references must be set up first"
+        assert self.ctrl_arm is not None, "Robot references must be set up first"
+        assert self.ctrl_gripper is not None, "Robot references must be set up first"
 
         # Initialize controllers
         self.base_controller = BaseController(

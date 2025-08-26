@@ -286,7 +286,7 @@ class MjModel:
         self._model = mujoco.MjModel.from_xml_string(xml_string)
         self._make_mappings()
 
-    def get_joint_qpos_addr(self, name):
+    def get_joint_qpos_addr(self, name: str) -> int:
         """
         See
         https://github.com/openai/mujoco-py/blob/ab86d331c9a77ae412079c6e58b8771fe63747fc/mujoco_py/generated/wrappers.pxi#L1178
