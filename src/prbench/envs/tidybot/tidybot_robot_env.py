@@ -48,6 +48,127 @@ class TidyBotRobotEnv(MujocoEnv):
         self.base_controller: Optional[BaseController] = None
         self.arm_controller: Optional[ArmController] = None
 
+        # Robot state/actuator references (initialized in _setup_robot_references)
+        self.qpos_base: Optional[NDArray[np.float64]] = None
+        self.qvel_base: Optional[NDArray[np.float64]] = None
+        self.ctrl_base: Optional[NDArray[np.float64]] = None
+        self.qpos_arm: Optional[NDArray[np.float64]] = None
+        self.qvel_arm: Optional[NDArray[np.float64]] = None
+        self.ctrl_arm: Optional[NDArray[np.float64]] = None
+        self.qpos_gripper: Optional[NDArray[np.float64]] = None
+        self.ctrl_gripper: Optional[NDArray[np.float64]] = None
+
+    def _setup_robot_references(self) -> None:
+        """Setup references to robot state/actuator buffers in the simulation data."""
+        assert self.sim is not None, "Simulation must be initialized."
+
+        # Joint names for the base and arm
+        base_joint_names: list[str] = ["joint_x", "joint_y", "joint_th"]
+        arm_joint_names: list[str] = [
+            "joint_1",
+            "joint_2",
+            "joint_3",
+            "joint_4",
+            "joint_5",
+            "joint_6",
+            "joint_7",
+        ]
+
+        # Joint positions: joint_id corresponds to qpos index
+        base_qpos_indices = [
+            self.sim.model.get_joint_qpos_addr(name) for name in base_joint_names
+        ]
+        arm_qpos_indices = [
+            self.sim.model.get_joint_qpos_addr(name) for name in arm_joint_names
+        ]
+
+        # Joint velocities: joint_id corresponds to qvel index
+        base_qvel_indices = [
+            self.sim.model.get_joint_qvel_addr(name) for name in base_joint_names
+        ]
+        arm_qvel_indices = [
+            self.sim.model.get_joint_qvel_addr(name) for name in arm_joint_names
+        ]
+
+        # Actuators: actuator_id corresponds to ctrl index
+        base_ctrl_indices = [
+            self.sim.model._actuator_name2id[name]  # pylint: disable=protected-access
+            for name in base_joint_names
+        ]
+        arm_ctrl_indices = [
+            self.sim.model._actuator_name2id[name]  # pylint: disable=protected-access
+            for name in arm_joint_names
+        ]
+
+        # Verify indices are contiguous for slicing
+        assert base_qpos_indices == list(
+            range(min(base_qpos_indices), max(base_qpos_indices) + 1)
+        ), "Base qpos indices not contiguous"
+        assert arm_qpos_indices == list(
+            range(min(arm_qpos_indices), max(arm_qpos_indices) + 1)
+        ), "Arm qpos indices not contiguous"
+        assert base_qvel_indices == list(
+            range(min(base_qvel_indices), max(base_qvel_indices) + 1)
+        ), "Base qvel indices not contiguous"
+        assert arm_qvel_indices == list(
+            range(min(arm_qvel_indices), max(arm_qvel_indices) + 1)
+        ), "Arm qvel indices not contiguous"
+        assert base_ctrl_indices == list(
+            range(min(base_ctrl_indices), max(base_ctrl_indices) + 1)
+        ), "Base ctrl indices not contiguous"
+        assert arm_ctrl_indices == list(
+            range(min(arm_ctrl_indices), max(arm_ctrl_indices) + 1)
+        ), "Arm ctrl indices not contiguous"
+
+        # Create views using correct slice ranges
+        base_qpos_start, base_qpos_end = (
+            min(base_qpos_indices),
+            max(base_qpos_indices) + 1,
+        )
+        base_qvel_start, base_qvel_end = (
+            min(base_qvel_indices),
+            max(base_qvel_indices) + 1,
+        )
+        arm_qpos_start, arm_qpos_end = min(arm_qpos_indices), max(arm_qpos_indices) + 1
+        arm_qvel_start, arm_qvel_end = (
+            min(arm_qvel_indices),
+            max(arm_qvel_indices) + 1,
+        )
+        base_ctrl_start, base_ctrl_end = (
+            min(base_ctrl_indices),
+            max(base_ctrl_indices) + 1,
+        )
+        arm_ctrl_start, arm_ctrl_end = min(arm_ctrl_indices), max(arm_ctrl_indices) + 1
+
+        self.qpos_base: NDArray[np.float64] = self.sim.data.qpos[
+            base_qpos_start:base_qpos_end
+        ]
+        self.qvel_base: NDArray[np.float64] = self.sim.data.qvel[
+            base_qvel_start:base_qvel_end
+        ]
+        self.ctrl_base: NDArray[np.float64] = self.sim.data.ctrl[
+            base_ctrl_start:base_ctrl_end
+        ]
+
+        self.qpos_arm: NDArray[np.float64] = self.sim.data.qpos[
+            arm_qpos_start:arm_qpos_end
+        ]
+        self.qvel_arm: NDArray[np.float64] = self.sim.data.qvel[
+            arm_qvel_start:arm_qvel_end
+        ]
+        self.ctrl_arm: NDArray[np.float64] = self.sim.data.ctrl[
+            arm_ctrl_start:arm_ctrl_end
+        ]
+
+        # Buffers for gripper
+        gripper_ctrl_id = self.sim.model._actuator_name2id[
+            "fingers_actuator"
+        ]  # pylint: disable=protected-access
+        self.qpos_gripper: NDArray[np.float64] | None = None
+        self.ctrl_gripper: NDArray[np.float64] = self.sim.data.ctrl[
+            gripper_ctrl_id : gripper_ctrl_id + 1
+        ]
+
     def reset(
         self, xml_string: str
     ) -> tuple[dict[str, NDArray[Any]], None, None, None]:
@@ -65,6 +186,9 @@ class TidyBotRobotEnv(MujocoEnv):
         # Insert robot in the xml_string
         xml_string = self._insert_robot_into_xml(xml_string)
         super().reset(xml_string)
+
+        # Setup references to robot state/actuator buffers
+        self._setup_robot_references()
 
         # Randomize the base pose of the robot in the sim
         self._randomize_base_pose()
@@ -89,9 +213,8 @@ class TidyBotRobotEnv(MujocoEnv):
         y = self.np_random.uniform(*y_limit)
         theta = self.np_random.uniform(*theta_limit)
         # Set the base position and orientation in the simulation
-        self.sim.data.qpos[0] = x  # x position
-        self.sim.data.qpos[1] = y  # y position
-        self.sim.data.qpos[2] = theta  # orientation (theta)
+        self.qpos_base[:] = [x, y, theta]
+        self.ctrl_base[:] = [x, y, theta]
         self.sim.forward()  # Update the simulation state
 
     def _insert_robot_into_xml(self, xml_string: str) -> str:
@@ -298,50 +421,24 @@ class TidyBotRobotEnv(MujocoEnv):
             self.sim is not None
         ), "Simulation must be initialized before setting up controllers."
 
-        # Cache references to array slices
-        base_dofs: int = self.sim.model._model.body(  # pylint: disable=protected-access
-            "base_link"
-        ).jntnum.item()
-        # VS: maybe "base_link" should include a prefix, such as "robot_1_base_link"
-        arm_dofs: int = 7
-        # Buffers for base
-        qpos_base: NDArray[np.float64] = self.sim.data.qpos[:base_dofs]
-        qvel_base: NDArray[np.float64] = self.sim.data.qvel[:base_dofs]
-        ctrl_base: NDArray[np.float64] = self.sim.data.ctrl[:base_dofs]
-        # Buffers for arm
-        qpos_arm: NDArray[np.float64] = self.sim.data.qpos[
-            base_dofs : (base_dofs + arm_dofs)
-        ]
-        qvel_arm: NDArray[np.float64] = self.sim.data.qvel[
-            base_dofs : (base_dofs + arm_dofs)
-        ]
-        ctrl_arm: NDArray[np.float64] = self.sim.data.ctrl[
-            base_dofs : (base_dofs + arm_dofs)
-        ]
-        # Buffers for gripper
-        qpos_gripper: NDArray[np.float64] = self.sim.data.qpos[
-            (base_dofs + arm_dofs) : (base_dofs + arm_dofs + 1)
-        ]
-        ctrl_gripper: NDArray[np.float64] = self.sim.data.ctrl[
-            (base_dofs + arm_dofs) : (base_dofs + arm_dofs + 1)
-        ]
-
         # Initialize controllers
         self.base_controller = BaseController(
-            qpos_base,
-            qvel_base,
-            ctrl_base,
+            self.qpos_base,
+            self.qvel_base,
+            self.ctrl_base,
             self.sim.model._model.opt.timestep,  # pylint: disable=protected-access
         )
         self.arm_controller = ArmController(
-            qpos_arm,
-            qvel_arm,
-            ctrl_arm,
-            qpos_gripper,
-            ctrl_gripper,
+            self.qpos_arm,
+            self.qvel_arm,
+            self.ctrl_arm,
+            self.qpos_gripper,
+            self.ctrl_gripper,
             self.sim.model._model.opt.timestep,  # pylint: disable=protected-access
         )
 
         # Reset controllers
         self.base_controller.reset()
         self.arm_controller.reset()  # also resets arm to retract position
+
+        self.sim.forward()

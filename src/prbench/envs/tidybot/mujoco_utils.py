@@ -286,6 +286,54 @@ class MjModel:
         self._model = mujoco.MjModel.from_xml_string(xml_string)
         self._make_mappings()
 
+    def get_joint_qpos_addr(self, name):
+        """
+        See
+        https://github.com/openai/mujoco-py/blob/ab86d331c9a77ae412079c6e58b8771fe63747fc/mujoco_py/generated/wrappers.pxi#L1178
+
+        Returns the qpos address for given joint.
+
+        Args:
+            name (str): name of the joint
+
+        Returns:
+            address (int): returns int address in qpos array
+        """
+        if name not in self._joint_name2id:
+            # Filter out None names for display
+            available_names = [n for n in self.joint_names if n is not None]
+            raise ValueError(
+                f'No "joint" with name {name} exists. '
+                f'Available "joint" names = {available_names}.'
+            )
+        joint_id = self._joint_name2id[name]
+        assert joint_id is not None, "Joint ID should not be None here."
+        return self._model.jnt_qposadr[joint_id]
+
+    def get_joint_qvel_addr(self, name: str) -> int:
+        """
+        See
+        https://github.com/openai/mujoco-py/blob/ab86d331c9a77ae412079c6e58b8771fe63747fc/mujoco_py/generated/wrappers.pxi#L1202
+
+        Returns the qvel address for given joint.
+
+        Args:
+            name (str): name of the joint
+
+        Returns:
+            address (int): returns int address in qvel array
+        """
+        if name not in self._joint_name2id:
+            # Filter out None names for display
+            available_names = [n for n in self.joint_names if n is not None]
+            raise ValueError(
+                f'No "joint" with name {name} exists. '
+                f'Available "joint" names = {available_names}.'
+            )
+        joint_id = self._joint_name2id[name]
+        assert joint_id is not None, "Joint ID should not be None here."
+        return self._model.jnt_dofadr[joint_id]
+
     def _make_mappings(self) -> None:
         """Make some useful internal mappings that mujoco-py supported."""
         self.body_names: tuple[str | None, ...]
@@ -399,9 +447,8 @@ class MjModel:
     ) -> tuple[tuple[str | None, ...], dict[str | None, int], dict[int, str | None]]:
         """Extract MuJoCo object names and create mappings.
 
-        See: https://github.com/openai/mujoco-py/blob/
-             ab86d331c9a77ae412079c6e58b8771fe63747fc/
-             mujoco_py/generated/wrappers.pxi#L1127
+        See:
+        https://github.com/openai/mujoco-py/blob/ab86d331c9a77ae412079c6e58b8771fe63747fc/mujoco_py/generated/wrappers.pxi#L1127
         """
 
         # Objects don't need to be named in the XML, so name might be None
