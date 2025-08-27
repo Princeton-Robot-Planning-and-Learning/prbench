@@ -84,9 +84,6 @@ jobs:
       - name: Run tests with coverage (fails on test failures)
         run: |
           uv run coverage run -m pytest tests/
-          uv run coverage report -m
-          # Optional (some coverage comment actions can use this):
-          uv run coverage xml -o coverage.xml
       - name: Coverage comment (Ubuntu/3.11 only)
         if: runner.os == 'Linux'
         uses: py-cov-action/python-coverage-comment-action@v3
