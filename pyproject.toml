@@ -30,7 +30,7 @@ dependencies = [
    "tqdm>=4.66.2",
    "threadpoolctl>=3.5.0",
    # PyBullet dependencies
-   "pybullet==3.2.6",
+   "pybullet==3.2.5",
    "pybullet-helpers@git+https://github.com/tomsilver/pybullet-helpers.git",
 ]
 
