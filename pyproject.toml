@@ -44,6 +44,7 @@ develop = [
     "pytest-pylint>=0.18.0",
     "pytest>=7.2.2",
     "pre-commit",
+    "coverage",
 ]
 
 [tool.setuptools.packages.find]
@@ -91,3 +92,7 @@ module = [
     "pybullet.*",
 ]
 ignore_missing_imports = true
+
+[tool.coverage.run]
+relative_files = true
+source = ["prbench"]
