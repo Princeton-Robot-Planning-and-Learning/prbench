@@ -1,10 +1,6 @@
 name: CI Checks
 
-on:
-  pull_request:
-  push:
-    branches:
-      - "main"
+on: [push]
 
 jobs:
   autoformat:
@@ -89,8 +85,10 @@ jobs:
       - name: Run tests with coverage (fails on test failures)
         run: |
           uv run coverage run -m pytest tests/
+          uv run coverage xml
       - name: Coverage comment (Ubuntu/3.11 only)
         if: runner.os == 'Linux'
-        uses: py-cov-action/python-coverage-comment-action@v3
+        uses: orgoro/coverage@v3.2
         with:
-          GITHUB_TOKEN: ${{ github.token }}
+          coverageFile: coverage.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
