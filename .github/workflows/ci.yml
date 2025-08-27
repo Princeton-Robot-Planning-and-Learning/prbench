@@ -1,6 +1,10 @@
 name: CI Checks
 
-on: [push]
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
 
 jobs:
   autoformat:
