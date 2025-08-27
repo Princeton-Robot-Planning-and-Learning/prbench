@@ -64,7 +64,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-14]
+        # NOTE: macos is disabled until we can figure out headless rendering in mujoco
+        os: [ubuntu-latest]
         python-version: ["3.11"]
     runs-on: ${{ matrix.os }}
     permissions:
