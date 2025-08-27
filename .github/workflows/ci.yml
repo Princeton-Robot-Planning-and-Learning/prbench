@@ -58,6 +58,7 @@ jobs:
         uv run mypy .
   unit-tests:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-14]
         python-version: ["3.11"]
