@@ -1,12 +1,17 @@
 """Configure pytest."""
 
-from _pytest.config import Config, Parser
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # typing-only; safe across pytest versions
+    from _pytest.config import Config
+    from _pytest.config.argparsing import Parser
 
 # Global variable that gets set with the command line --make-videos flag.
 MAKE_VIDEOS = False
 
 
-def pytest_addoption(parser: Parser) -> None:
+def pytest_addoption(parser: "Parser") -> None:
     """Register custom command-line options for pytest."""
     parser.addoption(
         "--make-videos",
@@ -16,7 +21,7 @@ def pytest_addoption(parser: Parser) -> None:
     )
 
 
-def pytest_configure(config: Config) -> None:
+def pytest_configure(config: "Config") -> None:
     """Set global configuration values after command-line options are parsed."""
     global MAKE_VIDEOS  # pylint:disable=global-statement
     MAKE_VIDEOS = config.getoption("--make-videos")

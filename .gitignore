@@ -2,6 +2,7 @@
 .python-version
 MUJOCO_LOG.TXT
 **/auto_*.xml
+uv.lock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
