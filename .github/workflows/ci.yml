@@ -80,7 +80,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew install glfw
+          brew install glfw pkg-config
       - uses: actions/checkout@v4
       - name: Install uv
         uses: astral-sh/setup-uv@v3
