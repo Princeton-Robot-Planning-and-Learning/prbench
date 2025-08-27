@@ -7,18 +7,35 @@ import gymnasium
 from gymnasium.envs.registration import register
 
 
+# Detect headless mode (no DISPLAY) and set OSMesa if needed
+if sys.platform == "darwin":
+    os.environ["MUJOCO_GL"] = "glfw"
+    os.environ["PYOPENGL_PLATFORM"] = "glfw"
+    # import glfw
+    # if not glfw.init():
+    #     raise RuntimeError("Failed to init GLFW")
+
+    # # macOS requires a forward-compatible *core* profile
+    # glfw.window_hint(glfw.VISIBLE, glfw.FALSE)                 # hidden
+    # glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
+    # glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)            # or 4,1 is OK on macOS
+    # glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+    # glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, glfw.TRUE)    # required on macOS
+    # # Optional: avoid HiDPI surprises
+    # glfw.window_hint(glfw.COCOA_RETINA_FRAMEBUFFER, glfw.FALSE)
+
+    # win = glfw.create_window(640, 480, "offscreen", None, None)
+    # if not win:
+    #     raise RuntimeError("Failed to create GLFW window")
+    # glfw.make_context_current(win)    # <<< MUST be current before MuJoCo GL calls
+elif not os.environ.get("DISPLAY"):
+    os.environ["MUJOCO_GL"] = "osmesa"
+    os.environ["PYOPENGL_PLATFORM"] = "osmesa"
+
+
 def register_all_environments() -> None:
     """Add all benchmark environments to the gymnasium registry."""
     # NOTE: ids must start with "prbench/" to be properly registered.
-
-    # Detect headless mode (no DISPLAY) and set OSMesa if needed
-    if not os.environ.get("DISPLAY"):
-        if sys.platform == "darwin":
-            os.environ["MUJOCO_GL"] = "glfw"
-            os.environ["PYOPENGL_PLATFORM"] = "glfw"
-        else:
-            os.environ["MUJOCO_GL"] = "osmesa"
-            os.environ["PYOPENGL_PLATFORM"] = "osmesa"
 
     # Obstructions2D environment with different numbers of obstructions.
     num_obstructions = [0, 1, 2, 3, 4]
