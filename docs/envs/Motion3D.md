@@ -29,9 +29,9 @@ The observation is returned as a Motion3DState dataclass with these two fields.
 
 ### Action Space
 Actions control the change in joint positions:
-- **delta_joints**: Change in joint positions for all 13 joints (list of floats)
+- **delta_arm_joints**: Change in joint positions for all 13 joints (list of floats)
 
-The action is a Motion3DAction dataclass with delta_joints field. Each delta is clipped to the range [-0.050, 0.050].
+The action is a Motion3DAction dataclass with delta_arm_joints field. Each delta is clipped to the range [-0.050, 0.050].
 
 The resulting joint positions are clipped to the robot's joint limits before being applied.
 
