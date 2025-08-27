@@ -49,7 +49,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # Initialize TidyBot environment
         camera_names = None
         if render_images:
-            camera_names = [self._render_camera_name]
+            camera_names = ["overview", "wrist", "base"]
         self._tidybot_robot_env = self._create_robot_tidybot_env(
             seed=seed, camera_names=camera_names, show_viewer=show_viewer
         )
@@ -257,10 +257,11 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         # Visualization loop for rendered image
         if self.show_images:
-            self._visualize_image_in_window(
-                obs[f"{self._render_camera_name}_image"],
-                f"TidyBot {self._render_camera_name} camera",
-            )
+            for camera_name in self._tidybot_robot_env.camera_names:
+                self._visualize_image_in_window(
+                    obs[f"{camera_name}_image"],
+                    f"TidyBot {camera_name} camera",
+                )
 
         # Calculate reward and termination
         reward = self._calculate_reward(obs)
