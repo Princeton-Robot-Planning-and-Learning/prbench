@@ -36,7 +36,7 @@ class ArmController:
         qpos: Current joint positions (rad).
         qvel: Current joint velocities (rad/s).
         ctrl: Actuator targets for arm joints (rad).
-        qpos_gripper: Current gripper position/state.
+        qpos_gripper: Current gripper position/state (optional).
         ctrl_gripper: Actuator target for gripper (0..gripper_scale).
         ik_solver: Inverse kinematics solver (configured with ``ee_offset``).
         otg: Ruckig trajectory generator instance.
@@ -56,7 +56,7 @@ class ArmController:
         qpos: NDArray[np.float64],
         qvel: NDArray[np.float64],
         ctrl: NDArray[np.float64],
-        qpos_gripper: NDArray[np.float64],
+        qpos_gripper: Optional[NDArray[np.float64]],
         ctrl_gripper: NDArray[np.float64],
         timestep: float,
         ee_offset: float = 0.12,
