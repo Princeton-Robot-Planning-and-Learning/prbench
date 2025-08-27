@@ -95,4 +95,4 @@ ignore_missing_imports = true
 
 [tool.coverage.run]
 relative_files = true
-source = ["prbench"]
+source = ["src", "tests"]
