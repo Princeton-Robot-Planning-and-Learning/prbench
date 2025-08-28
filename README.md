@@ -2,7 +2,7 @@
 
 ![workflow](https://github.com/Princeton-Robot-Planning-and-Learning/prbench/actions/workflows/ci.yml/badge.svg)
 
-I AM CHANGING WEEEEE
+I AM CHANGING WEEE
 
 A **p**hysical **r**easoning **bench**mark for robotics.
 
