@@ -223,12 +223,14 @@ def test_tidybot3d_arm_only() -> bool:
         print("Stabilizing controllers...")
         # Create stabilization action as numpy array:
         # [base_pose(3), arm_pos(3), arm_quat(4), gripper_pos(1)]
-        stabilize_action = np.concatenate([
-            robot_env.qpos_base.copy(),  # base_pose(3)
-            [0.0, 0.0, 0.5],  # arm_pos(3) - safe position
-            [1.0, 0.0, 0.0, 0.0],  # arm_quat(4) - identity quaternion
-            [0.0],  # gripper_pos(1) - closed
-        ])
+        stabilize_action = np.concatenate(
+            [
+                robot_env.qpos_base.copy(),  # base_pose(3)
+                [0.0, 0.0, 0.5],  # arm_pos(3) - safe position
+                [1.0, 0.0, 0.0, 0.0],  # arm_quat(4) - identity quaternion
+                [0.0],  # gripper_pos(1) - closed
+            ]
+        )
 
         for _ in range(10):
             env.step(stabilize_action)
@@ -292,12 +294,14 @@ def test_tidybot3d_arm_only() -> bool:
 
             # Create action as numpy array:
             # [base_pose(3), arm_pos(3), arm_quat(4), gripper_pos(1)]
-            action = np.concatenate([
-                fixed_base_pos,  # base_pose(3) - keep base fixed
-                movement["arm_pos"],  # arm_pos(3) - target position
-                movement["arm_quat"],  # arm_quat(4) - target orientation
-                [0.0],  # gripper_pos(1) - closed
-            ])
+            action = np.concatenate(
+                [
+                    fixed_base_pos,  # base_pose(3) - keep base fixed
+                    movement["arm_pos"],  # arm_pos(3) - target position
+                    movement["arm_quat"],  # arm_quat(4) - target orientation
+                    [0.0],  # gripper_pos(1) - closed
+                ]
+            )
 
             # Take multiple steps to allow movement to complete
             for step in range(100):

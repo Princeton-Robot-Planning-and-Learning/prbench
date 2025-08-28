@@ -138,12 +138,14 @@ def test_tidybot3d_minimal() -> bool:
 
         # Create action as numpy array:
         # [base_pose(3), arm_pos(3), arm_quat(4), gripper_pos(1)]
-        action = np.concatenate([
-            target_base,  # base_pose(3)
-            [0.0, 0.0, 0.5],  # arm_pos(3) - keep arm in safe position
-            [1.0, 0.0, 0.0, 0.0],  # arm_quat(4) - identity quaternion
-            [0.0],  # gripper_pos(1) - closed
-        ])
+        action = np.concatenate(
+            [
+                target_base,  # base_pose(3)
+                [0.0, 0.0, 0.5],  # arm_pos(3) - keep arm in safe position
+                [1.0, 0.0, 0.0, 0.0],  # arm_quat(4) - identity quaternion
+                [0.0],  # gripper_pos(1) - closed
+            ]
+        )
 
         # Execute movement
         steps_taken = 0
