@@ -41,9 +41,9 @@ Table environment
 import prbench
 prbench.register_all_environments()
 env = prbench.make(
-    "prbench/TidyBot3D-table-o5-v0",
+    "prbench/TidyBot3D-ground-o5-v0",
     render_images=True,
-    show_viewer=True,
+    show_viewer=False,
     show_images=True
     )
 obs, info = env.reset(seed=123)
