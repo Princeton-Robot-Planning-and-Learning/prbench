@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""Test script for joint command tracking in TidyBot3D environment."""
+import numpy as np
+
+import prbench
+
+TARGETS = [
+    np.array([0.0, -0.35, 3.14, -2.55, 0.0, -0.87, 1.57]),
+    np.array([0.5, -0.2, 2.8, -2.0, -0.3, -0.2, 1.9]),
+    np.array([-0.8, 0.3, 2.2, -1.2, 0.4, 0.1, 1.1]),
+]
+
+
+def main() -> None:
+    """Test joint command tracking functionality in TidyBot3D environment."""
+    prbench.register_all_environments()
+    env = prbench.make(
+        "prbench/TidyBot3D-ground-o3-v0",
+        render_images=False,
+        show_images=False,
+        show_viewer=False,
+    )
+
+    print("Joint Command Tracking Test (TidyBot3D)")
+    for idx, target in enumerate(TARGETS, 1):
+        # Reset environment for each target to avoid episode termination
+        _, _ = env.reset(seed=123)  # Ignore unused obs and info
+        robot_env = env.env.env._tidybot_robot_env  # type: ignore # pylint: disable=protected-access
+
+        print(f"\nTarget {idx}: {np.round(target, 3)}")
+        print(f"  Initial: {np.round(robot_env.qpos_arm.copy(), 3)}")
+
+        # Build action dict: keep base fixed, command joint targets
+        action = {
+            "base_pose": robot_env.qpos_base.copy(),
+            "arm_joints": target,
+            "gripper_pos": np.array([0.0]),
+        }
+        # Send command once
+        robot_env.step(action)
+
+        # Then send empty actions to let trajectory complete
+        empty_action = {
+            "base_pose": robot_env.qpos_base.copy(),
+            "gripper_pos": np.array([0.0]),
+        }
+        # Run for more time to allow trajectory completion
+        for _ in range(999):  # 999 more steps for total of 1000
+            robot_env.step(empty_action)
+
+        # Evaluate error
+        current = robot_env.qpos_arm.copy()
+        err = current - target
+        # Wrap error to [-pi, pi]
+        err = (err + np.pi) % (2 * np.pi) - np.pi
+        err_norm = np.linalg.norm(err)
+        print(f"  Current: {np.round(current, 3)}")
+        print(f"  Error:   {np.round(err, 4)} | L2: {err_norm:.4f}")
+        # Success criteria per joint < 0.03 rad
+        if np.all(np.abs(err) < 0.03):
+            print("  ✅ Joint target achieved (< 0.03 rad per joint)")
+        else:
+            print("  ❌ Joint target not reached within tolerance")
+
+    env.close()  # type: ignore
+
+
+if __name__ == "__main__":
+    main()

@@ -167,3 +167,5 @@ cython_debug/
 # Cache for environment documentation generation
 .cache/
 
+# updated xml file
+src/prbench/envs/tidybot/tidybot_robot_env.xml
