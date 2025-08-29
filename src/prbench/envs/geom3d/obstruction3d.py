@@ -9,6 +9,7 @@ from gymnasium.spaces import Space
 from prpl_utils.spaces import FunctionalSpace
 from pybullet_helpers.geometry import Pose, get_pose, set_pose
 from pybullet_helpers.utils import create_pybullet_block
+from pybullet_helpers.inverse_kinematics import check_body_collisions
 import pybullet as p
 
 from prbench.envs.geom3d.base_env import (
@@ -25,46 +26,59 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
     """Spec for Obstruction3DEnv()."""
 
     # Table.
-    table_pose: Pose = Pose((0.5, 0.0, -0.175))
+    table_pose: Pose = Pose((0.3, 0.0, -0.175))
     table_rgba: tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0)
-    table_half_extents: tuple[float, float, float] = (0.25, 0.4, 0.25)
+    table_half_extents: tuple[float, float, float] = (0.2, 0.4, 0.25)
 
     # Target region.
     target_region_half_extents_lb: tuple[float, float, float] = (0.02, 0.02, 0.001)
     target_region_half_extents_ub: tuple[float, float, float] = (0.05, 0.05, 0.001)
     target_region_rgba: tuple[float, float, float, float] = PURPLE + (1.0, )
 
-    def sample_target_region_pose(self, target_region_half_extents: tuple[float, float, float],
+    # Target block.
+    target_block_size_scale: float = 0.8  # x, y -- relative to target region
+    target_block_height: float = 0.025
+    target_block_rgba: tuple[float, float, float, float] = target_region_rgba
+
+    def sample_block_on_table_pose(self, block_half_extents: tuple[float, float, float],
                                   rng: np.random.Generator) -> Pose:
-        """Sample an initial target region pose given sampled half extents."""
+        """Sample an initial block pose given sampled half extents."""
         
         lb = (
             self.table_pose.position[0]
             - self.table_half_extents[0]
-            + target_region_half_extents[0],
+            + block_half_extents[0],
             self.table_pose.position[1]
             - self.table_half_extents[1]
-            + target_region_half_extents[1],
+            + block_half_extents[1],
             self.table_pose.position[2]
             + self.table_half_extents[2]
-            + target_region_half_extents[2],
+            + block_half_extents[2],
         )
         
         ub = (
             self.table_pose.position[0]
             + self.table_half_extents[0]
-            - target_region_half_extents[0],
+            - block_half_extents[0],
             self.table_pose.position[1]
             + self.table_half_extents[1]
-            - target_region_half_extents[1],
+            - block_half_extents[1],
             self.table_pose.position[2]
             + self.table_half_extents[2]
-            + target_region_half_extents[2],
+            + block_half_extents[2],
         )
 
         x, y, z = rng.uniform(lb, ub)
 
         return Pose((x, y, z))
+    
+    def get_target_block_half_extents(self, target_region_half_extents: tuple[float, float, float]) -> tuple[float, float, float]:
+        """Calculate the target block half extents based on the target region."""
+        return (
+            self.target_block_size_scale * target_region_half_extents[0],
+            self.target_block_size_scale * target_region_half_extents[1],
+            self.target_block_height,
+        )
 
 
 @dataclass(frozen=True)
@@ -133,7 +147,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
             self._spec.target_region_half_extents_lb,
             self._spec.target_region_half_extents_ub,
         )
-        target_region_pose = self._spec.sample_target_region_pose(target_region_half_extents, self.np_random)
+        target_region_pose = self._spec.sample_block_on_table_pose(target_region_half_extents, self.np_random)
         self._target_region_id = create_pybullet_block(
             self._spec.target_region_rgba,
             half_extents=target_region_half_extents,
@@ -144,6 +158,26 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         )
         
         # Recreate the target block.
+        target_block_half_extents = self._spec.get_target_block_half_extents(target_region_half_extents)
+        self._target_block_id = create_pybullet_block(
+            self._spec.target_block_rgba,
+            half_extents=target_block_half_extents,
+            physics_client_id=self.physics_client_id,
+        )
+        for _ in range(100_000):
+            target_block_pose = self._spec.sample_block_on_table_pose(target_block_half_extents, self.np_random)
+            set_pose(
+                self._target_block_id, target_block_pose, self.physics_client_id
+            )
+            # Make sure the target block is not touching the target region at all.
+            if not check_body_collisions(
+                self._target_block_id,
+                self._target_region_id,
+                self.physics_client_id,
+            ):
+                break
+        else:
+            raise RuntimeError("Failed to sample target block pose")
 
         # Recreate the obstructions.
 
