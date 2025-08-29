@@ -3,7 +3,7 @@
 
 ### Description
 A 3D mobile manipulation environment using the TidyBot platform.
-        
+
 The robot has a holonomic mobile base with powered casters and a Kinova Gen3 arm.
 Scene type: cupboard with 8 objects.
 
@@ -47,7 +47,7 @@ Currently returns a small negative reward (-0.01) per timestep to encourage expl
 ### References
 TidyBot++: An Open-Source Holonomic Mobile Manipulator
 for Robot Learning
-- Jimmy Wu, William Chong, Robert Holmberg, Aaditya Prasad, Yihuai Gao, 
+- Jimmy Wu, William Chong, Robert Holmberg, Aaditya Prasad, Yihuai Gao,
   Oussama Khatib, Shuran Song, Szymon Rusinkiewicz, Jeannette Bohg
 - Conference on Robot Learning (CoRL), 2024
 

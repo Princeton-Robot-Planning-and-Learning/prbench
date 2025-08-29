@@ -44,7 +44,6 @@ class ArmController:
         otg_out: Ruckig output parameters buffer.
         otg_res: Latest Ruckig result status (e.g., Working/Finished).
         motion3d_spec: Environment timing/specs (e.g., ``policy_control_period``).
-        last_command_time: Timestamp of last received command (seconds since epoch).
         command_timeout_factor: Multiplier applied to ``policy_control_period`` to
             determine command timeout.
         gripper_scale: Scales normalized gripper command to actuator units.
@@ -119,17 +118,27 @@ class ArmController:
         """Run the controller to update the arm position based on OTG."""
 
         # Update arm actuators
+        target_joints = None
+
         if "arm_pos" in action:
             # Run inverse kinematics on new target pose
-            qpos = self.ik_solver.solve(
+            target_joints = self.ik_solver.solve(
                 action["arm_pos"], action["arm_quat"], self.qpos
             )
-            qpos = (
-                self.qpos + np.mod((qpos - self.qpos) + np.pi, 2 * np.pi) - np.pi
-            )  # Unwrapped joint angles
+        elif "arm_joints" in action:
+            # Direct joint command mode
+            target_joints = np.array(action["arm_joints"], dtype=np.float64)
 
-            # Set target arm qpos
-            self.otg_inp.target_position = qpos
+        if target_joints is not None:
+            # Unwrap joint angles to avoid large jumps
+            target_joints = (
+                self.qpos
+                + np.mod((target_joints - self.qpos) + np.pi, 2 * np.pi)
+                - np.pi
+            )
+
+            # Set target arm qpos for trajectory generation
+            self.otg_inp.target_position = target_joints
             self.otg_res = Result.Working
 
             # Generate the next step in the trajectory
