@@ -94,7 +94,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             seed=seed,
             camera_names=camera_names,
             show_viewer=show_viewer,
-            scene_type=self.scene_type,
         )
 
     def _create_observation_space(self) -> spaces.Box:
