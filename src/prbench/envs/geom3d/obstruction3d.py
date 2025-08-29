@@ -177,7 +177,7 @@ class Obstruction3DState(Geom3DState):
 
     target_region: Geom3DObjectState
     target_block: Geom3DObjectState
-    obstructions: list[Geom3DObjectState]
+    obstructions: dict[str, Geom3DObjectState]
 
 
 @dataclass(frozen=True)
@@ -211,8 +211,11 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         # The objects are created in reset() because they have geometries that change
         # in each episode.
         self._target_region_id: int | None = None
+        self._target_region_half_extents: tuple[float, float, float] = (0.0, 0.0, 0.0)
         self._target_block_id: int | None = None
-        self._obstruction_ids: set[int] = set()
+        self._target_block_half_extents: tuple[float, float, float] = (0.0, 0.0, 0.0)
+        self._obstruction_ids: dict[str, int] = {}
+        self._obstruction_id_to_half_extents: dict[int, tuple[float, float, float]] = {}
 
     def _create_observation_space(self) -> Space[Obstruction3DState]:
         return FunctionalSpace(contains_fn=lambda o: isinstance(o, Obstruction3DState))
@@ -229,39 +232,39 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         for old_id in {
             self._target_region_id,
             self._target_block_id,
-        } | self._obstruction_ids:
+        } | set(self._obstruction_ids.values()):
             if old_id is not None:
                 p.removeBody(old_id, physicsClientID=self.physics_client_id)
 
         # Recreate the target region.
-        target_region_half_extents: tuple[float, float, float] = tuple(
+        self._target_region_half_extents = tuple(
             self.np_random.uniform(
                 self._spec.target_region_half_extents_lb,
                 self._spec.target_region_half_extents_ub,
             )
         )
         target_region_pose = self._spec.sample_block_on_table_pose(
-            target_region_half_extents, self.np_random
+            self._target_region_half_extents, self.np_random
         )
         self._target_region_id = create_pybullet_block(
             self._spec.target_region_rgba,
-            half_extents=target_region_half_extents,
+            half_extents=self._target_region_half_extents,
             physics_client_id=self.physics_client_id,
         )
         set_pose(self._target_region_id, target_region_pose, self.physics_client_id)
 
         # Recreate the target block.
-        target_block_half_extents = self._spec.get_target_block_half_extents(
-            target_region_half_extents
+        self._target_block_half_extents = self._spec.get_target_block_half_extents(
+            self._target_region_half_extents
         )
         self._target_block_id = create_pybullet_block(
             self._spec.target_block_rgba,
-            half_extents=target_block_half_extents,
+            half_extents=self._target_block_half_extents,
             physics_client_id=self.physics_client_id,
         )
         for _ in range(100_000):
             target_block_pose = self._spec.sample_block_on_table_pose(
-                target_block_half_extents, self.np_random
+                self._target_block_half_extents, self.np_random
             )
             set_pose(self._target_block_id, target_block_pose, self.physics_client_id)
             # Make sure the target block is not touching the target region at all.
@@ -275,8 +278,10 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
             raise RuntimeError("Failed to sample target block pose")
 
         # Recreate the obstructions.
-        self._obstruction_ids.clear()
-        for _ in range(self._num_obstructions):
+        self._obstruction_ids = {}
+        self._obstruction_id_to_half_extents = {}
+        for obstruction_idx in range(self._num_obstructions):
+            obstruction_name = f"obstruction{obstruction_idx}"
             obstruction_half_extents: tuple[float, float, float] = tuple(
                 self.np_random.uniform(
                     self._spec.obstruction_half_extents_lb,
@@ -288,19 +293,22 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
                 half_extents=obstruction_half_extents,
                 physics_client_id=self.physics_client_id,
             )
-            self._obstruction_ids.add(obstruction_id)
+            self._obstruction_id_to_half_extents[obstruction_id] = (
+                obstruction_half_extents
+            )
+            self._obstruction_ids[obstruction_name] = obstruction_id
             for _ in range(100_000):
                 obstruction_init_on_target = (
                     self.np_random.uniform()
                     < self._spec.obstruction_init_on_target_prob
                 )
-                collision_ids = ({self._target_block_id} | self._obstruction_ids) - {
-                    obstruction_id
-                }
+                collision_ids = (
+                    {self._target_block_id} | set(self._obstruction_ids.values())
+                ) - {obstruction_id}
                 if obstruction_init_on_target:
                     obstruction_pose = self._spec.sample_obstruction_pose_on_target(
                         obstruction_half_extents,
-                        target_region_half_extents,
+                        self._target_region_half_extents,
                         target_region_pose,
                         self.np_random,
                     )
@@ -325,6 +333,65 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
             else:
                 raise RuntimeError("Failed to sample target block pose")
 
+    def _set_object_states(self, obs: Obstruction3DState) -> None:
+        # Check if target region needs to be recreated.
+        if self._target_region_half_extents != obs.target_region.geometry:
+            # Recreate the target region.
+            if self._target_region_id is not None:
+                p.removeBody(self._target_region_id, physicsClientID=self.physics_client_id)
+            self._target_region_id = create_pybullet_block(
+                self._spec.target_region_rgba,
+                half_extents=obs.target_region.geometry,
+                physics_client_id=self.physics_client_id,
+            )
+            self._target_block_half_extents = obs.target_region.geometry
+        # Update target region pose.
+        assert self._target_region_id is not None
+        set_pose(self._target_region_id, obs.target_region.pose, self.physics_client_id)
+
+        # Check if target block needs to be recreated.
+        if self._target_block_half_extents != obs.target_block.geometry:
+            # Recreate the target block.
+            if self._target_block_id is not None:
+                p.removeBody(self._target_block_id, physicsClientID=self.physics_client_id)
+            self._target_block_id = create_pybullet_block(
+                self._spec.target_block_rgba,
+                half_extents=obs.target_block.geometry,
+                physics_client_id=self.physics_client_id,
+            )
+            self._target_block_half_extents = obs.target_block.geometry
+        # Update target block pose.
+        assert self._target_block_id is not None
+        set_pose(self._target_block_id, obs.target_block.pose, self.physics_client_id)
+
+        # Handle obstructions.
+        for obstruction_name, obstruction_state in obs.obstructions.items():
+            # Check if the block needs to be recreated.
+            need_recreate = False
+            need_destroy = False
+            if not self._obstruction_ids:
+                need_recreate = True
+            else:
+                obstruction_id = self._object_name_to_pybullet_id(obstruction_name)
+                current_half_extents = self._obstruction_id_to_half_extents[obstruction_id]
+                need_recreate = (current_half_extents != obstruction_state.geometry)
+                need_destroy = need_recreate
+            if need_recreate:
+                # Recreate the obstruction.
+                if need_destroy:
+                    p.removeBody(obstruction_id, physicsClientID=self.physics_client_id)
+                obstruction_id = create_pybullet_block(
+                    self._spec.target_block_rgba,
+                    half_extents=obstruction_state.geometry,
+                    physics_client_id=self.physics_client_id,
+                )
+                self._obstruction_ids[obstruction_name] = obstruction_id
+                self._obstruction_id_to_half_extents[obstruction_id] = (
+                    obstruction_state.geometry
+                )
+            # Update obstruction block pose.
+            set_pose(obstruction_id, obstruction_state.pose, self.physics_client_id)
+
     def _object_name_to_pybullet_id(self, object_name: str) -> int:
         if object_name == "target_region":
             assert self._target_region_id is not None
@@ -333,33 +400,42 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
             assert self._target_block_id is not None
             return self._target_block_id
         if object_name.startswith("obstruction"):
-            obstruction_idx = int(object_name[len("obstruction") :])
-            ordered_obstructions = sorted(self._obstruction_ids)
-            return ordered_obstructions[obstruction_idx]
+            return self._obstruction_ids[object_name]
         raise ValueError(f"Unrecognized object name: {object_name}")
 
     def _get_collision_object_ids(self) -> set[int]:
         assert self._target_block_id is not None
         assert self._target_region_id is not None
-        return {self._target_block_id, self._target_region_id} | self._obstruction_ids
+        return {self._target_block_id, self._target_region_id} | set(
+            self._obstruction_ids.values()
+        )
 
     def _get_obs(self) -> Obstruction3DState:
         joint_positions = self.robot.get_joint_positions()
         assert self._target_region_id is not None
         assert self._target_block_id is not None
         target_region_pose = get_pose(self._target_region_id, self.physics_client_id)
+        target_region_state = Geom3DObjectState(
+            target_region_pose, self._target_region_half_extents
+        )
         target_block_pose = get_pose(self._target_block_id, self.physics_client_id)
-        obstruction_poses = [
-            get_pose(obstruction, self.physics_client_id)
-            for obstruction in sorted(self._obstruction_ids)
-        ]
+        target_block_state = Geom3DObjectState(
+            target_block_pose, self._target_block_half_extents
+        )
+        obstruction_states = {
+            name: Geom3DObjectState(
+                get_pose(oid, self.physics_client_id),
+                self._obstruction_id_to_half_extents[oid],
+            )
+            for name, oid in self._obstruction_ids.items()
+        }
         return Obstruction3DState(
             joint_positions,
             grasped_object=self._grasped_object,
             grasped_object_transform=self._grasped_object_transform,
-            target_region=Geom3DObjectState(target_region_pose),
-            target_block=Geom3DObjectState(target_block_pose),
-            obstructions=[Geom3DObjectState(pose) for pose in obstruction_poses],
+            target_region=target_region_state,
+            target_block=target_block_state,
+            obstructions=obstruction_states,
         )
 
     def _goal_reached(self) -> bool:

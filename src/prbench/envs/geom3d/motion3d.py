@@ -101,6 +101,10 @@ class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
             raise RuntimeError("Failed to find reachable target position")
         set_pose(self.target_id, target_pose, self.physics_client_id)
 
+    def _set_object_states(self, obs: Motion3DState) -> None:
+        assert self.target_id is not None
+        set_pose(self.target_id, Pose(obs.target), self.physics_client_id)
+
     def _object_name_to_pybullet_id(self, object_name: str) -> int:
         if object_name == "target":
             return self.target_id

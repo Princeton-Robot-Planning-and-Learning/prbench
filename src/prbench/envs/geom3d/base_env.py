@@ -86,6 +86,7 @@ class Geom3DObjectState:
     """The state of a rigid object in Geom3DEnv()."""
 
     pose: Pose
+    geometry: tuple[float, float, float]  # for now assuming cuboids; half extents
 
 
 @dataclass(frozen=True)
@@ -205,6 +206,10 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         """Reset objects."""
 
     @abc.abstractmethod
+    def _set_object_states(self, obs: _ObsType) -> None:
+        """Reset the state of objects; helper for set_state()."""
+
+    @abc.abstractmethod
     def _object_name_to_pybullet_id(self, object_name: str) -> int:
         """Look up the PyBullet ID for a given object name."""
 
@@ -233,6 +238,16 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         self._reset_objects()
 
         return self._get_obs(), {}
+
+    def set_state(self, obs: _ObsType) -> None:
+        """Set the state of the environment to the given one.
+
+        This is useful when treating the environment as a simulator.
+        """
+        self._set_robot_and_held_object(obs.joint_positions)
+        self._grasped_object = obs.grasped_object
+        self._grasped_object_transform = obs.grasped_object_transform
+        self._set_object_states(obs)
 
     def step(self, action: _ActType) -> tuple[_ObsType, float, bool, bool, dict]:
         # Store the current robot joints because we may need to revert in collision.
@@ -264,13 +279,17 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         if action.gripper == "close":
             # Check if an object is in collision with the end effector marker.
             # TODO
-            import ipdb; ipdb.set_trace()
+            import ipdb
+
+            ipdb.set_trace()
 
         # Check for ungrasping.
         elif action.gripper == "open":
             # Check if the held object is being placed on a surface.
             # TODO
-            import ipdb; ipdb.set_trace()
+            import ipdb
+
+            ipdb.set_trace()
 
         reward = -1
         terminated = self._goal_reached()
