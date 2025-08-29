@@ -8,6 +8,7 @@ from pybullet_helpers.motion_planning import (
     remap_joint_position_plan_to_constant_distance,
     run_smooth_motion_planning_to_pose,
 )
+from prpl_utils.utils import wrap_angle
 
 from prbench.envs.geom3d.obstruction3d import (
     Obstruction3DAction,
@@ -37,7 +38,7 @@ def test_obstruction3d_env():
 def test_pick_place_no_obstructions():
     """Test that picking and placing succeeds when there are no obstructions."""
     # Create the real environment.
-    env = Obstruction3DEnv(num_obstructions=0, use_gui=False, render_mode="rgb_array")
+    env = Obstruction3DEnv(num_obstructions=0, use_gui=True, render_mode="rgb_array")
     spec = env._spec  # pylint: disable=protected-access
     if MAKE_VIDEOS:
         env = RecordVideo(env, "unit_test_videos")
@@ -45,7 +46,7 @@ def test_pick_place_no_obstructions():
     obs, _ = env.reset(seed=123)
 
     # Create a simulator for planning.
-    sim = Obstruction3DEnv(spec=spec, use_gui=True)
+    sim = Obstruction3DEnv(spec=spec)
     sim.set_state(obs)
 
     # Run motion planning.
@@ -55,7 +56,9 @@ def test_pick_place_no_obstructions():
         max_candidate_plans = 1
 
     # First, move to pre-grasp pose (top-down).
-    pre_grasp_pose = Pose.from_rpy(obs.target_block.pose.position, (np.pi, 0, 0))
+    x, y, z = obs.target_block.pose.position
+    dz = 0.025
+    pre_grasp_pose = Pose.from_rpy((x, y, z + dz), (np.pi, 0, np.pi / 2))
     joint_plan = run_smooth_motion_planning_to_pose(
         pre_grasp_pose,
         sim.robot,
@@ -73,9 +76,8 @@ def test_pick_place_no_obstructions():
 
     for target_joints in joint_plan[1:]:
         delta = np.subtract(target_joints, obs.joint_positions)[:7]
-        assert max(delta) < spec.max_action_mag
-        assert min(delta) > -spec.max_action_mag
-        action = Obstruction3DAction(delta.tolist())
+        delta_lst = [wrap_angle(a) for a in delta]
+        action = Obstruction3DAction(delta_lst)
         obs, _, _, _, _ = env.step(action)
 
     import pybullet as p

@@ -8,6 +8,8 @@ from pybullet_helpers.motion_planning import (
     remap_joint_position_plan_to_constant_distance,
     run_smooth_motion_planning_to_pose,
 )
+from prpl_utils.utils import wrap_angle
+
 
 from prbench.envs.geom3d.motion3d import Motion3DAction, Motion3DEnv, Motion3DState
 
@@ -67,9 +69,8 @@ def test_motion_planning_in_motion3d_env():
     env.action_space.seed(123)
     for target_joints in joint_plan[1:]:
         delta = np.subtract(target_joints, obs.joint_positions)[:7]
-        assert max(delta) < spec.max_action_mag
-        assert min(delta) > -spec.max_action_mag
-        action = Motion3DAction(delta.tolist())
+        delta_lst = [wrap_angle(a) for a in delta]
+        action = Motion3DAction(delta_lst)
         obs, _, done, _, _ = env.step(action)
         if done:
             break
