@@ -1,4 +1,4 @@
-"""Tests for motion3d.py."""
+"""Tests for obstruction3d.py."""
 
 import numpy as np
 from conftest import MAKE_VIDEOS
@@ -12,8 +12,8 @@ from prbench.envs.geom3d.obstruction3d import (
 )
 
 
-def test_motion3d_env():
-    """Tests for basic methods in motion3D env."""
+def test_obstruction3d_env():
+    """Tests for basic methods in obstruction3d env."""
 
     env = Obstruction3DEnv(use_gui=False)  # set use_gui=True to debug
     obs, _ = env.reset(seed=123)
