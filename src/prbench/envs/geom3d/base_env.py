@@ -29,14 +29,15 @@ class Geom3DEnvSpec:
     # NOTE: the robot joints include 7 DOF for the arm and 6 DOF for the fingers. We
     # don't need to change the fingers this in the environment.
     initial_joints: JointPositions = field(
+        # This is a retract position.
         default_factory=lambda: [
-            -4.3,  # "joint_1", starting at the robot base and going up to the gripper
-            -1.6,  # "joint_2"
-            -4.8,  # "joint_3"
-            -1.8,  # "joint_4"
-            -1.4,  # "joint_5"
-            -1.1,  # "joint_6"
-            1.6,  # "joint_7"
+            0.0, # "joint_1", starting at the robot base and going up to the gripper
+            -0.35, # "joint_2"
+            -np.pi, # "joint_3"
+            -2.5,  # "joint_4"
+            0.0, # "joint_5"
+            -0.87, # "joint_6"
+            np.pi / 2, # "joint_7"
             # Finger joints (not used in this environment).
             0.0,
             0.0,

@@ -91,7 +91,7 @@ class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
         *args,
         **kwargs,
     ) -> tuple[Motion3DState, dict]:
-        super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
+        super().reset(*args, **kwargs)  # reset the robot
 
         # Reset the target. Sample and check reachability.
         target_pose: Pose | None = None
