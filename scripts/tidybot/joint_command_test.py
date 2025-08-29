@@ -11,7 +11,7 @@ TARGETS = [
 ]
 
 
-def main() -> None:
+def joint_command_test() -> None:
     """Test joint command tracking functionality in TidyBot3D environment."""
     prbench.register_all_environments()
     env = prbench.make(
@@ -66,4 +66,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    joint_command_test()
