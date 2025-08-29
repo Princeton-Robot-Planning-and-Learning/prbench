@@ -17,6 +17,7 @@ from prbench.envs.geom3d.base_env import (
     Geom3DEnv,
     Geom3DEnvSpec,
     Geom3DState,
+    Geom3DObjectState,
 )
 from prbench.envs.geom3d.utils import PURPLE
 
@@ -170,6 +171,10 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
 class Obstruction3DState(Geom3DState):
     """A state for Obstruction3DEnv()."""
 
+    target_region: Geom3DObjectState
+    target_block: Geom3DObjectState
+    obstructions: list[Geom3DObjectState]
+
 
 @dataclass(frozen=True)
 class Obstruction3DAction(Geom3DAction):
@@ -214,12 +219,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
             sample_fn=self._sample_action,
         )
 
-    def reset(
-        self,
-        *args,
-        **kwargs,
-    ) -> tuple[Obstruction3DState, dict]:
-        super().reset(*args, **kwargs)  # reset the robot
+    def _reset_objects(self) -> None:
 
         # Destroy old objects that have varying geometries.
         for old_id in {
@@ -323,7 +323,16 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
 
     def _get_obs(self) -> Obstruction3DState:
         joint_positions = self.robot.get_joint_positions()
-        return Obstruction3DState(joint_positions)
+        target_region_pose = get_pose(self._target_region_id, self.physics_client_id)
+        target_block_pose = get_pose(self._target_block_id, self.physics_client_id)
+        obstruction_poses = [get_pose(obstruction, self.physics_client_id) for obstruction in sorted(self._obstruction_ids)]
+        # TODO handle grasped_object, grasped_object_transform
+        return Obstruction3DState(joint_positions,
+                                  grasped_object=None,
+                                  grasped_object_transform=None,
+                                  target_region=target_region_pose,
+                                  target_block=target_block_pose,
+                                  obstructions=obstruction_poses)
 
     def _goal_reached(self) -> bool:
         # TODO

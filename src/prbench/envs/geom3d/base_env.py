@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Literal
 
 import gymnasium
 import numpy as np
@@ -73,6 +73,14 @@ class Geom3DState:
     """A state for Geom3DEnv()."""
 
     joint_positions: JointPositions
+    grasped_object: str | None
+    grasped_object_transform: Pose | None # end effector -> obj
+
+
+class Geom3DObjectState:
+    """The state of a rigid object in Geom3DEnv()."""
+
+    pose: Pose
 
 
 @dataclass(frozen=True)
@@ -85,6 +93,7 @@ class Geom3DAction:
     # NOTE: this is only a delta on the 7 DOF of the arm, not the fingers, which do not
     # need to change in this environment.
     delta_arm_joints: JointPositions
+    gripper: Literal["open", "close", "none"] = "none"  # none = no change
 
 
 _ObsType = TypeVar("_ObsType", bound=Geom3DState)
@@ -182,6 +191,10 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
     def _goal_reached(self) -> bool:
         """Check if the goal is currently reached."""
 
+    @abc.abstractmethod
+    def _reset_objects(self) -> None:
+        """Reset objects."""
+
     def reset(
         self,
         *args,
@@ -192,6 +205,9 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         # Reset the robot. In the future, we may want to allow randomizing the initial
         # robot joint positions.
         self._set_robot_joints(self._spec.initial_joints)
+
+        # Reset objects.
+        self._reset_objects()
 
         return self._get_obs(), {}
 
@@ -212,6 +228,7 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         ).tolist()
         next_joints = next_joints_no_fingers + current_joints_fingers
         self._set_robot_joints(next_joints)
+        # TODO handle gripper.
         reward = -1
         terminated = self._goal_reached()
         return self._get_obs(), reward, terminated, False, {}

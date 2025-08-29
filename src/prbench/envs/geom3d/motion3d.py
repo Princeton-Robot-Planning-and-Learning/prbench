@@ -38,7 +38,8 @@ class Motion3DState(Geom3DState):
     """A state for Motion3DEnv()."""
 
     target: tuple[float, float, float]  # 3D position to reach with end effector
-
+    grasped_object: str | None = None  # always None in this env
+    grasped_object_transform: Pose | None = None # always None in this env
 
 @dataclass(frozen=True)
 class Motion3DAction(Geom3DAction):
@@ -81,13 +82,7 @@ class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
             sample_fn=self._sample_action,
         )
 
-    def reset(
-        self,
-        *args,
-        **kwargs,
-    ) -> tuple[Motion3DState, dict]:
-        super().reset(*args, **kwargs)  # reset the robot
-
+    def _reset_objects(self) -> None:
         # Reset the target. Sample and check reachability.
         target_pose: Pose | None = None
         for _ in range(100_000):
@@ -106,8 +101,6 @@ class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
         if target_pose is None:
             raise RuntimeError("Failed to find reachable target position")
         set_pose(self.target_id, target_pose, self.physics_client_id)
-
-        return self._get_obs(), {}
 
     def _get_obs(self) -> Motion3DState:
         joint_positions = self.robot.get_joint_positions()
