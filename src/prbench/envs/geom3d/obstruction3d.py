@@ -9,11 +9,7 @@ from gymnasium.spaces import Space
 from prpl_utils.spaces import FunctionalSpace
 from pybullet_helpers.geometry import Pose, get_pose, set_pose
 from pybullet_helpers.utils import create_pybullet_block
-
-from pybullet_helpers.inverse_kinematics import (
-    InverseKinematicsError,
-    inverse_kinematics,
-)
+import pybullet as p
 
 from prbench.envs.geom3d.base_env import (
     Geom3DAction,
@@ -21,6 +17,7 @@ from prbench.envs.geom3d.base_env import (
     Geom3DEnvSpec,
     Geom3DState,
 )
+from prbench.envs.geom3d.utils import PURPLE
 
 
 @dataclass(frozen=True)
@@ -31,6 +28,43 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
     table_pose: Pose = Pose((0.5, 0.0, -0.175))
     table_rgba: tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0)
     table_half_extents: tuple[float, float, float] = (0.25, 0.4, 0.25)
+
+    # Target region.
+    target_region_half_extents_lb: tuple[float, float, float] = (0.02, 0.02, 0.001)
+    target_region_half_extents_ub: tuple[float, float, float] = (0.05, 0.05, 0.001)
+    target_region_rgba: tuple[float, float, float, float] = PURPLE + (1.0, )
+
+    def sample_target_region_pose(self, target_region_half_extents: tuple[float, float, float],
+                                  rng: np.random.Generator) -> Pose:
+        """Sample an initial target region pose given sampled half extents."""
+        
+        lb = (
+            self.table_pose.position[0]
+            - self.table_half_extents[0]
+            + target_region_half_extents[0],
+            self.table_pose.position[1]
+            - self.table_half_extents[1]
+            + target_region_half_extents[1],
+            self.table_pose.position[2]
+            + self.table_half_extents[2]
+            + target_region_half_extents[2],
+        )
+        
+        ub = (
+            self.table_pose.position[0]
+            + self.table_half_extents[0]
+            - target_region_half_extents[0],
+            self.table_pose.position[1]
+            + self.table_half_extents[1]
+            - target_region_half_extents[1],
+            self.table_pose.position[2]
+            + self.table_half_extents[2]
+            + target_region_half_extents[2],
+        )
+
+        x, y, z = rng.uniform(lb, ub)
+
+        return Pose((x, y, z))
 
 
 @dataclass(frozen=True)
@@ -67,6 +101,12 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
             self.table_id, self._spec.table_pose, self.physics_client_id
         )
 
+        # The objects are created in reset() because they have geometries that change
+        # in each episode.
+        self._target_region_id: int | None = None
+        self._target_block_id: int | None = None
+        self._obstruction_ids: set[int] = set()
+
     def _create_observation_space(self) -> Space[Obstruction3DState]:
         return FunctionalSpace(contains_fn=lambda o: isinstance(o, Obstruction3DState))
 
@@ -82,6 +122,30 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         **kwargs,
     ) -> tuple[Obstruction3DState, dict]:
         super().reset(*args, **kwargs)  # reset the robot
+
+        # Destroy old objects that have varying geometries.
+        for old_id in {self._target_region_id, self._target_block_id} | self._obstruction_ids:
+            if old_id is not None:
+                p.removeBody(old_id, physicsClientID=self.physics_client_id)
+
+        # Recreate the target region.
+        target_region_half_extents = self.np_random.uniform(
+            self._spec.target_region_half_extents_lb,
+            self._spec.target_region_half_extents_ub,
+        )
+        target_region_pose = self._spec.sample_target_region_pose(target_region_half_extents, self.np_random)
+        self._target_region_id = create_pybullet_block(
+            self._spec.target_region_rgba,
+            half_extents=target_region_half_extents,
+            physics_client_id=self.physics_client_id,
+        )
+        set_pose(
+            self._target_region_id, target_region_pose, self.physics_client_id
+        )
+        
+        # Recreate the target block.
+
+        # Recreate the obstructions.
 
         return self._get_obs(), {}
 
