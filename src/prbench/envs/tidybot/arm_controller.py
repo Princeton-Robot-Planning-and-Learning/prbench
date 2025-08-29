@@ -9,7 +9,6 @@ The current controller is part of the environment.
 """
 
 import math
-import time
 from typing import Optional, Sequence
 
 import numpy as np
@@ -45,7 +44,6 @@ class ArmController:
         otg_out: Ruckig output parameters buffer.
         otg_res: Latest Ruckig result status (e.g., Working/Finished).
         motion3d_spec: Environment timing/specs (e.g., ``policy_control_period``).
-        last_command_time: Timestamp of last received command (seconds since epoch).
         command_timeout_factor: Multiplier applied to ``policy_control_period`` to
             determine command timeout.
         gripper_scale: Scales normalized gripper command to actuator units.
@@ -75,7 +73,6 @@ class ArmController:
         self.ctrl_gripper = ctrl_gripper
         self.ik_solver = TidybotIKSolver(ee_offset=ee_offset)
         # Ruckig (online trajectory generation)
-        self.last_command_time: Optional[float] = None
         self.otg = Ruckig(num_dofs, timestep)
         self.otg_inp = InputParameter(num_dofs)
         self.otg_out = OutputParameter(num_dofs)
@@ -112,7 +109,6 @@ class ArmController:
         self.ctrl[:] = self.qpos
         self.ctrl_gripper[:] = 0.0
         # Initialize OTG
-        self.last_command_time = time.time()
         self.otg_inp.current_position = self.qpos
         self.otg_inp.current_velocity = self.qvel
         self.otg_inp.target_position = self.qpos
@@ -122,32 +118,18 @@ class ArmController:
         """Run the controller to update the arm position based on OTG."""
 
         # Update arm actuators
+        target_joints = None
+
         if "arm_pos" in action:
             # Run inverse kinematics on new target pose
-            qpos = self.ik_solver.solve(
+            target_joints = self.ik_solver.solve(
                 action["arm_pos"], action["arm_quat"], self.qpos
             )
-            qpos = (
-                self.qpos + np.mod((qpos - self.qpos) + np.pi, 2 * np.pi) - np.pi
-            )  # Unwrapped joint angles
-
-            # Set target arm qpos
-            self.otg_inp.target_position = qpos
-            self.otg_res = Result.Working
-
-            # Generate the next step in the trajectory
-            self.otg_res = self.otg.update(self.otg_inp, self.otg_out)
-
-            # Pass output back to input for next iteration
-            self.otg_out.pass_to_input(self.otg_inp)
-
-            # Apply the smoothed position to the controller
-            self.ctrl[:] = self.otg_out.new_position
-
         elif "arm_joints" in action:
             # Direct joint command mode
             target_joints = np.array(action["arm_joints"], dtype=np.float64)
 
+        if target_joints is not None:
             # Unwrap joint angles to avoid large jumps
             target_joints = (
                 self.qpos
