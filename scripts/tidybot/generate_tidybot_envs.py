@@ -1,7 +1,6 @@
 """Generate TidyBot random action GIFs for debugging."""
 
 import argparse
-import subprocess
 from pathlib import Path
 
 import gymnasium
@@ -71,7 +70,7 @@ def _main() -> None:
         create_random_action_gif(
             env_id, env, num_actions=args.num_actions, seed=args.seed
         )
-        env.close()
+        env.close()  # type: ignore[no-untyped-call]
 
     print(f"Finished generating {len(tidybot_envs)} TidyBot GIFs in {DEBUG_DIR}")
 

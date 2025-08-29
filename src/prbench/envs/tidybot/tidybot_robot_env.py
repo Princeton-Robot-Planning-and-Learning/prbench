@@ -1,10 +1,9 @@
 """This module defines the TidyBotRobotEnv class, which is the base class for the
 TidyBot robot in simulation."""
 
-import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -222,10 +221,10 @@ class TidyBotRobotEnv(MujocoEnv):
         assets_dir = Path(__file__).parent / "models" / "assets"
 
         # Check if the input XML has an include directive for tidybot.xml
-        include_elem = input_root.find("include")
+        include_elem = input_root.find("include")  # type: ignore[union-attr]
         if include_elem is not None and include_elem.get("file") == "tidybot.xml":
             # Remove the include directive since we'll merge the content directly
-            input_root.remove(include_elem)
+            input_root.remove(include_elem)  # type: ignore[union-attr]
 
         with open(tidybot_path, "r", encoding="utf-8") as f:
             tidybot_content = f.read()
@@ -233,9 +232,11 @@ class TidyBotRobotEnv(MujocoEnv):
         # Parse tidybot XML
         tidybot_tree = ET.ElementTree(ET.fromstring(tidybot_content))
         tidybot_root = tidybot_tree.getroot()
+        if tidybot_root is None:
+            raise ValueError("Missing <tidybot> element")
 
         # Update compiler meshdir to absolute path in tidybot content
-        tidybot_compiler = tidybot_root.find("compiler")
+        tidybot_compiler = tidybot_root.find("compiler")  # type: ignore[union-attr]
         if tidybot_compiler is not None:
             tidybot_compiler.set("meshdir", str(assets_dir.resolve()))
 
@@ -244,23 +245,28 @@ class TidyBotRobotEnv(MujocoEnv):
         for child in list(tidybot_root):
             if child.tag == "worldbody":
                 # Merge worldbody content
-                input_worldbody = input_root.find("worldbody")
+                input_worldbody = input_root.find( # type:ignore[union-attr]
+                    "worldbody"
+                ) 
                 if input_worldbody is not None:
                     for tidybot_body in list(child):
                         input_worldbody.append(tidybot_body)
                 else:
-                    input_root.append(child)
+                    input_root.append(child)  # type: ignore[union-attr]
             elif child.tag in ["asset", "default"]:
                 # Merge or append asset and default sections
-                input_section = input_root.find(child.tag)
+                input_section = input_root.find(child.tag)  # type: ignore[union-attr]
                 if input_section is not None:
                     for sub_child in list(child):
                         input_section.append(sub_child)
                 else:
-                    input_root.append(child)
+                    input_root.append(child)  # type: ignore[union-attr]
             else:
                 # For other sections (compiler, actuator, contact, etc.), just append
-                input_root.append(child)
+                input_root.append(child)  # type: ignore[union-attr]
+
+        if input_root is None:
+            raise ValueError("input_root is None, cannot serialize to string")
 
         # Return the merged XML as string
         return ET.tostring(input_root, encoding="unicode")
