@@ -37,7 +37,7 @@ def test_obstruction3d_env():
 def test_pick_place_no_obstructions():
     """Test that picking and placing succeeds when there are no obstructions."""
     # Create the real environment.
-    env = Obstruction3DEnv(num_obstructions=0, use_gui=True, render_mode="rgb_array")
+    env = Obstruction3DEnv(num_obstructions=0, use_gui=False, render_mode="rgb_array")
     spec = env._spec  # pylint: disable=protected-access
     if MAKE_VIDEOS:
         env = RecordVideo(env, "unit_test_videos")
@@ -45,7 +45,7 @@ def test_pick_place_no_obstructions():
     obs, _ = env.reset(seed=123)
 
     # Create a simulator for planning.
-    sim = Obstruction3DEnv(spec=spec)
+    sim = Obstruction3DEnv(spec=spec, use_gui=True)
     sim.set_state(obs)
 
     # Run motion planning.
