@@ -48,13 +48,8 @@ class Motion3DAction(Geom3DAction):
 class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
     """Environment where only 3D motion planning is needed to reach a goal region."""
 
-    def __init__(
-        self,
-        spec: Motion3DEnvSpec = Motion3DEnvSpec(),
-        render_mode: str | None = None,
-        use_gui: bool = False,
-    ) -> None:
-        super().__init__(spec, render_mode=render_mode, use_gui=use_gui)
+    def __init__(self, spec: Motion3DEnvSpec = Motion3DEnvSpec(), **kwargs) -> None:
+        super().__init__(spec, **kwargs)
 
         # The spec is of the right type.
         self._spec: Motion3DEnvSpec

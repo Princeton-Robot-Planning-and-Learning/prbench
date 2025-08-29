@@ -31,13 +31,13 @@ class Geom3DEnvSpec:
     initial_joints: JointPositions = field(
         # This is a retract position.
         default_factory=lambda: [
-            0.0, # "joint_1", starting at the robot base and going up to the gripper
-            -0.35, # "joint_2"
-            -np.pi, # "joint_3"
+            0.0,  # "joint_1", starting at the robot base and going up to the gripper
+            -0.35,  # "joint_2"
+            -np.pi,  # "joint_3"
             -2.5,  # "joint_4"
-            0.0, # "joint_5"
-            -0.87, # "joint_6"
-            np.pi / 2, # "joint_7"
+            0.0,  # "joint_5"
+            -0.87,  # "joint_6"
+            np.pi / 2,  # "joint_7"
             # Finger joints (not used in this environment).
             0.0,
             0.0,

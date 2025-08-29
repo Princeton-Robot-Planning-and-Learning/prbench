@@ -5,7 +5,11 @@ from conftest import MAKE_VIDEOS
 from gymnasium.wrappers import RecordVideo
 from pybullet_helpers.geometry import Pose
 
-from prbench.envs.geom3d.obstruction3d import Obstruction3DAction, Obstruction3DEnv, Obstruction3DState
+from prbench.envs.geom3d.obstruction3d import (
+    Obstruction3DAction,
+    Obstruction3DEnv,
+    Obstruction3DState,
+)
 
 
 def test_motion3d_env():
@@ -22,5 +26,6 @@ def test_motion3d_env():
 
     # Uncomment to debug.
     import pybullet as p
+
     while True:
         p.getMouseEvents(env.physics_client_id)
