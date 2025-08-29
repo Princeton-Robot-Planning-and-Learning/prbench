@@ -41,8 +41,9 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
     target_block_rgba: tuple[float, float, float, float] = target_region_rgba
 
     # Obstructions.
-    obstruction_half_extents_lb: tuple[float, float, float] = (0.02, 0.02, 0.01)
-    obstruction_half_extents_ub: tuple[float, float, float] = (0.05, 0.05, 0.03)
+    obstruction_half_extents_lb: tuple[float, float, float] = (0.01, 0.01, 0.01)
+    obstruction_half_extents_ub: tuple[float, float, float] = (0.02, 0.02, 0.03)
+    obstruction_rgba: tuple[float, float, float, float] = (0.75, 0.1, 0.1, 1.0)
     # NOTE: this is not the "real" probability, but rather, the probability
     # that we will attempt to sample the obstruction somewhere on the target
     # surface during each round of rejection sampling during reset().
@@ -55,8 +56,8 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
         bottom_block_pose: Pose,
         rng: np.random.Generator,
     ) -> Pose:
-        """Sample one block pose on top of another one."""
-        assert np.allclose(bottom_block_pose, (0, 0, 0, 1)), "Not implemented"
+        """Sample one block pose on top of another one, with no hanging allowed."""
+        assert np.allclose(bottom_block_pose.orientation, (0, 0, 0, 1)), "Not implemented"
 
         lb = (
             bottom_block_pose.position[0]
@@ -77,6 +78,50 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
             bottom_block_pose.position[1]
             + bottom_block_half_extents[1]
             - top_block_half_extents[1],
+            bottom_block_pose.position[2]
+            + bottom_block_half_extents[2]
+            + top_block_half_extents[2],
+        )
+
+        x, y, z = rng.uniform(lb, ub)
+
+        return Pose((x, y, z))
+    
+    def _sample_block_on_block_pose_with_overhang(
+        self,
+        top_block_half_extents: tuple[float, float, float],
+        bottom_block_half_extents: tuple[float, float, float],
+        bottom_block_pose: Pose,
+        rng: np.random.Generator,
+    ) -> Pose:
+        """Sample one block pose on top of another one, where hanging is allowed."""
+        assert np.allclose(bottom_block_pose.orientation, (0, 0, 0, 1)), "Not implemented"
+
+        overhang_pad = 1e-3
+
+        lb = (
+            bottom_block_pose.position[0]
+            - bottom_block_half_extents[0]
+            - top_block_half_extents[0]
+            + overhang_pad,
+            bottom_block_pose.position[1]
+            - bottom_block_half_extents[1]
+            - top_block_half_extents[1]
+            + overhang_pad,
+            bottom_block_pose.position[2]
+            + bottom_block_half_extents[2]
+            + top_block_half_extents[2],
+        )
+
+        ub = (
+            bottom_block_pose.position[0]
+            + bottom_block_half_extents[0]
+            + top_block_half_extents[0]
+            - overhang_pad,
+            bottom_block_pose.position[1]
+            + bottom_block_half_extents[1]
+            + top_block_half_extents[1]
+            - overhang_pad,
             bottom_block_pose.position[2]
             + bottom_block_half_extents[2]
             + top_block_half_extents[2],
@@ -113,7 +158,7 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
         rng: np.random.Generator,
     ) -> Pose:
         """Sample a pose for the obstruction on top of the target region."""
-        return self._sample_block_on_block_pose(
+        return self._sample_block_on_block_pose_with_overhang(
             obstruction_half_extents,
             target_region_half_extents,
             target_region_pose,
@@ -235,8 +280,8 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
                 )
             )
             obstruction_id = create_pybullet_block(
-                self._spec.target_block_rgba,
-                half_extents=target_block_half_extents,
+                self._spec.obstruction_rgba,
+                half_extents=obstruction_half_extents,
                 physics_client_id=self.physics_client_id,
             )
             self._obstruction_ids.add(obstruction_id)
@@ -245,7 +290,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
                     self.np_random.uniform()
                     < self._spec.obstruction_init_on_target_prob
                 )
-                collision_ids = {self._target_block_id}
+                collision_ids = ({self._target_block_id} | self._obstruction_ids) - {obstruction_id}
                 if obstruction_init_on_target:
                     obstruction_pose = self._spec.sample_obstruction_pose_on_target(
                         obstruction_half_extents,
