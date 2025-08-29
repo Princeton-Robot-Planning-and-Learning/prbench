@@ -16,8 +16,8 @@ from prbench.envs.geom3d.base_env import (
     Geom3DAction,
     Geom3DEnv,
     Geom3DEnvSpec,
-    Geom3DState,
     Geom3DObjectState,
+    Geom3DState,
 )
 from prbench.envs.geom3d.utils import PURPLE
 
@@ -58,7 +58,9 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
         rng: np.random.Generator,
     ) -> Pose:
         """Sample one block pose on top of another one, with no hanging allowed."""
-        assert np.allclose(bottom_block_pose.orientation, (0, 0, 0, 1)), "Not implemented"
+        assert np.allclose(
+            bottom_block_pose.orientation, (0, 0, 0, 1)
+        ), "Not implemented"
 
         lb = (
             bottom_block_pose.position[0]
@@ -87,7 +89,7 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
         x, y, z = rng.uniform(lb, ub)
 
         return Pose((x, y, z))
-    
+
     def _sample_block_on_block_pose_with_overhang(
         self,
         top_block_half_extents: tuple[float, float, float],
@@ -96,7 +98,9 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
         rng: np.random.Generator,
     ) -> Pose:
         """Sample one block pose on top of another one, where hanging is allowed."""
-        assert np.allclose(bottom_block_pose.orientation, (0, 0, 0, 1)), "Not implemented"
+        assert np.allclose(
+            bottom_block_pose.orientation, (0, 0, 0, 1)
+        ), "Not implemented"
 
         overhang_pad = 1e-3
 
@@ -290,7 +294,9 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
                     self.np_random.uniform()
                     < self._spec.obstruction_init_on_target_prob
                 )
-                collision_ids = ({self._target_block_id} | self._obstruction_ids) - {obstruction_id}
+                collision_ids = ({self._target_block_id} | self._obstruction_ids) - {
+                    obstruction_id
+                }
                 if obstruction_init_on_target:
                     obstruction_pose = self._spec.sample_obstruction_pose_on_target(
                         obstruction_half_extents,
@@ -319,20 +325,42 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
             else:
                 raise RuntimeError("Failed to sample target block pose")
 
-        return self._get_obs(), {}
+    def _object_name_to_pybullet_id(self, object_name: str) -> int:
+        if object_name == "target_region":
+            assert self._target_region_id is not None
+            return self._target_region_id
+        if object_name == "target_block":
+            assert self._target_block_id is not None
+            return self._target_block_id
+        if object_name.startswith("obstruction"):
+            obstruction_idx = int(object_name[len("obstruction") :])
+            ordered_obstructions = sorted(self._obstruction_ids)
+            return ordered_obstructions[obstruction_idx]
+        raise ValueError(f"Unrecognized object name: {object_name}")
+
+    def _get_collision_object_ids(self) -> set[int]:
+        assert self._target_block_id is not None
+        assert self._target_region_id is not None
+        return {self._target_block_id, self._target_region_id} | self._obstruction_ids
 
     def _get_obs(self) -> Obstruction3DState:
         joint_positions = self.robot.get_joint_positions()
+        assert self._target_region_id is not None
+        assert self._target_block_id is not None
         target_region_pose = get_pose(self._target_region_id, self.physics_client_id)
         target_block_pose = get_pose(self._target_block_id, self.physics_client_id)
-        obstruction_poses = [get_pose(obstruction, self.physics_client_id) for obstruction in sorted(self._obstruction_ids)]
-        # TODO handle grasped_object, grasped_object_transform
-        return Obstruction3DState(joint_positions,
-                                  grasped_object=None,
-                                  grasped_object_transform=None,
-                                  target_region=target_region_pose,
-                                  target_block=target_block_pose,
-                                  obstructions=obstruction_poses)
+        obstruction_poses = [
+            get_pose(obstruction, self.physics_client_id)
+            for obstruction in sorted(self._obstruction_ids)
+        ]
+        return Obstruction3DState(
+            joint_positions,
+            grasped_object=self._grasped_object,
+            grasped_object_transform=self._grasped_object_transform,
+            target_region=Geom3DObjectState(target_region_pose),
+            target_block=Geom3DObjectState(target_block_pose),
+            obstructions=[Geom3DObjectState(pose) for pose in obstruction_poses],
+        )
 
     def _goal_reached(self) -> bool:
         # TODO

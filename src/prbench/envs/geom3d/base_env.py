@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass, field
-from typing import Any, TypeVar, Literal
+from typing import Any, Literal, TypeVar
 
 import gymnasium
 import numpy as np
@@ -14,6 +14,10 @@ from numpy.typing import NDArray
 from pybullet_helpers.camera import capture_image
 from pybullet_helpers.geometry import Pose, set_pose
 from pybullet_helpers.gui import create_gui_connection
+from pybullet_helpers.inverse_kinematics import (
+    check_collisions_with_held_object,
+    set_robot_joints_with_held_object,
+)
 from pybullet_helpers.joint import JointPositions
 from pybullet_helpers.robots import create_pybullet_robot
 from pybullet_helpers.robots.single_arm import FingeredSingleArmPyBulletRobot
@@ -74,9 +78,10 @@ class Geom3DState:
 
     joint_positions: JointPositions
     grasped_object: str | None
-    grasped_object_transform: Pose | None # end effector -> obj
+    grasped_object_transform: Pose | None  # end effector -> obj
 
 
+@dataclass(frozen=True)
 class Geom3DObjectState:
     """The state of a rigid object in Geom3DEnv()."""
 
@@ -175,6 +180,10 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
             physicsClientId=self.physics_client_id,
         )
 
+        # Track current held object.
+        self._grasped_object: str | None = None
+        self._grasped_object_transform: Pose | None = None
+
     @abc.abstractmethod
     def _create_observation_space(self) -> Space[_ObsType]:
         """Create the observation space."""
@@ -195,6 +204,20 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
     def _reset_objects(self) -> None:
         """Reset objects."""
 
+    @abc.abstractmethod
+    def _object_name_to_pybullet_id(self, object_name: str) -> int:
+        """Look up the PyBullet ID for a given object name."""
+
+    @abc.abstractmethod
+    def _get_collision_object_ids(self) -> set[int]:
+        """Get the collision object IDs."""
+
+    @property
+    def _grasped_object_id(self) -> int | None:
+        if self._grasped_object is not None:
+            return self._object_name_to_pybullet_id(self._grasped_object)
+        return None
+
     def reset(
         self,
         *args,
@@ -204,7 +227,7 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
 
         # Reset the robot. In the future, we may want to allow randomizing the initial
         # robot joint positions.
-        self._set_robot_joints(self._spec.initial_joints)
+        self._set_robot_and_held_object(self._spec.initial_joints)
 
         # Reset objects.
         self._reset_objects()
@@ -212,13 +235,16 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         return self._get_obs(), {}
 
     def step(self, action: _ActType) -> tuple[_ObsType, float, bool, bool, dict]:
+        # Store the current robot joints because we may need to revert in collision.
+        current_joints = self.robot.get_joint_positions()
+
+        # Tentatively apply robot action.
         # Clip the action to be within the allowed limits.
         delta_joints = np.clip(
             action.delta_arm_joints,
             -self._spec.max_action_mag,
             self._spec.max_action_mag,
         )
-        current_joints = self.robot.get_joint_positions()
         current_joints_fingers = current_joints[7:]
         current_joints_no_fingers = current_joints[:7]
         next_joints_no_fingers = np.clip(
@@ -227,8 +253,25 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
             self.robot.joint_upper_limits[:7],
         ).tolist()
         next_joints = next_joints_no_fingers + current_joints_fingers
-        self._set_robot_joints(next_joints)
-        # TODO handle gripper.
+        self._set_robot_and_held_object(next_joints)
+
+        # Check for collisions.
+        if self._robot_or_held_object_collision_exists():
+            # Revert!
+            self._set_robot_and_held_object(current_joints)
+
+        # Check for grasping.
+        if action.gripper == "close":
+            # Check if an object is in collision with the end effector marker.
+            # TODO
+            import ipdb; ipdb.set_trace()
+
+        # Check for ungrasping.
+        elif action.gripper == "open":
+            # Check if the held object is being placed on a surface.
+            # TODO
+            import ipdb; ipdb.set_trace()
+
         reward = -1
         terminated = self._goal_reached()
         return self._get_obs(), reward, terminated, False, {}
@@ -236,14 +279,30 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
     def render(self) -> NDArray[np.uint8]:  # type: ignore
         return capture_image(self.physics_client_id, **self._spec.get_camera_kwargs())
 
-    def _set_robot_joints(self, joints: JointPositions) -> None:
-        # Set the robot itself.
-        self.robot.set_joints(joints)
-        # NOTE: we will want to change this soon to allow for grasping.
-        self.robot.open_fingers()
+    def _set_robot_and_held_object(self, joints: JointPositions) -> None:
+        set_robot_joints_with_held_object(
+            self.robot,
+            self.physics_client_id,
+            self._grasped_object_id,
+            self._grasped_object_transform,
+            joints,
+        )
         # Update the end effector visualization.
         end_effector_pose = self.robot.get_end_effector_pose()
         set_pose(self.end_effector_viz_id, end_effector_pose, self.physics_client_id)
+
+    def _robot_or_held_object_collision_exists(self) -> bool:
+        collision_bodies = self._get_collision_object_ids()
+        if self._grasped_object_id is not None:
+            collision_bodies.discard(self._grasped_object_id)
+        return check_collisions_with_held_object(
+            self.robot,
+            collision_bodies,
+            self.physics_client_id,
+            self._grasped_object_id,
+            self._grasped_object_transform,
+            self.robot.get_joint_positions(),
+        )
 
     @abc.abstractmethod
     def _create_env_markdown_description(self) -> str:

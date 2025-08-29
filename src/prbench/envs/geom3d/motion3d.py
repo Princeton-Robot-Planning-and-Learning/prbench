@@ -38,8 +38,7 @@ class Motion3DState(Geom3DState):
     """A state for Motion3DEnv()."""
 
     target: tuple[float, float, float]  # 3D position to reach with end effector
-    grasped_object: str | None = None  # always None in this env
-    grasped_object_transform: Pose | None = None # always None in this env
+
 
 @dataclass(frozen=True)
 class Motion3DAction(Geom3DAction):
@@ -94,7 +93,7 @@ class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
                 inverse_kinematics(self.robot, target_pose, validate=True)
             except InverseKinematicsError:
                 continue
-            self._set_robot_joints(self._spec.initial_joints)
+            self._set_robot_and_held_object(self._spec.initial_joints)
             # If the goal is already reached, keep sampling.
             if not self._goal_reached():
                 break
@@ -102,10 +101,23 @@ class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
             raise RuntimeError("Failed to find reachable target position")
         set_pose(self.target_id, target_pose, self.physics_client_id)
 
+    def _object_name_to_pybullet_id(self, object_name: str) -> int:
+        if object_name == "target":
+            return self.target_id
+        raise ValueError(f"Unrecognized object name: {object_name}")
+
+    def _get_collision_object_ids(self) -> set[int]:
+        return set()
+
     def _get_obs(self) -> Motion3DState:
         joint_positions = self.robot.get_joint_positions()
         target = get_pose(self.target_id, self.physics_client_id).position
-        return Motion3DState(joint_positions, target)
+        return Motion3DState(
+            joint_positions,
+            grasped_object_transform=None,
+            grasped_object=None,
+            target=target,
+        )
 
     def _goal_reached(self) -> bool:
         target = get_pose(self.target_id, self.physics_client_id).position
