@@ -26,14 +26,12 @@ class TidyBotRobotEnv(MujocoEnv):
         camera_height: int = 480,
         seed: Optional[int] = None,
         show_viewer: bool = False,
-        scene_type: str = "ground",
     ) -> None:
         """
         Args:
             xml_string: A string containing the MuJoCo XML model.
             control_frequency: Frequency at which control actions are applied (in Hz).
             horizon: Maximum number of steps per episode.
-            scene_type: Type of scene to use ('ground', 'table', 'cupboard').
         """
 
         super().__init__(
@@ -46,7 +44,6 @@ class TidyBotRobotEnv(MujocoEnv):
             show_viewer=show_viewer,
         )
 
-        self.scene_type = scene_type
         self.base_controller: Optional[BaseController] = None
         self.arm_controller: Optional[ArmController] = None
 
@@ -215,7 +212,7 @@ class TidyBotRobotEnv(MujocoEnv):
         input_tree = ET.ElementTree(ET.fromstring(xml_string))
         input_root = input_tree.getroot()
 
-        # Read the scene XML content based on scene_type
+        # Read the scene XML content
         models_dir = Path(__file__).parent / "models" / "stanford_tidybot"
         tidybot_path = models_dir / "tidybot.xml"
         assets_dir = Path(__file__).parent / "models" / "assets"
