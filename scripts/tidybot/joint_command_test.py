@@ -36,17 +36,9 @@ def joint_command_test() -> None:
             "arm_joints": target,
             "gripper_pos": np.array([0.0]),
         }
-        # Send command once
-        robot_env.step(action)
-
-        # Then send empty actions to let trajectory complete
-        empty_action = {
-            "base_pose": robot_env.qpos_base.copy(),
-            "gripper_pos": np.array([0.0]),
-        }
-        # Run for more time to allow trajectory completion
-        for _ in range(999):  # 999 more steps for total of 1000
-            robot_env.step(empty_action)
+        # Send joint command continuously until trajectory completes
+        for _ in range(1000):
+            robot_env.step(action)
 
         # Evaluate error
         current = robot_env.qpos_arm.copy()

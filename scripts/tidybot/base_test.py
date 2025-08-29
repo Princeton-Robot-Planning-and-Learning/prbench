@@ -136,16 +136,19 @@ def test_tidybot3d_minimal() -> bool:
         target_base[0] += 0.1  # Move 10cm forward
         print(f"Target base position: {target_base}")
 
-        # Create action as numpy array:
-        # [base_pose(3), arm_pos(3), arm_quat(4), gripper_pos(1)]
-        action = np.concatenate(
-            [
-                target_base,  # base_pose(3)
-                [0.0, 0.0, 0.5],  # arm_pos(3) - keep arm in safe position
-                [1.0, 0.0, 0.0, 0.0],  # arm_quat(4) - identity quaternion
-                [0.0],  # gripper_pos(1) - closed
-            ]
-        )
+        # Get current arm pose to maintain it during base movement
+        # Current arm end-effector position and orientation (from initial state)
+        current_arm_pos = np.array([0.13046603, 0.0013501, 0.20866412])
+        current_arm_quat = np.array([0.70667603, 0.70667603, 0.02467767, 0.02467767])
+        
+        # Create action as numpy array: [base_pose(3), arm_pos(3), arm_quat(4), gripper_pos(1)]
+        # Keep arm in current position while moving base
+        action = np.concatenate([
+            target_base,         # base_pose(3) - target base movement
+            current_arm_pos,     # arm_pos(3) - maintain current arm position  
+            current_arm_quat,    # arm_quat(4) - maintain current arm orientation
+            [0.0],              # gripper_pos(1) - keep gripper closed
+        ])
 
         # Execute movement
         steps_taken = 0
