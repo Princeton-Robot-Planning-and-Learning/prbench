@@ -245,9 +245,9 @@ class TidyBotRobotEnv(MujocoEnv):
         for child in list(tidybot_root):
             if child.tag == "worldbody":
                 # Merge worldbody content
-                input_worldbody = input_root.find( # type:ignore[union-attr]
+                input_worldbody = input_root.find(  # type:ignore[union-attr]
                     "worldbody"
-                ) 
+                )
                 if input_worldbody is not None:
                     for tidybot_body in list(child):
                         input_worldbody.append(tidybot_body)
