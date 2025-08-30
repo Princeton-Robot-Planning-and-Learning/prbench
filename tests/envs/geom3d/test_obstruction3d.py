@@ -80,6 +80,13 @@ def test_pick_place_no_obstructions():
         action = Obstruction3DAction(delta_lst)
         obs, _, _, _, _ = env.step(action)
 
+    # Close the gripper to grasp.
+    action = Obstruction3DAction(delta_arm_joints=[0.] * 7, gripper="close")
+    obs, _, _, _, _ = env.step(action)
+
+    # The target block should now be grasped.
+    assert obs.grasped_object == "target_block"
+
     import pybullet as p
 
     # from pybullet_helpers.gui import visualize_pose

@@ -12,11 +12,12 @@ import pybullet as p
 from gymnasium.spaces import Space
 from numpy.typing import NDArray
 from pybullet_helpers.camera import capture_image
-from pybullet_helpers.geometry import Pose, set_pose
+from pybullet_helpers.geometry import Pose, set_pose, multiply_poses, get_pose
 from pybullet_helpers.gui import create_gui_connection
 from pybullet_helpers.inverse_kinematics import (
     check_collisions_with_held_object,
     set_robot_joints_with_held_object,
+    check_body_collisions,
 )
 from pybullet_helpers.joint import JointPositions
 from pybullet_helpers.robots import create_pybullet_robot
@@ -170,11 +171,18 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
             physicsClientId=self.physics_client_id,
         )
 
+        # Also create a collision body because we use it for grasp detection.
+        collision_id = p.createCollisionShape(
+            p.GEOM_SPHERE,
+            radius=self._spec.end_effector_viz_radius,
+            physicsClientId=self.physics_client_id,
+        )
+
         # Create the body for the end effector.
         end_effector_pose = self.robot.get_end_effector_pose()
         self.end_effector_viz_id = p.createMultiBody(
             baseMass=0,
-            baseCollisionShapeIndex=-1,
+            baseCollisionShapeIndex=collision_id,
             baseVisualShapeIndex=visual_id,
             basePosition=end_effector_pose.position,
             baseOrientation=end_effector_pose.orientation,
@@ -216,6 +224,10 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
     @abc.abstractmethod
     def _get_collision_object_ids(self) -> set[int]:
         """Get the collision object IDs."""
+
+    @abc.abstractmethod
+    def _get_movable_object_names(self) -> set[str]:
+        """The names of objects that can be moved by the robot (grasped and placed)."""
 
     @property
     def _grasped_object_id(self) -> int | None:
@@ -278,10 +290,25 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         # Check for grasping.
         if action.gripper == "close":
             # Check if an object is in collision with the end effector marker.
-            # TODO
-            import ipdb
-
-            ipdb.set_trace()
+            # If multiple objects are in collision, treat this as a failed grasp.
+            objects_in_grasp_zone : set[str] = set()
+            # Perform collision detection one-time rather than once per check.
+            p.performCollisionDetection(physicsClientId=self.physics_client_id)
+            for obj in sorted(self._get_movable_object_names()):
+                obj_id = self._object_name_to_pybullet_id(obj)
+                if check_body_collisions(obj_id, self.end_effector_viz_id,
+                                         self.physics_client_id,
+                                         perform_collision_detection=False):
+                    objects_in_grasp_zone.add(obj)
+            # There must be exactly one object in the grasp zone to succeed.
+            if len(objects_in_grasp_zone) == 1:
+                self._grasped_object = next(iter(objects_in_grasp_zone))
+                # Create grasp transform.
+                world_to_robot = self.robot.get_end_effector_pose()
+                world_to_object = get_pose(self._grasped_object_id, self.physics_client_id)
+                self._grasped_object_transform = multiply_poses(
+                    world_to_robot.invert(), world_to_object
+                )
 
         # Check for ungrasping.
         elif action.gripper == "open":

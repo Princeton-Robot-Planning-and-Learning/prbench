@@ -409,6 +409,9 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         return {self._target_block_id, self._target_region_id, self.table_id} | set(
             self._obstruction_ids.values()
         )
+    
+    def _get_movable_object_names(self) -> set[str]:
+        return {"target_block"} | set(self._obstruction_ids)
 
     def _get_obs(self) -> Obstruction3DState:
         joint_positions = self.robot.get_joint_positions()
