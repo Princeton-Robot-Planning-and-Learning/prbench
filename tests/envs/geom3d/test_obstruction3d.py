@@ -7,6 +7,8 @@ from pybullet_helpers.geometry import Pose, get_pose
 from pybullet_helpers.motion_planning import (
     remap_joint_position_plan_to_constant_distance,
     run_smooth_motion_planning_to_pose,
+    smoothly_follow_end_effector_path,
+    create_joint_distance_fn,
 )
 from prpl_utils.utils import wrap_angle
 
@@ -86,6 +88,29 @@ def test_pick_place_no_obstructions():
 
     # The target block should now be grasped.
     assert obs.grasped_object == "target_block"
+
+    # Move up slightly to break contact with the table.
+    sim.set_state(obs)
+    current_end_effector_pose = sim.robot.get_end_effector_pose()
+    post_grasp_pose = Pose((current_end_effector_pose.position[0], current_end_effector_pose.position[1],
+                            current_end_effector_pose.position[2] + 1e-2),
+                            current_end_effector_pose.orientation)
+    joint_distance_fn = create_joint_distance_fn(sim.robot)
+    joint_plan = smoothly_follow_end_effector_path(sim.robot, [current_end_effector_pose, post_grasp_pose],
+                                      sim.robot.get_joint_positions(),
+                                      collision_ids=set(),
+                                      joint_distance_fn=joint_distance_fn,
+                                      max_smoothing_iters_per_step=max_candidate_plans)
+
+    joint_plan = remap_joint_position_plan_to_constant_distance(
+        joint_plan, sim.robot, max_distance=spec.max_action_mag / 2
+    )
+
+    for target_joints in joint_plan[1:]:
+        delta = np.subtract(target_joints, obs.joint_positions)[:7]
+        delta_lst = [wrap_angle(a) for a in delta]
+        action = Obstruction3DAction(delta_lst)
+        obs, _, _, _, _ = env.step(action)
 
     import pybullet as p
 

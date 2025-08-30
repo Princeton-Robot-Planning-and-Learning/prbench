@@ -309,7 +309,7 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
                 self._grasped_object_transform = multiply_poses(
                     world_to_robot.invert(), world_to_object
                 )
-                # Close the fingers until they are around the object.
+                # Close the fingers until they are touching the object.
                 while not check_body_collisions(self._grasped_object_id,
                                                 self.robot.robot_id,
                                                 self.physics_client_id):

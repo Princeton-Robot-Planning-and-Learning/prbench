@@ -234,7 +234,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
             self._target_block_id,
         } | set(self._obstruction_ids.values()):
             if old_id is not None:
-                p.removeBody(old_id, physicsClientID=self.physics_client_id)
+                p.removeBody(old_id, physicsClientId=self.physics_client_id)
 
         # Recreate the target region.
         self._target_region_half_extents = tuple(
@@ -338,7 +338,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         if self._target_region_half_extents != obs.target_region.geometry:
             # Recreate the target region.
             if self._target_region_id is not None:
-                p.removeBody(self._target_region_id, physicsClientID=self.physics_client_id)
+                p.removeBody(self._target_region_id, physicsClientId=self.physics_client_id)
             self._target_region_id = create_pybullet_block(
                 self._spec.target_region_rgba,
                 half_extents=obs.target_region.geometry,
@@ -353,7 +353,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         if self._target_block_half_extents != obs.target_block.geometry:
             # Recreate the target block.
             if self._target_block_id is not None:
-                p.removeBody(self._target_block_id, physicsClientID=self.physics_client_id)
+                p.removeBody(self._target_block_id, physicsClientId=self.physics_client_id)
             self._target_block_id = create_pybullet_block(
                 self._spec.target_block_rgba,
                 half_extents=obs.target_block.geometry,
@@ -379,7 +379,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
             if need_recreate:
                 # Recreate the obstruction.
                 if need_destroy:
-                    p.removeBody(obstruction_id, physicsClientID=self.physics_client_id)
+                    p.removeBody(obstruction_id, physicsClientId=self.physics_client_id)
                 obstruction_id = create_pybullet_block(
                     self._spec.target_block_rgba,
                     half_extents=obstruction_state.geometry,
