@@ -748,6 +748,10 @@ class MjRenderContext:
             rgb=rgb_img, depth=depth_img, viewport=viewport, con=self.con
         )
 
+        rgb_img = np.flipud(rgb_img)
+        if depth_img is not None:
+            depth_img = np.flipud(depth_img)
+
         if depth:
             return (rgb_img, depth_img)
         return rgb_img

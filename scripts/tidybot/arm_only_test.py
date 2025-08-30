@@ -205,7 +205,7 @@ def test_tidybot3d_arm_only() -> bool:
 
         print("Creating TidyBot3D environment...")
         env = prbench.make(
-            "prbench/TidyBot3D-ground-o3-v0",
+            "prbench/TidyBot3D-cupboard-o8-v0",
             render_images=True,
             show_images=True,
             show_viewer=False,

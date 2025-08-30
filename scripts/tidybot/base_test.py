@@ -119,7 +119,7 @@ def test_tidybot3d_minimal() -> bool:
     try:
         prbench.register_all_environments()
         env = prbench.make(
-            "prbench/TidyBot3D-ground-o3-v0",
+            "prbench/TidyBot3D-cupboard-o8-v0",
             render_images=True,
             show_images=True,
             show_viewer=False,
@@ -131,9 +131,9 @@ def test_tidybot3d_minimal() -> bool:
         robot_env = env.env.env._tidybot_robot_env  # type: ignore
         print(f"Initial base position: {robot_env.qpos_base}")
 
-        # Test 1: Small forward movement
+        # Test 1: Small test
         target_base = robot_env.qpos_base.copy()
-        target_base[0] += 0.1  # Move 10cm forward
+        target_base[:3] = [0.3, 0, 0]  # setup target base position
         print(f"Target base position: {target_base}")
 
         # Get current arm pose to maintain it during base movement
