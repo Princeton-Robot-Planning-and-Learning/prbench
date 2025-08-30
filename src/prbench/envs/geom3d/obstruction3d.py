@@ -348,7 +348,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
                 half_extents=obs.target_region.geometry,
                 physics_client_id=self.physics_client_id,
             )
-            self._target_block_half_extents = obs.target_region.geometry
+            self._target_region_half_extents = obs.target_region.geometry
         # Update target region pose.
         assert self._target_region_id is not None
         set_pose(self._target_region_id, obs.target_region.pose, self.physics_client_id)
@@ -389,7 +389,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
                 if need_destroy:
                     p.removeBody(obstruction_id, physicsClientId=self.physics_client_id)
                 obstruction_id = create_pybullet_block(
-                    self._spec.target_block_rgba,
+                    self._spec.obstruction_rgba,
                     half_extents=obstruction_state.geometry,
                     physics_client_id=self.physics_client_id,
                 )
