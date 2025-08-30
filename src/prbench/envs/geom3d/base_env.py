@@ -309,6 +309,19 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
                 self._grasped_object_transform = multiply_poses(
                     world_to_robot.invert(), world_to_object
                 )
+                # Close the fingers until they are around the object.
+                while not check_body_collisions(self._grasped_object_id,
+                                                self.robot.robot_id,
+                                                self.physics_client_id):
+                    # If the fingers are fully closed, stop.
+                    current_finger_state = self.robot.get_finger_state()
+                    closed_finger_state = self.robot.closed_fingers_state
+                    assert isinstance(current_finger_state, float)
+                    assert isinstance(closed_finger_state, float)
+                    if current_finger_state >= closed_finger_state - 1e-2:
+                        break
+                    next_finger_state = current_finger_state + 1e-2
+                    self.robot.set_finger_state(next_finger_state)
 
         # Check for ungrasping.
         elif action.gripper == "open":
