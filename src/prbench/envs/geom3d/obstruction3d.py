@@ -188,6 +188,8 @@ class Obstruction3DAction(Geom3DAction):
 class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
     """Environment where obstructions must be cleared to place a target on a region."""
 
+    metadata = {"render_modes": ["rgb_array"]}
+
     def __init__(
         self,
         num_obstructions: int = 2,

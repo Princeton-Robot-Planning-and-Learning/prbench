@@ -62,6 +62,8 @@ class Geom3DEnvSpec:
     # For rendering.
     render_dpi: int = 300
     render_fps: int = 20
+    render_image_width: int = 836
+    render_image_height: int = 450
 
     def get_camera_kwargs(self) -> dict[str, Any]:
         """Get kwargs to pass to PyBullet camera."""
@@ -70,9 +72,6 @@ class Geom3DEnvSpec:
             "camera_yaw": 90,
             "camera_distance": 1.5,
             "camera_pitch": -20,
-            # Use for fast testing.
-            # "image_width": 32,
-            # "image_height": 32,
         }
 
 
@@ -349,7 +348,10 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         return self._get_obs(), reward, terminated, False, {}
 
     def render(self) -> NDArray[np.uint8]:  # type: ignore
-        return capture_image(self.physics_client_id, **self._spec.get_camera_kwargs())
+        return capture_image(self.physics_client_id,
+                             image_width=self._spec.render_image_width,
+                             image_height=self._spec.render_image_height,
+                             **self._spec.get_camera_kwargs())
 
     def _set_robot_and_held_object(self, joints: JointPositions) -> None:
         set_robot_joints_with_held_object(
