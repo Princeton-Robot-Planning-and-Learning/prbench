@@ -12,12 +12,12 @@ import pybullet as p
 from gymnasium.spaces import Space
 from numpy.typing import NDArray
 from pybullet_helpers.camera import capture_image
-from pybullet_helpers.geometry import Pose, set_pose, multiply_poses, get_pose
+from pybullet_helpers.geometry import Pose, get_pose, multiply_poses, set_pose
 from pybullet_helpers.gui import create_gui_connection
 from pybullet_helpers.inverse_kinematics import (
+    check_body_collisions,
     check_collisions_with_held_object,
     set_robot_joints_with_held_object,
-    check_body_collisions,
 )
 from pybullet_helpers.joint import JointPositions
 from pybullet_helpers.robots import create_pybullet_robot
@@ -234,7 +234,7 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
     @abc.abstractmethod
     def _get_surface_object_names(self) -> set[str]:
         """The names of objects that can be used as surfaces for other objects.
-        
+
         Note that surfaces might be movable, for example, consider block stacking.
         """
 
@@ -300,28 +300,34 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         if action.gripper == "close" and self._grasped_object is None:
             # Check if an object is in collision with the end effector marker.
             # If multiple objects are in collision, treat this as a failed grasp.
-            objects_in_grasp_zone : set[str] = set()
+            objects_in_grasp_zone: set[str] = set()
             # Perform collision detection one-time rather than once per check.
             p.performCollisionDetection(physicsClientId=self.physics_client_id)
             for obj in sorted(self._get_movable_object_names()):
                 obj_id = self._object_name_to_pybullet_id(obj)
-                if check_body_collisions(obj_id, self.end_effector_viz_id,
-                                         self.physics_client_id,
-                                         perform_collision_detection=False):
+                if check_body_collisions(
+                    obj_id,
+                    self.end_effector_viz_id,
+                    self.physics_client_id,
+                    perform_collision_detection=False,
+                ):
                     objects_in_grasp_zone.add(obj)
             # There must be exactly one object in the grasp zone to succeed.
             if len(objects_in_grasp_zone) == 1:
                 self._grasped_object = next(iter(objects_in_grasp_zone))
+                assert self._grasped_object_id is not None
                 # Create grasp transform.
                 world_to_robot = self.robot.get_end_effector_pose()
-                world_to_object = get_pose(self._grasped_object_id, self.physics_client_id)
+                world_to_object = get_pose(
+                    self._grasped_object_id, self.physics_client_id
+                )
                 self._grasped_object_transform = multiply_poses(
                     world_to_robot.invert(), world_to_object
                 )
                 # Close the fingers until they are touching the object.
-                while not check_body_collisions(self._grasped_object_id,
-                                                self.robot.robot_id,
-                                                self.physics_client_id):
+                while not check_body_collisions(
+                    self._grasped_object_id, self.robot.robot_id, self.physics_client_id
+                ):
                     # If the fingers are fully closed, stop.
                     current_finger_state = self.robot.get_finger_state()
                     closed_finger_state = self.robot.closed_fingers_state
@@ -333,10 +339,12 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
                     self.robot.set_finger_state(next_finger_state)
 
         # Check for ungrasping.
-        elif action.gripper == "open" and self._grasped_object is not None:
+        elif action.gripper == "open" and self._grasped_object_id is not None:
             # Check if the held object is being placed on a surface. The rule is that
             # the distance between the object and the surface must be less than thresh.
-            surface_supports = self._get_surfaces_supporting_object(self._grasped_object_id)
+            surface_supports = self._get_surfaces_supporting_object(
+                self._grasped_object_id
+            )
             # Placement is successful.
             if surface_supports:
                 self._grasped_object = None
@@ -348,10 +356,12 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         return self._get_obs(), reward, terminated, False, {}
 
     def render(self) -> NDArray[np.uint8]:  # type: ignore
-        return capture_image(self.physics_client_id,
-                             image_width=self._spec.render_image_width,
-                             image_height=self._spec.render_image_height,
-                             **self._spec.get_camera_kwargs())
+        return capture_image(
+            self.physics_client_id,
+            image_width=self._spec.render_image_width,
+            image_height=self._spec.render_image_height,
+            **self._spec.get_camera_kwargs(),
+        )
 
     def _set_robot_and_held_object(self, joints: JointPositions) -> None:
         set_robot_joints_with_held_object(
@@ -377,15 +387,15 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
             self._grasped_object_transform,
             self.robot.get_joint_positions(),
         )
-    
+
     def _get_surfaces_supporting_object(self, object_id: int) -> set[int]:
         thresh = self._spec.min_placement_dist
         supporting_surface_ids: set[int] = set()
         for surface in self._get_surface_object_names():
             surface_id = self._object_name_to_pybullet_id(surface)
-            if check_body_collisions(object_id, surface_id,
-                                        self.physics_client_id,
-                                        distance_threshold=thresh):
+            if check_body_collisions(
+                object_id, surface_id, self.physics_client_id, distance_threshold=thresh
+            ):
                 supporting_surface_ids.add(surface_id)
         return supporting_surface_ids
 

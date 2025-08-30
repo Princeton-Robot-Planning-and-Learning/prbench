@@ -112,10 +112,10 @@ class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
 
     def _get_collision_object_ids(self) -> set[int]:
         return set()
-    
+
     def _get_movable_object_names(self) -> set[str]:
         return set()
-    
+
     def _get_surface_object_names(self) -> set[str]:
         return set()
 

@@ -3,13 +3,12 @@
 import numpy as np
 from conftest import MAKE_VIDEOS
 from gymnasium.wrappers import RecordVideo
+from prpl_utils.utils import wrap_angle
 from pybullet_helpers.geometry import Pose
 from pybullet_helpers.motion_planning import (
     remap_joint_position_plan_to_constant_distance,
     run_smooth_motion_planning_to_pose,
 )
-from prpl_utils.utils import wrap_angle
-
 
 from prbench.envs.geom3d.motion3d import Motion3DAction, Motion3DEnv, Motion3DState
 

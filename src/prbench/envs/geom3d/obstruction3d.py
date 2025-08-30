@@ -340,7 +340,9 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         if self._target_region_half_extents != obs.target_region.geometry:
             # Recreate the target region.
             if self._target_region_id is not None:
-                p.removeBody(self._target_region_id, physicsClientId=self.physics_client_id)
+                p.removeBody(
+                    self._target_region_id, physicsClientId=self.physics_client_id
+                )
             self._target_region_id = create_pybullet_block(
                 self._spec.target_region_rgba,
                 half_extents=obs.target_region.geometry,
@@ -355,7 +357,9 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         if self._target_block_half_extents != obs.target_block.geometry:
             # Recreate the target block.
             if self._target_block_id is not None:
-                p.removeBody(self._target_block_id, physicsClientId=self.physics_client_id)
+                p.removeBody(
+                    self._target_block_id, physicsClientId=self.physics_client_id
+                )
             self._target_block_id = create_pybullet_block(
                 self._spec.target_block_rgba,
                 half_extents=obs.target_block.geometry,
@@ -375,8 +379,10 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
                 need_recreate = True
             else:
                 obstruction_id = self._object_name_to_pybullet_id(obstruction_name)
-                current_half_extents = self._obstruction_id_to_half_extents[obstruction_id]
-                need_recreate = (current_half_extents != obstruction_state.geometry)
+                current_half_extents = self._obstruction_id_to_half_extents[
+                    obstruction_id
+                ]
+                need_recreate = current_half_extents != obstruction_state.geometry
                 need_destroy = need_recreate
             if need_recreate:
                 # Recreate the obstruction.
@@ -413,7 +419,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         return {self._target_block_id, self._target_region_id, self.table_id} | set(
             self._obstruction_ids.values()
         )
-    
+
     def _get_movable_object_names(self) -> set[str]:
         return {"target_block"} | set(self._obstruction_ids)
 
@@ -451,6 +457,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
     def _goal_reached(self) -> bool:
         if self._grasped_object is not None:
             return False
+        assert self._target_block_id is not None
         target_supports = self._get_surfaces_supporting_object(self._target_block_id)
         return self._target_region_id in target_supports
 
@@ -487,5 +494,6 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
 
     def _create_references_markdown_description(self) -> str:
         """Create references description."""
+        # pylint: disable=line-too-long
         return """Similar environments have been used many times, especially in the task and motion planning literature. We took inspiration especially from the "1D Continuous TAMP" environment in [PDDLStream](https://github.com/caelan/pddlstream).
 """
