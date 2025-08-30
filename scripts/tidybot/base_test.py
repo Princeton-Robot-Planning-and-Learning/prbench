@@ -131,9 +131,8 @@ def test_tidybot3d_minimal() -> bool:
         robot_env = env.env.env._tidybot_robot_env  # type: ignore
         print(f"Initial base position: {robot_env.qpos_base}")
 
-        # Test 1: Small forward movement
+        # Test 1: Small test
         target_base = robot_env.qpos_base.copy()
-        # target_base[0] += 0.1  # Move 10cm forward
         target_base[:3] = [0.3, 0, 0]  # setup target base position
         print(f"Target base position: {target_base}")
 
