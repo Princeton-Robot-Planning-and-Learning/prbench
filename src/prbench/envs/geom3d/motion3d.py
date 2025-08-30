@@ -115,6 +115,9 @@ class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
     
     def _get_movable_object_names(self) -> set[str]:
         return set()
+    
+    def _get_surface_object_names(self) -> set[str]:
+        return set()
 
     def _get_obs(self) -> Motion3DState:
         joint_positions = self.robot.get_joint_positions()

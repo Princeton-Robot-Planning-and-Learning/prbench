@@ -56,6 +56,9 @@ class Geom3DEnvSpec:
     end_effector_viz_color: tuple[float, float, float, float] = (1.0, 0.2, 0.2, 0.5)
     max_action_mag: float = 0.05
 
+    # This is used to check whether a grasped object can be placed on a surface.
+    min_placement_dist: float = 1e-3
+
     # For rendering.
     render_dpi: int = 300
     render_fps: int = 20
@@ -229,6 +232,13 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
     def _get_movable_object_names(self) -> set[str]:
         """The names of objects that can be moved by the robot (grasped and placed)."""
 
+    @abc.abstractmethod
+    def _get_surface_object_names(self) -> set[str]:
+        """The names of objects that can be used as surfaces for other objects.
+        
+        Note that surfaces might be movable, for example, consider block stacking.
+        """
+
     @property
     def _grasped_object_id(self) -> int | None:
         if self._grasped_object is not None:
@@ -288,7 +298,7 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
             self._set_robot_and_held_object(current_joints)
 
         # Check for grasping.
-        if action.gripper == "close":
+        if action.gripper == "close" and self._grasped_object is None:
             # Check if an object is in collision with the end effector marker.
             # If multiple objects are in collision, treat this as a failed grasp.
             objects_in_grasp_zone : set[str] = set()
@@ -324,12 +334,15 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
                     self.robot.set_finger_state(next_finger_state)
 
         # Check for ungrasping.
-        elif action.gripper == "open":
-            # Check if the held object is being placed on a surface.
-            # TODO
-            import ipdb
-
-            ipdb.set_trace()
+        elif action.gripper == "open" and self._grasped_object is not None:
+            # Check if the held object is being placed on a surface. The rule is that
+            # the distance between the object and the surface must be less than thresh.
+            surface_supports = self._get_surfaces_supporting_object(self._grasped_object_id)
+            # Placement is successful.
+            if surface_supports:
+                self._grasped_object = None
+                self._grasped_object_transform = None
+                self.robot.open_fingers()
 
         reward = -1
         terminated = self._goal_reached()
@@ -362,6 +375,17 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
             self._grasped_object_transform,
             self.robot.get_joint_positions(),
         )
+    
+    def _get_surfaces_supporting_object(self, object_id: int) -> set[int]:
+        thresh = self._spec.min_placement_dist
+        supporting_surface_ids: set[int] = set()
+        for surface in self._get_surface_object_names():
+            surface_id = self._object_name_to_pybullet_id(surface)
+            if check_body_collisions(object_id, surface_id,
+                                        self.physics_client_id,
+                                        distance_threshold=thresh):
+                supporting_surface_ids.add(surface_id)
+        return supporting_surface_ids
 
     @abc.abstractmethod
     def _create_env_markdown_description(self) -> str:

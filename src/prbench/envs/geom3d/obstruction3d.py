@@ -399,6 +399,8 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         if object_name == "target_block":
             assert self._target_block_id is not None
             return self._target_block_id
+        if object_name == "table":
+            return self.table_id
         if object_name.startswith("obstruction"):
             return self._obstruction_ids[object_name]
         raise ValueError(f"Unrecognized object name: {object_name}")
@@ -412,6 +414,9 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
     
     def _get_movable_object_names(self) -> set[str]:
         return {"target_block"} | set(self._obstruction_ids)
+
+    def _get_surface_object_names(self) -> set[str]:
+        return {"target_region", "table"}
 
     def _get_obs(self) -> Obstruction3DState:
         joint_positions = self.robot.get_joint_positions()
@@ -442,8 +447,10 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         )
 
     def _goal_reached(self) -> bool:
-        # TODO
-        return False
+        if self._grasped_object is not None:
+            return False
+        target_supports = self._get_surfaces_supporting_object(self._target_block_id)
+        return self._target_region_id in target_supports
 
     def _sample_action(self, rng: np.random.Generator) -> Obstruction3DAction:
         num_dof = 7
