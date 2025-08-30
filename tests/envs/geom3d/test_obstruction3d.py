@@ -3,7 +3,7 @@
 import numpy as np
 from conftest import MAKE_VIDEOS
 from gymnasium.wrappers import RecordVideo
-from pybullet_helpers.geometry import Pose, get_pose
+from pybullet_helpers.geometry import Pose, multiply_poses
 from pybullet_helpers.motion_planning import (
     remap_joint_position_plan_to_constant_distance,
     run_smooth_motion_planning_to_pose,
@@ -112,11 +112,55 @@ def test_pick_place_no_obstructions():
         action = Obstruction3DAction(delta_lst)
         obs, _, _, _, _ = env.step(action)
 
-    import pybullet as p
+    # Determine placement pose and pre-placement pose. Place directly in the center of
+    # the target region for this test.
+    placement_padding = 1e-4  # leave some room to prevent collisions with surface
+    block_placement_pose = Pose((
+        obs.target_region.pose.position[0],
+        obs.target_region.pose.position[1],
+        obs.target_region.pose.position[2] + obs.target_region.geometry[2] + obs.target_block.geometry[2] + placement_padding,
+    ),
+        obs.target_region.pose.orientation,
+    )
+    end_effector_placement_pose = multiply_poses(
+        block_placement_pose, obs.grasped_object_transform,
+    )
+    end_effector_pre_placement_pose = Pose((
+        end_effector_placement_pose.position[0],
+        end_effector_placement_pose.position[1],
+        end_effector_placement_pose.position[2] + 1e-2,
+    ), end_effector_placement_pose.orientation)
 
+    # We don't really have to motion plan here because there are no other objects, but
+    # in general we would motion plan.
+    sim.set_state(obs)
+    current_end_effector_pose = sim.robot.get_end_effector_pose()
+    joint_plan = smoothly_follow_end_effector_path(sim.robot, [current_end_effector_pose, end_effector_pre_placement_pose, end_effector_placement_pose],
+                                      sim.robot.get_joint_positions(),
+                                      collision_ids=set(),
+                                      joint_distance_fn=joint_distance_fn,
+                                      max_smoothing_iters_per_step=max_candidate_plans)
+    joint_plan = remap_joint_position_plan_to_constant_distance(
+        joint_plan, sim.robot, max_distance=spec.max_action_mag / 2
+    )
+
+    for target_joints in joint_plan[1:]:
+        delta = np.subtract(target_joints, obs.joint_positions)[:7]
+        delta_lst = [wrap_angle(a) for a in delta]
+        action = Obstruction3DAction(delta_lst)
+        obs, _, _, _, _ = env.step(action)
+
+    # Open the gripper to finish the placement. Should trigger "done" (goal reached).
+    action = Obstruction3DAction(delta_arm_joints=[0.] * 7, gripper="open")
+    obs, _, done, _, _ = env.step(action)
+    assert obs.grasped_object is None, "Object not released"
+    assert done, "Goal not reached"
+
+    # Uncomment to debug.
+    # import pybullet as p
     # from pybullet_helpers.gui import visualize_pose
-    # visualize_pose(pre_grasp_pose, env.physics_client_id)
-    while True:
-        p.getMouseEvents(env.physics_client_id)
+    # visualize_pose(end_effector_placement_pose, env.physics_client_id)
+    # while True:
+    #     p.getMouseEvents(env.physics_client_id)
 
     env.close()
