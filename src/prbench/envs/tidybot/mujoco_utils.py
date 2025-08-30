@@ -615,53 +615,22 @@ class MjRenderContext:
                 raise RuntimeError(
                     f"invalid value for environment variable MUJOCO_GL: {_MUJOCO_GL}"
                 )
-            
-            # Use conditional imports based on backend, similar to tidybot_mujoco_env.py
             # fmt: off
             # pylint: disable=import-outside-toplevel
             # isort: off
             if _SYSTEM == "Linux" and _MUJOCO_GL == "osmesa":
-                try:
-                    from mujoco.osmesa import GLContext as _MujocoGLContext  # type: ignore[import-untyped]
-                    # Wrap official GLContext to match our API
-                    class GLContext:
-                        def __init__(self, max_width: int, max_height: int, device_id: int = -1):
-                            self._ctx = _MujocoGLContext(max_width, max_height)
-                        def make_current(self):
-                            return self._ctx.make_current()
-                        def free(self):
-                            return self._ctx.free()
-                except ImportError:
-                    from prbench.envs.tidybot.renderers.context.osmesa_context import (
-                        OSMesaGLContext as GLContext,)
+                from prbench.envs.tidybot.renderers.context.osmesa_context import (
+                    OSMesaGLContext as GLContext,)
+
+                # TODO this needs testing on a Linux machine  # pylint: disable=fixme
             elif _SYSTEM == "Linux" and _MUJOCO_GL == "egl":
-                try:
-                    from mujoco.gl_context import GLContext as _MujocoGLContext  # type: ignore[import-untyped]
-                    # Wrap official GLContext to match our API
-                    class GLContext:
-                        def __init__(self, max_width: int, max_height: int, device_id: int = -1):
-                            self._ctx = _MujocoGLContext(max_width, max_height)
-                        def make_current(self):
-                            return self._ctx.make_current()
-                        def free(self):
-                            return self._ctx.free()
-                except ImportError:
-                    from prbench.envs.tidybot.renderers.context.egl_context import (  # type: ignore[assignment] # pylint: disable=line-too-long
-                        EGLGLContext as GLContext,)
+                from prbench.envs.tidybot.renderers.context.egl_context import (  # type: ignore[assignment] # pylint: disable=line-too-long
+                    EGLGLContext as GLContext,)
+
+                # TODO this needs testing on a Linux machine  # pylint: disable=fixme
             else:
-                try:
-                    from mujoco.gl_context import GLContext as _MujocoGLContext  # type: ignore[import-untyped]
-                    # Wrap official GLContext to match our API
-                    class GLContext:
-                        def __init__(self, max_width: int, max_height: int, device_id: int = -1):
-                            self._ctx = _MujocoGLContext(max_width, max_height)
-                        def make_current(self):
-                            return self._ctx.make_current()
-                        def free(self):
-                            return self._ctx.free()
-                except ImportError:
-                    from prbench.envs.tidybot.renderers.context.glfw_context import (  # type: ignore[assignment] # pylint: disable=line-too-long
-                        GLFWGLContext as GLContext,)
+                from prbench.envs.tidybot.renderers.context.glfw_context import (  # type: ignore[assignment] # pylint: disable=line-too-long
+                    GLFWGLContext as GLContext,)
             # isort: on
             # fmt: on
 
@@ -730,9 +699,6 @@ class MjRenderContext:
         camera_id: int | None = None,
     ) -> None:
         """Render the scene."""
-        # Make GL context current for thread safety
-        self.gl_ctx.make_current()
-        
         viewport = mujoco.MjrRect(0, 0, width, height)
 
         # update width and height of rendering context if necessary
@@ -758,7 +724,7 @@ class MjRenderContext:
             self.scn,
         )
 
-        mujoco.mjr_render(viewport, self.scn, self.con)
+        mujoco.mjr_render(viewport=viewport, scn=self.scn, con=self.con)
 
     def read_pixels(
         self,
@@ -772,9 +738,6 @@ class MjRenderContext:
             NDArray[np.uint8] if depth is False,
             tuple of (NDArray[np.uint8], NDArray[np.float32] or None) if depth is True.
         """
-        # Make GL context current for thread safety
-        self.gl_ctx.make_current()
-        
         viewport = mujoco.MjrRect(0, 0, width, height)
         rgb_img: NDArray[np.uint8] = np.empty((height, width, 3), dtype=np.uint8)
         depth_img: NDArray[np.float32] | None = (
@@ -785,7 +748,6 @@ class MjRenderContext:
             rgb=rgb_img, depth=depth_img, viewport=viewport, con=self.con
         )
 
-        # Flip image vertically to match standard conventions (similar to tidybot_mujoco_env.py)
         rgb_img = np.flipud(rgb_img)
         if depth_img is not None:
             depth_img = np.flipud(depth_img)
@@ -801,27 +763,18 @@ class MjRenderContext:
 
     def __del__(self) -> None:
         """Free mujoco rendering context and GL rendering context."""
+        self.con.free()
         try:
-            if hasattr(self, 'con') and self.con is not None:
-                self.con.free()
-        except Exception:  # pylint: disable=broad-exception-caught
-            # Avoid errors during cleanup
-            pass
-            
-        try:
-            if hasattr(self, 'gl_ctx') and self.gl_ctx is not None:
-                self.gl_ctx.free()
+            self.gl_ctx.free()
         except Exception:  # pylint: disable=broad-exception-caught
             # avoid getting OpenGL.error.GLError
             pass
-            
-        # Clean up references
-        for attr in ['con', 'gl_ctx', 'scn', 'cam', 'vopt', 'pert']:
-            if hasattr(self, attr):
-                try:
-                    delattr(self, attr)
-                except Exception:  # pylint: disable=broad-exception-caught
-                    pass
+        del self.con
+        del self.gl_ctx
+        del self.scn
+        del self.cam
+        del self.vopt
+        del self.pert
 
 
 class MjRenderContextOffscreen(MjRenderContext):
