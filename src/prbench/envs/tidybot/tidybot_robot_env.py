@@ -57,6 +57,13 @@ class TidyBotRobotEnv(MujocoEnv):
         self.qpos_gripper: Optional[NDArray[np.float64]] = None
         self.ctrl_gripper: Optional[NDArray[np.float64]] = None
 
+        # Cached identifiers for commonly used sites/bodies
+        self.ee_site_id: Optional[int] = None
+        self.ee_body_id: Optional[int] = None
+
+        # Cached environment IDs grouped by category (objects, tables, grounds, etc.)
+        self.environment_ids: dict[str, list[int]] = {}
+
     def _setup_robot_references(self) -> None:
         """Setup references to robot state/actuator buffers in the simulation data."""
         assert self.sim is not None, "Simulation must be initialized."
@@ -155,6 +162,60 @@ class TidyBotRobotEnv(MujocoEnv):
         )
         self.qpos_gripper = None
         self.ctrl_gripper = self.sim.data.ctrl[gripper_ctrl_id : gripper_ctrl_id + 1]
+
+        # Cache end-effector identifiers if available
+        try:
+            self.ee_site_id = self.sim.model._site_name2id.get("pinch_site")  # type: ignore[attr-defined]
+        except Exception:  # pylint: disable=broad-exception-caught
+            self.ee_site_id = None
+        try:
+            self.ee_body_id = self.sim.model._body_name2id.get("tool_frame")  # type: ignore[attr-defined]
+        except Exception:  # pylint: disable=broad-exception-caught
+            self.ee_body_id = None
+
+        # Cache environment IDs for objects, tables, and other fixtures
+        self._cache_environment_ids()
+
+    def _cache_environment_ids(self) -> None:
+        """Populate environment_ids mapping by scanning model body names."""
+        assert self.sim is not None, "Simulation must be initialized."
+
+        objects: list[int] = []
+        tables: list[int] = []
+        grounds: list[int] = []
+        cabinets: list[int] = []
+        drawers: list[int] = []
+
+        try:
+            for name, body_id in self.sim.model._body_name2id.items():  # type: ignore[attr-defined]
+                if name is None:
+                    continue
+                lname = name.lower()
+                if lname.startswith("cube") or "object" in lname:
+                    objects.append(body_id)
+                if "table" in lname:
+                    tables.append(body_id)
+                if "ground" in lname or "floor" in lname:
+                    grounds.append(body_id)
+                if "cabinet" in lname or "cupboard" in lname:
+                    cabinets.append(body_id)
+                if "drawer" in lname:
+                    drawers.append(body_id)
+        except Exception:  # pylint: disable=broad-exception-caught
+            # If mappings unavailable, leave empty
+            pass
+
+        self.environment_ids = {
+            "objects": objects,
+            "tables": tables,
+            "grounds": grounds,
+            "cabinets": cabinets,
+            "drawers": drawers,
+        }
+
+    def get_environment_ids(self) -> dict[str, list[int]]:
+        """Return cached environment IDs grouped by category."""
+        return self.environment_ids
 
     def reset(
         self, xml_string: str
