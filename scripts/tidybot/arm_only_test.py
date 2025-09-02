@@ -58,25 +58,23 @@ def test_arm_controller() -> bool:
         initial_ee_pos = None
         target_ee_pos = np.array([0.5, 0.3, 0.4])  # Target end-effector position
 
-        try:
-            if hasattr(controller, "ik_solver") and controller.ik_solver:
-                # Get initial end-effector position
-                # pylint: disable=no-member
-                mujoco.mj_kinematics(
-                    controller.ik_solver.model, controller.ik_solver.data
-                )
-                # pylint: disable=no-member
-                mujoco.mj_comPos(controller.ik_solver.model, controller.ik_solver.data)
-                initial_ee_pos = controller.ik_solver.site_pos.copy()
-                print(
-                    f"Initial end-effector position: "
-                    f"[{initial_ee_pos[0]:.3f}, {initial_ee_pos[1]:.3f}, "
-                    f"{initial_ee_pos[2]:.3f}]"
-                )
-            else:
-                print("IK solver not available, skipping FK test")
-        except Exception as fk_error:
-            print(f"Forward kinematics failed: {fk_error}")
+        if hasattr(controller, "ik_solver") and controller.ik_solver:
+            # Get initial end-effector position
+            # pylint: disable=no-member
+            mujoco.mj_kinematics(
+                controller.ik_solver.model, controller.ik_solver.data
+            )
+            # pylint: disable=no-member
+            mujoco.mj_comPos(controller.ik_solver.model, controller.ik_solver.data)
+            initial_ee_pos = controller.ik_solver.site_pos.copy()
+            print(
+                f"Initial end-effector position: "
+                f"[{initial_ee_pos[0]:.3f}, {initial_ee_pos[1]:.3f}, "
+                f"{initial_ee_pos[2]:.3f}]"
+            )
+        else:
+            print("IK solver not available, skipping FK test")
+        
 
         # Test arm movements
         print("\nTesting arm movements...")
@@ -132,32 +130,30 @@ def test_arm_controller() -> bool:
             ee_movement = float(0.0)
 
             # Test forward kinematics on final position
-            try:
-                if (
-                    hasattr(controller, "ik_solver")
-                    and controller.ik_solver
-                    and initial_ee_pos is not None
-                ):
-                    # pylint: disable=no-member
-                    mujoco.mj_kinematics(
-                        controller.ik_solver.model, controller.ik_solver.data
-                    )
-                    # pylint: disable=no-member
-                    mujoco.mj_comPos(
-                        controller.ik_solver.model, controller.ik_solver.data
-                    )
-                    final_ee_pos = controller.ik_solver.site_pos.copy()
-                    ee_error = float(np.linalg.norm(final_ee_pos - target_ee_pos))
-                    ee_movement = float(np.linalg.norm(final_ee_pos - initial_ee_pos))
-                    print(
-                        f"  Final end-effector position: "
-                        f"[{final_ee_pos[0]:.3f}, {final_ee_pos[1]:.3f}, "
-                        f"{final_ee_pos[2]:.3f}]"
-                    )
-                else:
-                    print("  IK solver not available for FK test")
-            except Exception:
-                print("  Final end-effector position: [FK failed]")
+            if (
+                hasattr(controller, "ik_solver")
+                and controller.ik_solver
+                and initial_ee_pos is not None
+            ):
+                # pylint: disable=no-member
+                mujoco.mj_kinematics(
+                    controller.ik_solver.model, controller.ik_solver.data
+                )
+                # pylint: disable=no-member
+                mujoco.mj_comPos(
+                    controller.ik_solver.model, controller.ik_solver.data
+                )
+                final_ee_pos = controller.ik_solver.site_pos.copy()
+                ee_error = float(np.linalg.norm(final_ee_pos - target_ee_pos))
+                ee_movement = float(np.linalg.norm(final_ee_pos - initial_ee_pos))
+                print(
+                    f"  Final end-effector position: "
+                    f"[{final_ee_pos[0]:.3f}, {final_ee_pos[1]:.3f}, "
+                    f"{final_ee_pos[2]:.3f}]"
+                )
+            else:
+                print("  IK solver not available for FK test")
+            
 
             joint_movement = np.linalg.norm(final_joints - initial_joints)
 
@@ -205,7 +201,7 @@ def test_tidybot3d_arm_only() -> bool:
 
         print("Creating TidyBot3D environment...")
         env = prbench.make(
-            "prbench/TidyBot3D-cupboard-o8-v0",
+            "prbench/TidyBot3D-ground-o5-v0",
             render_images=True,
             show_images=True,
             show_viewer=False,
@@ -213,7 +209,7 @@ def test_tidybot3d_arm_only() -> bool:
 
         print("Resetting environment...")
         # Ignore unused obs and info
-        _, _ = env.reset(seed=42)
+        _, _ = env.reset()
 
         # Get access to the robot environment
         # pylint: disable=protected-access
@@ -247,7 +243,7 @@ def test_tidybot3d_arm_only() -> bool:
         arm_movements = [
             {
                 "name": "Reach Forward",
-                "arm_pos": [0.5, 0.0, 0.4],
+                "arm_pos": [0.5, 0.0, -0.3],
                 "arm_quat": [1.0, 0.0, 0.0, 0.0],
             },
             {
@@ -262,20 +258,15 @@ def test_tidybot3d_arm_only() -> bool:
             },
         ]
 
-        # Track initial end-effector position if possible
+        # Track initial end-effector position using robot env helper
         initial_ee_pos = None
         try:
-            if hasattr(robot_env, "sim") and hasattr(robot_env.sim, "data"):
-                ee_site_name = "end_effector"
-                site_id = robot_env.sim.model.site_name2id(ee_site_name)
-                initial_ee_pos = robot_env.sim.data.site_xpos[site_id].copy()
-                print(
-                    f"Initial end-effector position: "
-                    f"[{initial_ee_pos[0]:.3f}, {initial_ee_pos[1]:.3f}, "
-                    f"{initial_ee_pos[2]:.3f}]"
-                )
-            else:
-                print("End-effector site not accessible in this environment")
+            initial_ee_pos = robot_env.get_end_effector_position()
+            print(
+                f"Initial end-effector position: "
+                f"[{initial_ee_pos[0]:.3f}, {initial_ee_pos[1]:.3f}, "
+                f"{initial_ee_pos[2]:.3f}]"
+            )
         except Exception:
             print("Could not get initial end-effector position")
 
@@ -304,7 +295,11 @@ def test_tidybot3d_arm_only() -> bool:
             )
 
             # Take multiple steps to allow movement to complete
-            for step in range(100):
+            change_tol = 1e-3  # L2 norm threshold for joint change between steps
+            stagnant_required = 10  # number of consecutive small-change steps to declare convergence
+            stagnant_steps = 0
+            prev_arm_joints = initial_arm_joints.copy()
+            for step in range(1000):
                 try:
                     # Handle both 4 and 5 return values for compatibility
                     step_result = env.step(action)
@@ -328,9 +323,19 @@ def test_tidybot3d_arm_only() -> bool:
                         )
                         print(f"    Step {step+1}: arm_joints={arm_str}")
 
-                    # Check for convergence
-                    if joint_error > 0.5:  # Significant arm movement
-                        print(f"    ✅ Arm movement detected at step {step+1}!")
+                    # Check for convergence: joints not changing much
+                    joint_delta = float(
+                        np.linalg.norm(current_arm_joints - prev_arm_joints)
+                    )
+                    if joint_delta < change_tol:
+                        stagnant_steps += 1
+                    else:
+                        stagnant_steps = 0
+                    prev_arm_joints = current_arm_joints
+                    if stagnant_steps >= stagnant_required:
+                        print(
+                            f"    ✅ Converged: joint change < {change_tol} for {stagnant_required} steps"
+                        )
                         break
 
                     if done:
@@ -348,37 +353,25 @@ def test_tidybot3d_arm_only() -> bool:
             arm_movement = np.linalg.norm(final_arm_joints - initial_arm_joints)
             base_drift = np.linalg.norm(final_base_pos - fixed_base_pos)
 
-            # Check end-effector position if possible
+            # Check end-effector position using robot env helper
             try:
-                if hasattr(robot_env, "sim") and hasattr(robot_env.sim, "data"):
-                    site_id = robot_env.sim.model.site_name2id("end_effector")
-                    final_ee_pos = robot_env.sim.data.site_xpos[site_id].copy()
-                    if initial_ee_pos is not None:
-                        ee_error = float(np.linalg.norm(final_ee_pos - target_ee_pos))
-                        ee_movement = float(
-                            np.linalg.norm(final_ee_pos - initial_ee_pos)
-                        )
-                    else:
-                        ee_error = float("inf")
-                        ee_movement = float(0.0)
-                    print(
-                        f"    Final end-effector position: "
-                        f"[{final_ee_pos[0]:.3f}, {final_ee_pos[1]:.3f}, "
-                        f"{final_ee_pos[2]:.3f}]"
-                    )
+                final_ee_pos = robot_env.get_end_effector_position()
+                if initial_ee_pos is not None:
+                    ee_error = float(np.linalg.norm(final_ee_pos - target_ee_pos))
+                    ee_movement = float(np.linalg.norm(final_ee_pos - initial_ee_pos))
                 else:
-                    final_ee_pos = None
                     ee_error = float("inf")
                     ee_movement = float(0.0)
-                    print(
-                        "    Final end-effector position: "
-                        "[arm controller not accessible]"
-                    )
+                print(
+                    f"    Final end-effector position: "
+                    f"[{final_ee_pos[0]:.3f}, {final_ee_pos[1]:.3f}, "
+                    f"{final_ee_pos[2]:.3f}]"
+                )
             except Exception:
                 final_ee_pos = None
                 ee_error = float("inf")
                 ee_movement = float(0.0)
-                print("    Final end-effector position: [FK failed]")
+                print("    Final end-effector position: [unavailable]")
 
             print("  📊 Movement Summary:")
             arm_str = (

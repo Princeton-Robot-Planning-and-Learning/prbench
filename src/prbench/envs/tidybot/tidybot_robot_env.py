@@ -229,6 +229,72 @@ class TidyBotRobotEnv(MujocoEnv):
         """Return cached environment IDs grouped by category."""
         return self.environment_ids
 
+    def get_end_effector_position(self) -> NDArray[np.float64]:
+        """Return the current end-effector position in world coordinates.
+
+        Prefers the cached end-effector site position if available; otherwise
+        falls back to the corresponding body position. Raises if neither is
+        available in the model.
+        """
+        assert self.sim is not None, "Simulation must be initialized."
+        if self.ee_site_id is not None:
+            return self.sim.data.site_xpos[self.ee_site_id].copy()
+        if self.ee_body_id is not None:
+            return self.sim.data.body_xpos[self.ee_body_id].copy()
+        raise RuntimeError("End-effector identifiers not available in the model")
+
+    def get_object_poses(self) -> dict[str, dict[str, NDArray[np.float64]]]:
+        """Return poses (position and orientation) of all objects in the environment.
+        
+        Returns:
+            Dictionary mapping object names to pose dictionaries containing:
+            - 'position': 3D position as numpy array [x, y, z]
+            - 'orientation': 4D quaternion as numpy array [w, x, y, z]
+        """
+        assert self.sim is not None, "Simulation must be initialized."
+        
+        object_poses: dict[str, dict[str, NDArray[np.float64]]] = {}
+        
+        try:
+            # Get object body IDs
+            object_ids = self.environment_ids.get('objects', [])
+
+            print(f"Object IDs: {object_ids}")
+            
+            # Get body name mapping
+            body_name2id = getattr(self.sim.model, '_body_name2id', {})
+            
+            for body_id in object_ids:
+                # Find the body name for this ID
+                body_name = None
+                for name, bid in body_name2id.items():
+                    if bid == body_id:
+                        body_name = name
+                        break
+                
+                if body_name is None:
+                    continue
+                
+                # Get position from xpos
+                position = self.sim.data.xpos[body_id].copy()
+                print(f"Position: {position}")
+                # Get orientation quaternion from xquat (if available) or compute from xmat
+                if hasattr(self.sim.data, 'xquat') and body_id < len(self.sim.data.xquat):
+                    quaternion = self.sim.data.xquat[body_id].copy()
+                    print(f"Quaternion: {quaternion}")
+                else:
+                    raise ValueError(f"No quaternion data available for body {body_name}")
+                
+                object_poses[body_name] = {
+                    'position': position,
+                    'orientation': quaternion
+                }
+                
+        except Exception as e:
+            print(f"Warning: Error getting object poses: {e}")
+        
+        return object_poses
+
     def reset(
         self, xml_string: str
     ) -> tuple[dict[str, NDArray[Any]], None, None, None]:
