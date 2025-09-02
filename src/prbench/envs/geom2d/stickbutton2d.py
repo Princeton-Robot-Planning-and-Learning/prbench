@@ -345,6 +345,9 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
             if not np.allclose(color, self._spec.button_pressed_rgb):
                 terminated = False
                 break
+        if terminated:
+            return 1.0, terminated
+        
         return -1.0, terminated
 
 
