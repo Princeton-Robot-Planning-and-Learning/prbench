@@ -5,7 +5,6 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-import cv2 as cv
 import gymnasium
 import numpy as np
 from gymnasium import spaces
@@ -94,6 +93,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             seed=seed,
             camera_names=camera_names,
             show_viewer=show_viewer,
+            show_images=self.show_images,
         )
 
     def _create_observation_space(self) -> spaces.Box:
@@ -232,18 +232,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         vec_obs = self._vectorize_observation(obs)
         return vec_obs, {}
 
-    def _visualize_image_in_window(
-        self, image: NDArray[np.uint8], window_name: str
-    ) -> None:
-        """Visualize an image in an OpenCV window."""
-        if image.dtype == np.uint8 and len(image.shape) == 3:
-            # Convert RGB to BGR for proper color display in OpenCV
-            display_image = cv.cvtColor(  # pylint: disable=no-member
-                image, cv.COLOR_RGB2BGR  # pylint: disable=no-member
-            )
-            cv.imshow(window_name, display_image)  # pylint: disable=no-member
-            cv.waitKey(1)  # pylint: disable=no-member
-
     def step(
         self, action: NDArray[np.float32]
     ) -> tuple[NDArray[np.float32], float, bool, bool, dict[str, Any]]:
@@ -254,14 +242,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         # Get observation
         obs = self._tidybot_robot_env.get_obs()
         vec_obs = self._vectorize_observation(obs)
-
-        # Visualization loop for rendered image
-        if self.show_images:
-            for camera_name in self._tidybot_robot_env.camera_names:
-                self._visualize_image_in_window(
-                    obs[f"{camera_name}_image"],
-                    f"TidyBot {camera_name} camera",
-                )
 
         # Calculate reward and termination
         reward = self._calculate_reward(obs)
@@ -296,9 +276,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
     def close(self) -> None:
         """Close the environment."""
-        if self.show_images:
-            # Close OpenCV windows
-            cv.destroyAllWindows()  # pylint: disable=no-member
         self._tidybot_robot_env.close()
 
     def set_render_camera(self, camera_name: str | None) -> None:

@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Optional
 
+import cv2 as cv
 import numpy as np
 from numpy.typing import NDArray
 
@@ -26,6 +27,7 @@ class TidyBotRobotEnv(MujocoEnv):
         camera_height: int = 480,
         seed: Optional[int] = None,
         show_viewer: bool = False,
+        show_images: bool = False,
     ) -> None:
         """
         Args:
@@ -47,6 +49,9 @@ class TidyBotRobotEnv(MujocoEnv):
         self.base_controller: Optional[BaseController] = None
         self.arm_controller: Optional[ArmController] = None
 
+        # Visualization flag
+        self.show_images = show_images
+
         # Robot state/actuator references (initialized in _setup_robot_references)
         self.qpos_base: Optional[NDArray[np.float64]] = None
         self.qvel_base: Optional[NDArray[np.float64]] = None
@@ -63,6 +68,13 @@ class TidyBotRobotEnv(MujocoEnv):
 
         # Cached environment IDs grouped by category (objects, tables, grounds, etc.)
         self.environment_ids: dict[str, list[int]] = {}
+
+    def _visualize_image_in_window(self, image: NDArray[np.uint8], window_name: str) -> None:
+        """Visualize an image in an OpenCV window."""
+        if image.dtype == np.uint8 and len(image.shape) == 3:
+            display_image = cv.cvtColor(image, cv.COLOR_RGB2BGR)  # pylint: disable=no-member
+            cv.imshow(window_name, display_image)  # pylint: disable=no-member
+            cv.waitKey(1)  # pylint: disable=no-member
 
     def _setup_robot_references(self) -> None:
         """Setup references to robot state/actuator buffers in the simulation data."""
@@ -239,7 +251,7 @@ class TidyBotRobotEnv(MujocoEnv):
         self._setup_robot_references()
 
         # Randomize the base pose of the robot in the sim
-        self._randomize_base_pose()
+        # self._randomize_base_pose()
 
         # Setup controllers after resetting the environment
         self._setup_controllers()
@@ -352,7 +364,16 @@ class TidyBotRobotEnv(MujocoEnv):
             Tuple of (observation, reward, done, info).
         """
         assert isinstance(action, dict), "Action must be a dictionary."
-        return super().step(action)
+        obs, reward, done, info = super().step(action)
+
+        # If requested, visualize available camera images
+        if self.show_images and hasattr(self, "camera_names") and self.camera_names is not None:
+            for camera_name in self.camera_names:
+                key = f"{camera_name}_image"
+                if key in obs:
+                    self._visualize_image_in_window(obs[key], f"TidyBot {camera_name} camera")
+
+        return obs, reward, done, info
 
     def reward(self, **kwargs: Any) -> float:
         """Compute the reward for the current state and action."""
@@ -395,3 +416,9 @@ class TidyBotRobotEnv(MujocoEnv):
         self.arm_controller.reset()  # also resets arm to retract position
 
         self.sim.forward()
+
+    def close(self) -> None:
+        """Close environment and any visualization windows."""
+        if self.show_images:
+            cv.destroyAllWindows()  # pylint: disable=no-member
+        super().close()
