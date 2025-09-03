@@ -168,7 +168,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 # Insert new cubes
                 for i in range(self.num_objects):
                     name = f"cube{i+1}"
-                    body = ET.Element("body", name=f"{name}_body")
+                    body = ET.Element("body")
                     ET.SubElement(body, "freejoint", name=f"{name}_joint")
                     ET.SubElement(
                         body,
@@ -177,7 +177,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                         size="0.02 0.02 0.02",
                         rgba=".5 .7 .5 1",
                         mass="0.1",
-                        name=f"{name}_geom",
                     )
                     worldbody.append(body)
                     self._object_names.append(name)
@@ -193,7 +192,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         return xml_string
 
-    def _set_object_pos_quat(self, name, pos, quat) -> None:
+    def _set_object_pos_quat(self, name: str, pos: float, quat: float) -> None:
         """Set object position and orientation in the environment."""
 
         assert self._tidybot_robot_env.sim is not None, "Simulation not initialized"
@@ -204,7 +203,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             [float(x) for x in pos] + [float(q) for q in quat]
         )
 
-    def get_object_pos_quat(self, name) -> tuple[float, float]:
+    def get_object_pos_quat(self, name: str) -> tuple[float, float]:
         """Set object position and orientation in the environment."""
 
         assert self._tidybot_robot_env.sim is not None, "Simulation not initialized"
@@ -258,13 +257,14 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         super().reset(*args, **kwargs)
 
+        # Create scene XML
+        self._object_names = []
         xml_string = self._create_scene_xml()
 
         # Reset the underlying TidyBot robot environment
         self._tidybot_robot_env.reset(xml_string)
 
-        # initialize object poses
-        self._object_names = []
+        # Initialize object poses
         self._initialize_object_poses()
 
         # Get observation and vectorize
