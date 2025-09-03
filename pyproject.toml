@@ -32,6 +32,7 @@ dependencies = [
    # PyBullet dependencies
    "pybullet==3.2.5",
    "pybullet-helpers@git+https://github.com/tomsilver/pybullet-helpers.git",
+   "pymunk==7.1.0"
 ]
 
 [project.optional-dependencies]
