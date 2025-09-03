@@ -13,14 +13,13 @@ import os
 import platform
 import xml.etree.ElementTree as ET
 from threading import Lock
-from typing import Any
+from typing import Any, TypeAlias
 
+import gymnasium
 import mujoco
 import mujoco.viewer
 import numpy as np
 from numpy.typing import NDArray
-
-from prbench.envs.tidybot import utils
 
 # This value is then used by the physics engine to determine how much time
 # to simulate for each step.
@@ -54,7 +53,11 @@ _MUJOCO_GL = os.environ.get("MUJOCO_GL", "").lower().strip()
 _MjSim_render_lock = Lock()
 
 
-class MujocoEnv:
+MjObs: TypeAlias = dict[str, NDArray[Any]]
+MjAct: TypeAlias = NDArray[Any] | dict[str, Any]
+
+
+class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
     """This is the base class for environments that use MuJoCo for simulation."""
 
     def __init__(
@@ -90,21 +93,21 @@ class MujocoEnv:
         self.camera_height: int = camera_height
 
         # Initialize random number generator
-        self.np_random = self.seed(seed)
-
-    def seed(self, seed: int | None = None) -> np.random.Generator:
-        """Set the random seed for the environment.
-
-        Args:
-            seed: The seed value to set. If None, a random seed is used.
-        """
-        self.np_random = utils.get_rng(seed)  # type: ignore[no-untyped-call]
-        return self.np_random
+        self.np_random = np.random.default_rng(seed)
+        super().__init__()
 
     def reset(
-        self, xml_string: str
-    ) -> tuple[dict[str, NDArray[Any]], None, None, None]:
-        """Reset the environment using xml string."""
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> tuple[MjObs, dict[str, Any]]:
+        # Reset the random seed.
+        super().reset(seed=seed, options=options)
+
+        # Access the xml.
+        assert options is not None and "xml" in options, "XML required to reset env"
+        xml_string = options["xml"]
 
         # Destroy the current simulation if it exists.
         self._close_sim()
@@ -115,9 +118,13 @@ class MujocoEnv:
         assert self.sim is not None, "Simulation must be initialized after _create_sim"
         self.sim.reset()
         self.sim.forward()
-        return self.get_obs(), None, None, None
+        return self.get_obs(), {}
 
-    def _pre_action(self, action: NDArray[Any] | dict[str, Any]) -> None:
+    def render(self):
+        # Subclasses should override.
+        pass
+
+    def _pre_action(self, action: MjAct) -> None:
         """Do any preprocessing before taking an action.
 
         Args:
@@ -130,9 +137,7 @@ class MujocoEnv:
                 )
             self.sim.data.ctrl[:] = action
 
-    def _post_action(
-        self, action: NDArray[Any] | dict[str, Any]
-    ) -> tuple[float, bool, dict[str, Any]]:
+    def _post_action(self, action: MjAct) -> tuple[float, bool, dict[str, Any]]:
         """Do any housekeeping after taking an action.
 
         Args:
@@ -157,20 +162,7 @@ class MujocoEnv:
         """
         raise NotImplementedError
 
-    def step(
-        self, action: NDArray[Any] | dict[str, Any]
-    ) -> tuple[dict[str, Any], float, bool, dict[str, Any]]:
-        """Step the environment.
-
-        Args:
-            action: Optional action to apply before stepping.
-
-        Returns:
-            obs: Observation after step.
-            reward: Reward from the environment.
-            done: Whether the episode is completed.
-            info: Additional information.
-        """
+    def step(self, action: MjAct) -> tuple[MjObs, float, bool, bool, dict[str, Any]]:
         if self.done:
             raise ValueError("Executing action in a terminated episode.")
 
@@ -192,10 +184,11 @@ class MujocoEnv:
 
         # Check if the episode is done due to horizon
         self.done = self.done or (self.timestep >= self.horizon)
+        truncated = False
 
-        return self.get_obs(), reward, self.done, info
+        return self.get_obs(), reward, self.done, truncated, info
 
-    def get_obs(self) -> dict[str, NDArray[Any]]:
+    def get_obs(self) -> MjObs:
         """Get the current observation."""
         assert self.sim is not None, "Simulation must be initialized."
 

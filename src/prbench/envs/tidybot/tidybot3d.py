@@ -99,7 +99,8 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def _create_observation_space(self) -> spaces.Box:
         """Create observation space based on TidyBot's observation structure."""
         # Get example observation to determine dimensions
-        self._tidybot_robot_env.reset(self._create_scene_xml())
+        xml_string = self._create_scene_xml()
+        self._tidybot_robot_env.reset(options={"xml": xml_string})
         example_obs = self._tidybot_robot_env.get_obs()
 
         # Calculate total observation dimension (all values are ndarrays)
@@ -214,20 +215,20 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         return xml_string
 
     def reset(
-        self, *args: Any, **kwargs: Any
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
     ) -> tuple[NDArray[np.float32], dict[str, Any]]:
-        """Reset the environment."""
 
-        if "seed" in kwargs:
-            self._tidybot_robot_env.seed(kwargs.get("seed"))
-            self.np_random = self._tidybot_robot_env.np_random
-
-        super().reset(*args, **kwargs)
+        super().reset(seed=seed, options=options)
 
         xml_string = self._create_scene_xml()
 
         # Reset the underlying TidyBot robot environment
-        obs, _, _, _ = self._tidybot_robot_env.reset(xml_string)
+        robot_options = options.copy() if options is not None else {}
+        robot_options["xml"] = xml_string
+        obs, _ = self._tidybot_robot_env.reset(seed=seed, options=robot_options)
 
         vec_obs = self._vectorize_observation(obs)
         return vec_obs, {}
@@ -247,7 +248,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def step(
         self, action: NDArray[np.float32]
     ) -> tuple[NDArray[np.float32], float, bool, bool, dict[str, Any]]:
-        """Execute action and return next observation."""
         action_dict = self._action_to_dict(action)
         self._tidybot_robot_env.step(action_dict)
 
