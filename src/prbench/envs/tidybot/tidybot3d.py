@@ -192,7 +192,9 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         return xml_string
 
-    def _set_object_pos_quat(self, name: str, pos: float, quat: float) -> None:
+    def _set_object_pos_quat(
+        self, name: str, pos: NDArray[np.float32], quat: NDArray[np.float32]
+    ) -> None:
         """Set object position and orientation in the environment."""
 
         assert self._tidybot_robot_env.sim is not None, "Simulation not initialized"
@@ -220,7 +222,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         assert self._tidybot_robot_env.sim is not None, "Simulation not initialized"
 
         for name in self._object_names:
-            pos = [0.0, 0.0, 0.0]
+            pos = np.array([0.0, 0.0, 0.0])
             if self.scene_type == "cupboard":
                 pass  # no position randomization for cupboard scene
             elif self.scene_type == "table":
@@ -229,14 +231,14 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 x = round(self.np_random.uniform(0.2, 0.8), 3)
                 y = round(self.np_random.uniform(-0.15, 0.15), 3)
                 z = 0.44
-                pos = [x, y, z]
+                pos = np.array([x, y, z])
             else:
                 # Randomize position within a reasonable range
                 # for the ground environment
                 x = round(self.np_random.uniform(0.4, 0.8), 3)
                 y = round(self.np_random.uniform(-0.3, 0.3), 3)
                 z = 0.02
-                pos = [x, y, z]
+                pos = np.array([x, y, z])
             # Randomize orientation around Z-axis (yaw)
             theta = self.np_random.uniform(-math.pi, math.pi)
             quat = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
