@@ -54,6 +54,9 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             seed=seed, camera_names=camera_names, show_viewer=show_viewer
         )
 
+        # Initialize empty object list
+        self._object_names: list[str] = []
+
         # Set random number generator
         self.np_random = self._tidybot_robot_env.np_random
 
@@ -166,31 +169,8 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 # Insert new cubes
                 for i in range(self.num_objects):
                     name = f"cube{i+1}"
-                    body = ET.Element("body", name=name, pos="0 0 0")
-                    ET.SubElement(body, "freejoint")
-                    pos = "0 0 0"
-                    if self.scene_type == "cupboard":
-                        pass  # no position randomization for cupboard scene
-                    elif self.scene_type == "table":
-                        # Randomize position within a reasonable range
-                        # for the table environment
-                        x = round(self.np_random.uniform(0.2, 0.8), 3)
-                        y = round(self.np_random.uniform(-0.15, 0.15), 3)
-                        z = 0.44
-                        pos = f"{x} {y} {z}"
-                    else:
-                        # Randomize position within a reasonable range
-                        # for the ground environment
-                        x = round(self.np_random.uniform(0.4, 0.8), 3)
-                        y = round(self.np_random.uniform(-0.3, 0.3), 3)
-                        z = 0.02
-                        pos = f"{x} {y} {z}"
-                    # Randomize orientation around Z-axis (yaw)
-                    theta = self.np_random.uniform(-math.pi, math.pi)
-                    quat_array = np.array(
-                        [math.cos(theta / 2), 0, 0, math.sin(theta / 2)]
-                    )
-                    quat = " ".join(map(str, quat_array))
+                    body = ET.Element("body")
+                    ET.SubElement(body, "freejoint", name=f"{name}_joint")
                     ET.SubElement(
                         body,
                         "geom",
@@ -198,10 +178,9 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                         size="0.02 0.02 0.02",
                         rgba=".5 .7 .5 1",
                         mass="0.1",
-                        pos=pos,
-                        quat=quat,
                     )
                     worldbody.append(body)
+                    self._object_names.append(name)
 
                 # Get XML string from tree
                 xml_string = ET.tostring(root, encoding="unicode")
@@ -214,6 +193,62 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         return xml_string
 
+    def _set_object_pos_quat(
+        self, name: str, pos: NDArray[np.float32], quat: NDArray[np.float32]
+    ) -> None:
+        """Set object position and orientation in the environment."""
+
+        assert self._tidybot_robot_env.sim is not None, "Simulation not initialized"
+        joint_id = self._tidybot_robot_env.sim.model.get_joint_qpos_addr(
+            f"{name}_joint"
+        )
+        self._tidybot_robot_env.sim.data.qpos[joint_id : joint_id + 7] = np.array(
+            [float(x) for x in pos] + [float(q) for q in quat]
+        )
+
+    def get_object_pos_quat(self, name: str) -> tuple[float, float]:
+        """Set object position and orientation in the environment."""
+
+        assert self._tidybot_robot_env.sim is not None, "Simulation not initialized"
+        joint_id = self._tidybot_robot_env.sim.model.get_joint_qpos_addr(
+            f"{name}_joint"
+        )
+        pos = self._tidybot_robot_env.sim.data.qpos[joint_id : joint_id + 3]
+        quat = self._tidybot_robot_env.sim.data.qpos[joint_id + 3 : joint_id + 7]
+        return pos, quat
+
+    def _initialize_object_poses(self) -> None:
+        """Initialize object poses in the environment."""
+
+        assert self._tidybot_robot_env.sim is not None, "Simulation not initialized"
+
+        for name in self._object_names:
+            pos = np.array([0.0, 0.0, 0.0])
+            if self.scene_type == "cupboard":
+                pass  # no position randomization for cupboard scene
+            elif self.scene_type == "table":
+                # Randomize position within a reasonable range
+                # for the table environment
+                x = round(self.np_random.uniform(0.2, 0.8), 3)
+                y = round(self.np_random.uniform(-0.15, 0.15), 3)
+                z = 0.44
+                pos = np.array([x, y, z])
+            else:
+                # Randomize position within a reasonable range
+                # for the ground environment
+                x = round(self.np_random.uniform(0.4, 0.8), 3)
+                y = round(self.np_random.uniform(-0.3, 0.3), 3)
+                z = 0.02
+                pos = np.array([x, y, z])
+            # Randomize orientation around Z-axis (yaw)
+            theta = self.np_random.uniform(-math.pi, math.pi)
+            quat = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
+
+            # Set object pose in the environment
+            self._set_object_pos_quat(name, pos, quat)
+
+        self._tidybot_robot_env.sim.forward()
+
     def reset(
         self,
         *,
@@ -223,12 +258,20 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         super().reset(seed=seed, options=options)
 
+        # Create scene XML
+        self._object_names = []
         xml_string = self._create_scene_xml()
 
         # Reset the underlying TidyBot robot environment
         robot_options = options.copy() if options is not None else {}
         robot_options["xml"] = xml_string
-        obs, _ = self._tidybot_robot_env.reset(seed=seed, options=robot_options)
+        self._tidybot_robot_env.reset(seed=seed, options=robot_options)
+
+        # Initialize object poses
+        self._initialize_object_poses()
+
+        # Get observation and vectorize
+        obs = self._tidybot_robot_env.get_obs()
 
         vec_obs = self._vectorize_observation(obs)
         return vec_obs, {}

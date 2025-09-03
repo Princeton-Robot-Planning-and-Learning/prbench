@@ -59,3 +59,36 @@ def test_tidybot3d_step_returns_valid_outputs():
     assert isinstance(truncated, bool), "Truncated is not a bool"
     assert isinstance(info, dict), "Info is not a dict"
     env.close()
+
+
+def test_tidybot3d_get_object_pos_quat():
+    """Test that get_object_pos_quat() returns valid position and orientation."""
+    env = TidyBot3DEnv(num_objects=3, render_images=False)
+    env.reset()
+    for name in env._object_names:  # pylint: disable=protected-access
+        pos, quat = env.get_object_pos_quat(name)
+        assert len(pos) == 3, "Position should have 3 elements"
+        assert len(quat) == 4, "Quaternion should have 4 elements"
+    env.close()
+
+
+def test_tidybot3d_set_get_object_pos_quat_consistency():
+    """Test that setting and then getting an object's position and orientation is
+    consistent."""
+    env = TidyBot3DEnv(num_objects=3, render_images=False)
+    env.reset()
+    for name in env._object_names:  # pylint: disable=protected-access
+        original_pos, original_quat = env.get_object_pos_quat(name)
+        new_pos = [p + 0.1 for p in original_pos]
+        new_quat = original_quat  # Keep orientation the same for simplicity
+        env._set_object_pos_quat(  # pylint: disable=protected-access
+            name, new_pos, new_quat
+        )
+        updated_pos, updated_quat = env.get_object_pos_quat(name)
+        assert all(
+            abs(o - u) < 1e-5 for o, u in zip(new_pos, updated_pos)
+        ), "Position not set correctly"
+        assert all(
+            abs(o - u) < 1e-5 for o, u in zip(new_quat, updated_quat)
+        ), "Orientation not set correctly"
+    env.close()
