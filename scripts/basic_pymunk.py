@@ -74,32 +74,19 @@ class KinRobot:
         space.add(self.left_finger_body, self.left_finger_shape)
         space.add(self.right_finger_body, self.right_finger_shape)
     
-    def update(self, keys, mouse_pos, mouse_pressed):
-        if keys[pygame.K_w]:
-            self.position += Vec2d(0, -1) * self.speed
-        if keys[pygame.K_s]:
-            self.position += Vec2d(0, 1) * self.speed
-        if keys[pygame.K_a]:
-            self.position += Vec2d(-1, 0) * self.speed
-        if keys[pygame.K_d]:
-            self.position += Vec2d(1, 0) * self.speed
-        
-        self.angle = (mouse_pos - self.position).angle
-        
-        gripper_dy = 0.0
-        if mouse_pressed[0]:
-            gripper_dy = -self.gripper_speed
-        else:
-            gripper_dy = self.gripper_speed
+    def update(self, dx, dy, dtheta, dgripper):
+        self.position += Vec2d(dx, dy)
+        self.angle += dtheta
         
         current_finger_pose = SE2Pose(
             x=self.left_finger_body.position.x,
             y=self.left_finger_body.position.y,
             theta=self.left_finger_body.angle,
         )
-        body_pose = SE2Pose(x=self.position.x, y=self.position.y, theta=self.angle)
+        body_pose = SE2Pose(x=self.base_body.position.x, y=self.base_body.position.y, \
+                            theta=self.base_body.position.angle)
         current_relative_finger_pose = body_pose.inverse * current_finger_pose
-        relative_y = abs(min(current_relative_finger_pose.y + gripper_dy, self.gripper_gap_max // 2))
+        relative_y = abs(min(current_relative_finger_pose.y + dgripper, self.gripper_gap_max // 2))
         
         self.update_positions(relative_y)
     
@@ -186,7 +173,31 @@ def main():
         )
         mouse_pressed = pygame.mouse.get_pressed()
         
-        robot.update(keys, mouse_position, mouse_pressed)
+        # Calculate movement deltas from inputs
+        dx, dy = 0.0, 0.0
+        speed = 2.5
+        if keys[pygame.K_w]:
+            dy = -speed
+        if keys[pygame.K_s]:
+            dy = speed
+        if keys[pygame.K_a]:
+            dx = -speed
+        if keys[pygame.K_d]:
+            dx = speed
+        
+        # Calculate rotation from mouse position
+        target_angle = (mouse_position - robot.position).angle
+        dtheta = target_angle - robot.angle
+        
+        # Calculate gripper movement
+        dgripper = 0.0
+        gripper_speed = 1.0
+        if mouse_pressed[0]:
+            dgripper = -gripper_speed
+        else:
+            dgripper = gripper_speed
+        
+        robot.update(dx, dy, dtheta, dgripper)
 
         ### Clear screen
         screen.fill(pygame.Color("black"))
