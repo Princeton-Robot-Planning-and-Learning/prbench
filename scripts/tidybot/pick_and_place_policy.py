@@ -517,7 +517,7 @@ def run_episode() -> None:
     env = prbench.make(
         env_id,
         render_images=True,
-        show_images=False,
+        show_images=True,
         show_viewer=False,
         render_mode="rgb_array",
     )

@@ -151,7 +151,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         # --- Dynamic object insertion logic ---
         needs_dynamic_objects = self.scene_type in ["ground", "table"]
-        if needs_dynamic_objects:
+        if False: #needs_dynamic_objects:
             tree = ET.parse(str(absolute_model_path))
             root = tree.getroot()
             worldbody = root.find("worldbody")

@@ -258,8 +258,10 @@ class TidyBotRobotEnv(MujocoEnv):
         try:
             # Get object body IDs
             object_ids = self.environment_ids.get('objects', [])
-
-            print(f"Object IDs: {object_ids}")
+            # print(f"body name2id: {self.sim.model._body_name2id}")
+            # print(f"geom name2id: {self.sim.model._geom_name2id}")
+            # print(f"xpos: {self.sim.data.xpos}")
+            
             
             # Get body name mapping
             body_name2id = getattr(self.sim.model, '_body_name2id', {})
