@@ -196,6 +196,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def _set_object_pos_quat(self, name, pos, quat) -> None:
         """Set object position and orientation in the environment."""
 
+        assert self._tidybot_robot_env.sim is not None, "Simulation not initialized"
         joint_id = self._tidybot_robot_env.sim.model.get_joint_qpos_addr(
             f"{name}_joint"
         )
@@ -206,6 +207,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def get_object_pos_quat(self, name) -> tuple[float, float]:
         """Set object position and orientation in the environment."""
 
+        assert self._tidybot_robot_env.sim is not None, "Simulation not initialized"
         joint_id = self._tidybot_robot_env.sim.model.get_joint_qpos_addr(
             f"{name}_joint"
         )
@@ -216,8 +218,10 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     def _initialize_object_poses(self) -> None:
         """Initialize object poses in the environment."""
 
+        assert self._tidybot_robot_env.sim is not None, "Simulation not initialized"
+
         for name in self._object_names:
-            pos = [0, 0, 0]
+            pos = [0.0, 0.0, 0.0]
             if self.scene_type == "cupboard":
                 pass  # no position randomization for cupboard scene
             elif self.scene_type == "table":
