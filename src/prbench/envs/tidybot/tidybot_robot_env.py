@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 from prbench.envs.tidybot.arm_controller import ArmController
 from prbench.envs.tidybot.base_controller import BaseController
-from prbench.envs.tidybot.mujoco_utils import MujocoEnv
+from prbench.envs.tidybot.mujoco_utils import MjAct, MjObs, MujocoEnv
 
 
 class TidyBotRobotEnv(MujocoEnv):
@@ -157,22 +157,18 @@ class TidyBotRobotEnv(MujocoEnv):
         self.ctrl_gripper = self.sim.data.ctrl[gripper_ctrl_id : gripper_ctrl_id + 1]
 
     def reset(
-        self, xml_string: str
-    ) -> tuple[dict[str, NDArray[Any]], None, None, None]:
-        """Reset the environment using xml string.
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> tuple[MjObs, dict[str, Any]]:
+        # Access the original xml.
+        assert options is not None and "xml" in options, "XML required to reset env"
+        xml_string = options["xml"]
 
-        Args:
-            xml_string: A string containing the MuJoCo XML model.
-
-        Returns:
-            observation: The observation from the environment.
-            reward: None (placeholder for compatibility).
-            done: None (placeholder for compatibility).
-            info: None (placeholder for compatibility).
-        """
-        # Insert robot in the xml_string
+        # Insert the robot into the xml string.
         xml_string = self._insert_robot_into_xml(xml_string)
-        super().reset(xml_string)
+        super().reset(seed=seed, options={"xml": xml_string})
 
         # Setup references to robot state/actuator buffers
         self._setup_robot_references()
@@ -183,7 +179,7 @@ class TidyBotRobotEnv(MujocoEnv):
         # Setup controllers after resetting the environment
         self._setup_controllers()
 
-        return self.get_obs(), None, None, None  # reward, done, info
+        return self.get_obs(), {}
 
     def _randomize_base_pose(self) -> None:
         """Randomize the base pose of the robot within defined limits."""
@@ -268,7 +264,7 @@ class TidyBotRobotEnv(MujocoEnv):
         # Return the merged XML as string
         return ET.tostring(input_root, encoding="unicode")
 
-    def _pre_action(self, action: NDArray[Any] | dict[str, Any]) -> None:
+    def _pre_action(self, action: MjAct) -> None:
         """Do any preprocessing before taking an action.
 
         Args:
@@ -279,17 +275,7 @@ class TidyBotRobotEnv(MujocoEnv):
         if self.arm_controller is not None and action is not None:
             self.arm_controller.run_controller(action)
 
-    def step(
-        self, action: NDArray[Any] | dict[str, Any]
-    ) -> tuple[dict[str, NDArray[Any]], float, bool, dict[str, Any]]:
-        """Step the environment.
-
-        Args:
-            action: Optional action to apply before stepping.
-
-        Returns:
-            Tuple of (observation, reward, done, info).
-        """
+    def step(self, action: MjAct) -> tuple[MjObs, float, bool, bool, dict[str, Any]]:
         assert isinstance(action, dict), "Action must be a dictionary."
         return super().step(action)
 
