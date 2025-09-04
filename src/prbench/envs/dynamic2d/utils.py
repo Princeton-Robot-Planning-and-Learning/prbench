@@ -5,8 +5,13 @@ from typing import Any
 import numpy as np
 import pymunk
 from gymnasium.spaces import Box
+import matplotlib.pyplot as plt
+
 from numpy.typing import NDArray
 from pymunk.vec2d import Vec2d
+from pymunk.examples.shapes_for_draw_demos import fill_space
+from prpl_utils.utils import fig2data
+import pymunk.matplotlib_util
 
 from prbench.envs.geom2d.structs import SE2Pose
 
@@ -221,6 +226,16 @@ class KinRobot:
         """Check if the gripper is closing."""
         current_relative_finger_pose = self.gripper_base_pose.inverse * self.left_finger_pose
         return (current_relative_finger_pose.y + 0.1) <= (self._gripper_gap / 2)
+
+    @property
+    def curr_gripper_gap(self) -> float:
+        """Get the current gripper gap."""
+        return self._gripper_gap
+    
+    @property
+    def curr_arm_length(self) -> float:
+        """Get the current arm length."""
+        return self._arm_length
 
     def reset_last_state(self) -> None:
         """Reset to last state when collide with static objects."""
@@ -443,6 +458,39 @@ def on_collision_w_static(arbiter: pymunk.Arbiter,
     robot.reset_last_state()
     return True
 
+def render_state(
+    space: pymunk.Space,
+    world_min_x: float = 0.0,
+    world_max_x: float = 10.0,
+    world_min_y: float = 0.0,
+    world_max_y: float = 10.0,
+    render_dpi: int = 150,
+) -> NDArray[np.uint8]:
+    """Render a state from the physics space to an image.
+    """
+
+    figsize = (
+        world_max_x - world_min_x,
+        world_max_y - world_min_y,
+    )
+    fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=render_dpi)
+    pad_x = (world_max_x - world_min_x) / 25
+    pad_y = (world_max_y - world_min_y) / 25
+    ax.set_xlim(world_min_x - pad_x, world_max_x + pad_x)
+    ax.set_ylim(world_min_y - pad_y, world_max_y + pad_y)
+    ax.axis("off")
+    plt.tight_layout()
+
+    captions = fill_space(space, (1,1,0,1))
+    for caption in captions:
+        x, y = caption[0]
+        y = y - 15
+        ax.text(x, y, caption[1], fontsize=12)
+    o = pymunk.matplotlib_util.DrawOptions(ax)
+    space.debug_draw(o)
+    img = fig2data(fig)
+    plt.close()
+    return img
 
 def get_fingered_robot_action_from_gui_input(
     action_space: FingeredRobotActionSpace, gui_input: dict[str, Any]

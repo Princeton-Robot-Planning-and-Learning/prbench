@@ -71,6 +71,15 @@ def register_all_environments() -> None:
         entry_point="prbench.envs.geom3d.motion3d:Motion3DEnv",
     )
 
+    # DynObstruction2D environment with different numbers of obstructions.
+    num_obstructions = [0, 1, 2, 3, 4]
+    for num_obstruction in num_obstructions:
+        _register(
+            id=f"prbench/DynObstruction2D-o{num_obstruction}-v0",
+            entry_point="prbench.envs.dynamic2d.dyn_obstruction2d:DynObstruction2DEnv",
+            kwargs={"num_obstructions": num_obstruction},
+        )
+
     # TidyBot3D environments with different scenes and object counts
     scene_configs = [
         ("ground", [3, 5, 7]),  # Ground/scene.xml with different object counts

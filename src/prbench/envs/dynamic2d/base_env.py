@@ -30,6 +30,7 @@ from prbench.envs.dynamic2d.utils import (
     get_fingered_robot_action_from_gui_input,
     on_collision_w_static,
     on_gripper_grasp,
+    render_state
 )
 
 
@@ -39,19 +40,19 @@ class Dynamic2DRobotEnvSpec:
 
     # The world is oriented like a standard X/Y coordinate frame.
     world_min_x: float = 0.0
-    world_max_x: float = 600.0
+    world_max_x: float = 10.0
     world_min_y: float = 0.0
-    world_max_y: float = 600.0
+    world_max_y: float = 10.0
 
     # Action space parameters.
-    min_dx: float = -2.5
-    max_dx: float = 2.5
-    min_dy: float = -2.5
-    max_dy: float = 2.5
+    min_dx: float = -5e-1
+    max_dx: float = 5e-1
+    min_dy: float = -5e-1
+    max_dy: float = 5e-1
     min_dtheta: float = -np.pi / 16
     max_dtheta: float = np.pi / 16
-    min_darm: float = -5.0
-    max_darm: float = 5.0
+    min_darm: float = -1e-1
+    max_darm: float = 1e-1
     min_dgripper: float = -1.0
     max_dgripper: float = 1.0
 
@@ -116,14 +117,12 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Set up collision handlers
         self.space.on_collision(
-            DYNAMIC_COLLISION_TYPE, GRIPPER_COLLISION_TYPE
-        ).post_solve = lambda arbiter, space, _: on_gripper_grasp(
-            arbiter, space, {"robot": self.robot}
+            DYNAMIC_COLLISION_TYPE, GRIPPER_COLLISION_TYPE,
+            post_solve=on_gripper_grasp, data=self.robot
         )
-        self.space.add_collision_handler(
-            STATIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE
-        ).pre_solve = lambda arbiter, space, _: on_collision_w_static(
-            arbiter, space, {"robot": self.robot}
+        self.space.on_collision(
+            STATIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE,
+            pre_solve=on_collision_w_static, data=self.robot
         )
 
     @abc.abstractmethod
@@ -194,7 +193,11 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             self._current_state = self._sample_initial_state()
 
         # Add objects to physics space
-        self._add_pymunk_objects_to_space(self._current_state)
+        self._add_state_to_space(self._current_state)
+
+        # Initially step the physics simulation for one step
+        dt = 1.0 / self._spec.fps
+        self.space.step(dt)
 
         observation = self._get_obs()
         info = self._get_info()
@@ -229,9 +232,11 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         # This will be implemented later
         assert self.render_mode == "rgb_array"
         # Return a placeholder black image
-        height = int(self._spec.world_max_y - self._spec.world_min_y)
-        width = int(self._spec.world_max_x - self._spec.world_min_x)
-        return np.zeros((height, width, 3), dtype=np.uint8)
+        return render_state(self.space, 
+                            self._spec.world_min_x,
+                            self._spec.world_max_x,
+                            self._spec.world_min_y,
+                            self._spec.world_max_y)
 
 
 class ConstantObjectDynamic2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
