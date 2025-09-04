@@ -1,4 +1,6 @@
 <mujoco model="cupboard_scene">
+    <include file="tidybot.xml"/>
+
     <statistic center="0.25 0 0.6" extent="1.0" meansize="0.05"/>
 
     <visual>
@@ -77,6 +79,6 @@
         </body>
 
         <!-- Overview camera -->
-        <camera name="overview" pos="1.0 -2.0 1.7" euler="1.0 0.0 0" fovy="42" resolution="640 480"/>
+        <camera name="overview" pos="0.8 -2.0 1.7" euler="1.0 0.0 0" fovy="42" resolution="640 480"/>
     </worldbody>
 </mujoco>

@@ -303,9 +303,9 @@ The observation is returned as a Motion3DState dataclass with these two fields.
         """Create action space description."""
         # pylint: disable=line-too-long
         return f"""Actions control the change in joint positions:
-- **delta_joints**: Change in joint positions for all {len(self._spec.initial_joints)} joints (list of floats)
+- **delta_arm_joints**: Change in joint positions for all {len(self._spec.initial_joints)} joints (list of floats)
 
-The action is a Motion3DAction dataclass with delta_joints field. Each delta is clipped to the range [-{self._spec.max_action_mag:.3f}, {self._spec.max_action_mag:.3f}].
+The action is a Motion3DAction dataclass with delta_arm_joints field. Each delta is clipped to the range [-{self._spec.max_action_mag:.3f}, {self._spec.max_action_mag:.3f}].
 
 The resulting joint positions are clipped to the robot's joint limits before being applied.
 """

@@ -1,6 +1,10 @@
 name: CI Checks
 
-on: [push]
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
 
 jobs:
   autoformat:
@@ -18,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.11"]
     steps:
     - name: Install LAPACK BLAS, and OSMESA
       run: |
@@ -41,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.11"]
     steps:
     - uses: actions/checkout@v4
     - name: Install uv
@@ -57,25 +61,44 @@ jobs:
       run: |
         uv run mypy .
   unit-tests:
-    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10"]
+        # NOTE: macos is disabled until we can figure out headless rendering in mujoco
+        os: [ubuntu-latest]
+        python-version: ["3.11"]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      pull-requests: write
+      contents: write
     steps:
-    - name: Install LAPACK BLAS, and OSMESA
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y liblapack-dev libblas-dev libosmesa6-dev libgl1 libglx-mesa0
-    - uses: actions/checkout@v4
-    - name: Install uv
-      uses: astral-sh/setup-uv@v3
-      with:
-        enable-cache: true
-        cache-dependency-glob: "pyproject.toml"
-    - name: Set up Python ${{ matrix.python-version }}
-      run: uv python install ${{ matrix.python-version }}    
-    - name: Install the project
-      run: uv sync --all-extras --dev
-    - name: Pytest
-      run: |
-       uv run pytest tests/
+      - name: Install LAPACK, BLAS, OSMesa (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liblapack-dev libblas-dev libosmesa6-dev libgl1 libglx-mesa0
+      - name: Install GLFW (Macos)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install glfw
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      - name: Install the project (dev)
+        run: uv sync --all-extras --dev
+      - name: Run tests with coverage (fails on test failures)
+        run: |
+          uv run coverage run -m pytest tests/
+          uv run coverage xml
+      - name: Coverage comment (Ubuntu/3.11 only)
+        if: runner.os == 'Linux'
+        uses: orgoro/coverage@v3.2
+        with:
+          coverageFile: coverage.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
