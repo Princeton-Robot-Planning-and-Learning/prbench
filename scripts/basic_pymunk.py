@@ -23,7 +23,7 @@ HELD_OBJECT_COLLISION_TYPE = 4
 
 class KinRobot:
     def __init__(self, 
-                 init_pos=Vec2d(100, 500),
+                 init_pos=Vec2d(100, 300),
                  base_radius=30, 
                  arm_length_max=60, 
                  gripper_base_width=4,
@@ -293,26 +293,12 @@ def on_gripper_grasp(arbiter, space, robot):
         space.remove(dynamic_body, arbiter.shapes[0])
         return True
 
-# def on_gripper_leave(arbiter, space, data):
-#     print(f"Gripper leave detected!")
-#     kinematic_body = arbiter.bodies[0]
-#     if data[0].is_opening_finger:
-#         # Create a new kinematic object
-#         points = data[1]
-#         mass = 1.0
-#         moment = pymunk.moment_for_poly(mass, points, (0, 0))
-#         dynamic_body = pymunk.Body(mass, moment)
-#         dynamic_body.position = kinematic_body.position
-#         dynamic_body.angle = kinematic_body.angle
-#         shape = pymunk.Poly(dynamic_body, points)
-#         shape.friction = 1
-#         shape.density = 1.0
-#         shape.collision_type = DYNAMIC_COLLISION_TYPE
-#         space.add(dynamic_body, shape)
-#         data[0].del_from_hand((kinematic_body, arbiter.shapes[0]))
-#         # Remove the dynamic body from the space
-#         space.remove(kinematic_body, arbiter.shapes[0])
-#         return True
+def on_collision_w_static(arbiter, space, robot):
+    del arbiter
+    del space
+    print(f"Static Collision detected!")
+    robot.reset_last_state()
+    return True
 
 width, height = 690, 600
 
@@ -335,13 +321,20 @@ def main():
     shape.friction = 1.0
     shape.collision_type = STATIC_COLLISION_TYPE
     space.add(shape)
-    size = 15
 
+    # Obstacle
+    shape = pymunk.Segment(space.static_body, (200, 450), (300, 450), 1.0)
+    shape.friction = 1.0
+    shape.collision_type = STATIC_COLLISION_TYPE
+    space.add(shape)
+
+    # Create some boxes
+    size = 15
     points = [(-size, -size), (-size, size), (size, size), (size, -size)]
     mass = 1.0
     moment = pymunk.moment_for_poly(mass, points, (0, 0))
     b1 = pymunk.Body(mass, moment)
-    b1.position = Vec2d(50, 450)
+    b1.position = Vec2d(50, 470)
     shape = pymunk.Poly(b1, points)
     shape.friction = 1
     shape.density = 1.0
@@ -349,7 +342,7 @@ def main():
     space.add(b1, shape)
 
     b2 = pymunk.Body(mass, moment)
-    b2.position = Vec2d(200, 450)
+    b2.position = Vec2d(250, 470)
     shape = pymunk.Poly(b2, points)
     shape.friction = 1
     shape.density = 1.0
@@ -362,6 +355,8 @@ def main():
 
     # Grasping collision handler
     space.on_collision(DYNAMIC_COLLISION_TYPE, GRIPPER_COLLISION_TYPE, post_solve=on_gripper_grasp, data=robot)
+    # Static collision handler
+    space.on_collision(STATIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE, pre_solve=on_collision_w_static, data=robot)
 
     while running:
         for event in pygame.event.get():
