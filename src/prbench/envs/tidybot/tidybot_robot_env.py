@@ -8,8 +8,6 @@ from typing import Any, Optional
 import numpy as np
 from numpy.typing import NDArray
 
-from prbench.envs.tidybot.arm_controller import ArmController
-from prbench.envs.tidybot.base_controller import BaseController
 from prbench.envs.tidybot.mujoco_utils import MjAct, MjObs, MujocoEnv
 
 
@@ -43,9 +41,6 @@ class TidyBotRobotEnv(MujocoEnv):
             seed=seed,
             show_viewer=show_viewer,
         )
-
-        self.base_controller: Optional[BaseController] = None
-        self.arm_controller: Optional[ArmController] = None
 
         # Robot state/actuator references (initialized in _setup_robot_references)
         self.qpos_base: Optional[NDArray[np.float64]] = None
@@ -176,9 +171,6 @@ class TidyBotRobotEnv(MujocoEnv):
         # Randomize the base pose of the robot in the sim
         self._randomize_base_pose()
 
-        # Setup controllers after resetting the environment
-        self._setup_controllers()
-
         return self.get_obs(), {}
 
     def _randomize_base_pose(self) -> None:
@@ -270,10 +262,6 @@ class TidyBotRobotEnv(MujocoEnv):
         Args:
             action: Action to execute within the environment.
         """
-        if self.base_controller is not None and action is not None:
-            self.base_controller.run_controller(action)
-        if self.arm_controller is not None and action is not None:
-            self.arm_controller.run_controller(action)
 
     def step(self, action: MjAct) -> tuple[MjObs, float, bool, bool, dict[str, Any]]:
         assert isinstance(action, dict), "Action must be a dictionary."
@@ -282,41 +270,3 @@ class TidyBotRobotEnv(MujocoEnv):
     def reward(self, **kwargs: Any) -> float:
         """Compute the reward for the current state and action."""
         return 0.0  # Placeholder reward
-
-    def _setup_controllers(self) -> None:
-        """Setup the controllers for the robot."""
-
-        assert (
-            self.sim is not None
-        ), "Simulation must be initialized before setting up controllers."
-
-        # Ensure robot references are properly initialized
-        assert self.qpos_base is not None, "Robot references must be set up first"
-        assert self.qvel_base is not None, "Robot references must be set up first"
-        assert self.ctrl_base is not None, "Robot references must be set up first"
-        assert self.qpos_arm is not None, "Robot references must be set up first"
-        assert self.qvel_arm is not None, "Robot references must be set up first"
-        assert self.ctrl_arm is not None, "Robot references must be set up first"
-        assert self.ctrl_gripper is not None, "Robot references must be set up first"
-
-        # Initialize controllers
-        self.base_controller = BaseController(
-            self.qpos_base,
-            self.qvel_base,
-            self.ctrl_base,
-            self.sim.model._model.opt.timestep,  # pylint: disable=protected-access
-        )
-        self.arm_controller = ArmController(
-            self.qpos_arm,
-            self.qvel_arm,
-            self.ctrl_arm,
-            self.qpos_gripper,
-            self.ctrl_gripper,
-            self.sim.model._model.opt.timestep,  # pylint: disable=protected-access
-        )
-
-        # Reset controllers
-        self.base_controller.reset()
-        self.arm_controller.reset()  # also resets arm to retract position
-
-        self.sim.forward()
