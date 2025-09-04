@@ -172,8 +172,9 @@ class KinRobot:
     def is_grasping(self, contact_point_set):
         normal = contact_point_set.normal
         dtheta = abs(self.gripper_base_body.angle - normal.angle)
-        return False
-
+        dtheta = min(dtheta, 2 * np.pi - dtheta)
+        # TODO: also check contact point is within finger bounds and far from the gripper border
+        return abs(dtheta - np.pi / 2) < 0.1
 
     def add_to_hand(self, obj):
         obj_pose = SE2Pose(x=obj[0].position.x, y=obj[0].position.y, theta=obj[0].angle)
