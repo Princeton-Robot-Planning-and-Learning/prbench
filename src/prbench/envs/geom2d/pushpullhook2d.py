@@ -3,6 +3,10 @@
 from dataclasses import dataclass
 
 import numpy as np
+from numpy.typing import NDArray
+from relational_structs import Object, ObjectCentricState
+from relational_structs.utils import create_state_from_dict
+
 from prbench.envs.geom2d.base_env import (
     ConstantObjectGeom2DEnv,
     Geom2DRobotEnv,
@@ -25,9 +29,7 @@ from prbench.envs.geom2d.utils import (
     sample_se2_pose,
     state_has_collision,
 )
-from numpy.typing import NDArray
-from relational_structs import Object, ObjectCentricState
-from relational_structs.utils import create_state_from_dict
+
 
 @dataclass(frozen=True)
 class PushPullHook2DEnvSpec(Geom2DRobotEnvSpec):
@@ -431,7 +433,7 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         self,
         state: ObjectCentricState,
         suctioned_objs: list[tuple[Object, SE2Pose]],
-    ) -> tuple[ObjectCentricState, set[Object]]:
+    ) -> tuple[ObjectCentricState, set[tuple[Object, SE2Pose]]]:
         """Get the set of objects that should be moved based on the current state and
         robot actions."""
         robots = [o for o in state if o.is_instance(CRVRobotType)]
