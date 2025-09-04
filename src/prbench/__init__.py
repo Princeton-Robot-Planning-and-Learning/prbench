@@ -39,7 +39,7 @@ def register_all_environments() -> None:
         )
 
     # ClutteredStorage2D environment with different numbers of blocks.
-    num_blocks = [1, 7, 15]
+    num_blocks = [1, 3, 7, 15]
     for num_block in num_blocks:
         _register(
             id=f"prbench/ClutteredStorage2D-b{num_block}-v0",
@@ -69,6 +69,12 @@ def register_all_environments() -> None:
     register(
         id="prbench/PushPullHook2D-v0",
         entry_point="prbench.envs.geom2d.pushpullhook2d:PushPullHook2DEnv",
+    )
+
+    # Motion3D environment.
+    _register(
+        id="prbench/Motion3D-v0",
+        entry_point="prbench.envs.geom3d.motion3d:Motion3DEnv",
     )
 
     # TidyBot3D environments with different scenes and object counts

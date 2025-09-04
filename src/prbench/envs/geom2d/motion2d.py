@@ -3,14 +3,21 @@
 from dataclasses import dataclass
 
 import numpy as np
-from geom2drobotenvs.envs.base_env import Geom2DRobotEnv, Geom2DRobotEnvSpec
-from geom2drobotenvs.object_types import (
+from relational_structs import Object, ObjectCentricState, Type
+from relational_structs.utils import create_state_from_dict
+
+from prbench.envs.geom2d.base_env import (
+    ConstantObjectGeom2DEnv,
+    Geom2DRobotEnv,
+    Geom2DRobotEnvSpec,
+)
+from prbench.envs.geom2d.object_types import (
     CRVRobotType,
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
 )
-from geom2drobotenvs.structs import ZOrder
-from geom2drobotenvs.utils import (
+from prbench.envs.geom2d.structs import ZOrder
+from prbench.envs.geom2d.utils import (
     BLACK,
     PURPLE,
     CRVRobotActionSpace,
@@ -20,10 +27,6 @@ from geom2drobotenvs.utils import (
     sample_se2_pose,
     state_has_collision,
 )
-from relational_structs import Object, ObjectCentricState, Type
-from relational_structs.utils import create_state_from_dict
-
-from prbench.envs.geom2d.geom2d_utils import ConstantObjectGeom2DEnv
 
 TargetRegionType = Type("target_region", parent=RectangleType)
 Geom2DRobotEnvTypeFeatures[TargetRegionType] = list(
@@ -135,6 +138,10 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
             "render_modes": ["rgb_array"],
             "render_fps": self._spec.render_fps,
         }
+        initial_state_dict = self._create_constant_initial_state_dict()
+        self._initial_constant_state = create_state_from_dict(
+            initial_state_dict, Geom2DRobotEnvTypeFeatures
+        )
 
     def _sample_initial_state(self) -> ObjectCentricState:
         # Sample initial robot pose.
@@ -183,13 +190,7 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
 
         return state
 
-    def _create_initial_state(
-        self,
-        robot_pose: SE2Pose,
-        target_region_pose: SE2Pose | None = None,
-        obstacles: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
-    ) -> ObjectCentricState:
-
+    def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create room walls.
@@ -207,6 +208,20 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
             max_dy,
         )
         init_state_dict.update(wall_state_dict)
+
+        return init_state_dict
+
+    def _create_initial_state(
+        self,
+        robot_pose: SE2Pose,
+        target_region_pose: SE2Pose | None = None,
+        obstacles: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
+    ) -> ObjectCentricState:
+
+        # Shallow copy should be okay because the constant objects should not
+        # ever change in this method.
+        assert self._initial_constant_state is not None
+        init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.
         robot = Object("robot", CRVRobotType)
@@ -265,8 +280,11 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         x = self._current_state.get(robot, "x")
         y = self._current_state.get(robot, "y")
         target_region = self._current_state.get_objects(TargetRegionType)[0]
+        # NOTE: the type: ignore can be removed after refactor.
         target_region_geom = rectangle_object_to_geom(
-            self._current_state, target_region, self._static_object_body_cache
+            self._current_state,
+            target_region,
+            self._static_object_body_cache,
         )
         terminated = target_region_geom.contains_point(x, y)
         return -1.0, terminated
