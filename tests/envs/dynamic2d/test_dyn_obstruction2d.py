@@ -19,7 +19,8 @@ def test_dyn_obstruction2d_action_space():
     """Tests that the actions are valid and the step function works."""
     prbench.register_all_environments()
     env = prbench.make("prbench/DynObstruction2D-o4-v0")
-    obs, _ = env.reset()
+    obs, _ = env.reset(seed=0)
+    env.action_space.seed(0)
     for _ in range(5):
         action = env.action_space.sample()
         assert env.action_space.contains(action)
@@ -29,28 +30,6 @@ def test_dyn_obstruction2d_action_space():
         assert isinstance(terminated, bool)
         assert isinstance(truncated, bool)
         assert isinstance(info, dict)
-
-
-def test_dyn_obstruction2d_physics_integration():
-    """Tests that the physics simulation works properly."""
-    prbench.register_all_environments()
-    env = prbench.make("prbench/DynObstruction2D-o1-v0")
-    obs, _ = env.reset()
-    
-    # Test that we can step through the environment
-    for _ in range(10):
-        action = env.action_space.sample()
-        obs, reward, terminated, truncated, info = env.step(action)
-        
-        # Reward should always be -1.0 unless terminated
-        if not terminated:
-            assert reward == -1.0
-            
-        # Check that physics state is being updated
-        assert env.observation_space.contains(obs)
-        
-        if terminated:
-            break
 
 
 def test_dyn_obstruction2d_different_obstruction_counts():

@@ -20,6 +20,7 @@ def register_all_environments() -> None:
             os.environ["MUJOCO_GL"] = "osmesa"
             os.environ["PYOPENGL_PLATFORM"] = "osmesa"
 
+    # ******* Geom2D Environments *******
     # Obstructions2D environment with different numbers of obstructions.
     num_obstructions = [0, 1, 2, 3, 4]
     for num_obstruction in num_obstructions:
@@ -65,12 +66,8 @@ def register_all_environments() -> None:
             kwargs={"num_buttons": num_button},
         )
 
-    # Motion3D environment.
-    _register(
-        id="prbench/Motion3D-v0",
-        entry_point="prbench.envs.geom3d.motion3d:Motion3DEnv",
-    )
-
+    # ******* Dynamic2D Environments *******
+    
     # DynObstruction2D environment with different numbers of obstructions.
     num_obstructions = [0, 1, 2, 3, 4]
     for num_obstruction in num_obstructions:
@@ -79,6 +76,16 @@ def register_all_environments() -> None:
             entry_point="prbench.envs.dynamic2d.dyn_obstruction2d:DynObstruction2DEnv",
             kwargs={"num_obstructions": num_obstruction},
         )
+
+    # ******* Geom3D Environments *******
+
+    # Motion3D environment.
+    _register(
+        id="prbench/Motion3D-v0",
+        entry_point="prbench.envs.geom3d.motion3d:Motion3DEnv",
+    )
+
+    # ******* Dynamic3D Environments *******
 
     # TidyBot3D environments with different scenes and object counts
     scene_configs = [

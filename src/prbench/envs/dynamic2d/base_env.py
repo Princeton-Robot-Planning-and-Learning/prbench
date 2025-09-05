@@ -1,6 +1,7 @@
 """Base class for Dynamic2D (PyMunk) robot environments."""
 
 import abc
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -26,6 +27,7 @@ from prbench.envs.dynamic2d.utils import (
     STATIC_COLLISION_TYPE,
     FingeredRobotActionSpace,
     KinRobot,
+    PDController,
     get_fingered_robot_action_from_gui_input,
     on_collision_w_static,
     on_gripper_grasp,
@@ -44,14 +46,14 @@ class Dynamic2DRobotEnvSpec:
     world_max_y: float = 10.0
 
     # Action space parameters.
-    min_dx: float = -5e-2
-    max_dx: float = 5e-2
-    min_dy: float = -5e-2
-    max_dy: float = 5e-2
+    min_dx: float = -1e-2
+    max_dx: float = 1e-2
+    min_dy: float = -1e-2
+    max_dy: float = 1e-2
     min_dtheta: float = -np.pi / 16
     max_dtheta: float = np.pi / 16
-    min_darm: float = -1e-1
-    max_darm: float = 1e-1
+    min_darm: float = -5e-2
+    max_darm: float = 5e-2
     min_dgripper: float = -0.02
     max_dgripper: float = 0.02
 
@@ -65,15 +67,15 @@ class Dynamic2DRobotEnvSpec:
     gripper_finger_height: float = 0.01
 
     # Controller parameters
-    kp_pos: float = 100.0
-    kv_pos: float = 20.0
-    kp_rot: float = 500.0
-    kv_rot: float = 50.0
+    kp_pos: float = 50.0
+    kv_pos: float = 5.0
+    kp_rot: float = 20.0
+    kv_rot: float = 5.0
 
     # Physics parameters
     gravity_y: float = 1000.0
-    control_freq: int = 60  # Control frequency (actions per second)
-    sim_freq: int = 240     # Simulation frequency (physics steps per second)
+    control_freq: int = 2  # Control frequency (actions per second)
+    sim_freq: int = 20     # Simulation frequency (physics steps per second)
 
     # For rendering.
     render_dpi: int = 50
@@ -115,6 +117,12 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         # PyMunk physics space
         self.space: pymunk.Space | None = None
         self.robot: KinRobot | None = None
+        self.pd_controller = PDController(
+            kp_pos=self._spec.kp_pos,
+            kv_pos=self._spec.kv_pos,
+            kp_rot=self._spec.kp_rot,
+            kv_rot=self._spec.kv_rot,
+        )
 
         # Initialized by reset().
         self._current_state: ObjectCentricState | None = None
@@ -241,13 +249,32 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         n_steps = self._spec.sim_freq // self._spec.control_freq
         dt = 1.0 / self._spec.sim_freq
 
+        # Calculate target positions
+        tgt_x = self.robot.base_pose.x + dx
+        tgt_y = self.robot.base_pose.y + dy
+        tgt_theta = self.robot.base_pose.theta + dtheta
+        tgt_arm = max(min(self.robot.curr_arm_length + darm, self.robot.arm_length_max), 
+                      self.robot.base_radius)
+        tgt_gripper = max(
+            min(self.robot.curr_gripper + dgripper, self.robot.gripper_gap_max),
+            self.robot.gripper_finger_height * 2,
+        )
+
         # Multi-step simulation like basic_pymunk.py
+        s = time.time()
         for _ in range(n_steps):
-            # Update robot with the action (PD control updates velocities)
-            self.robot.update(dx, dy, dtheta, darm, dgripper, dt)
+            # Use PD control to compute base and gripper velocities
+            base_vel, base_ang_vel, gripper_base_vel, finger_vel = self.pd_controller.compute_control(
+                self.robot, tgt_x, tgt_y, tgt_theta, tgt_arm, tgt_gripper, dt)
+            # Update robot with the vel (PD control updates velocities)
+            self.robot.update(base_vel, 
+                              base_ang_vel, 
+                              gripper_base_vel, 
+                              finger_vel)
             # Step physics simulation
             self.space.step(dt)
-
+        e = time.time()
+        print(f"Stepped {n_steps} physics steps in {e - s:.4f} seconds")
         # Drop objects after internal steps (like basic_pymunk.py)
         self.robot.drop_held_objects(self.space)
 
