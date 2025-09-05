@@ -7,6 +7,11 @@ import numpy as np
 import pymunk
 from gymnasium.spaces import Box
 import matplotlib.pyplot as plt
+from relational_structs import (
+    Object,
+    ObjectCentricState
+)
+from tomsgeoms2d.structs import Geom2D, Rectangle
 
 from numpy.typing import NDArray
 from pymunk.vec2d import Vec2d
@@ -14,7 +19,14 @@ from pymunk.examples.shapes_for_draw_demos import fill_space
 from prpl_utils.utils import fig2data
 import pymunk.matplotlib_util
 
-from prbench.envs.geom2d.structs import SE2Pose
+from prbench.envs.geom2d.structs import SE2Pose, MultiBody2D, Body2D
+from prbench.envs.geom2d.utils import geom2ds_intersect
+from prbench.envs.dynamic2d.object_types import (
+    RectangleType,
+    KinRobotType,
+    Dynamic2DType,
+    DynRectangleType
+)
 
 # Collision types from the basic_pymunk.py script
 STATIC_COLLISION_TYPE = 0
@@ -22,8 +34,10 @@ DYNAMIC_COLLISION_TYPE = 1
 ROBOT_COLLISION_TYPE = 2
 HELD_OBJECT_COLLISION_TYPE = 3
 
+PURPLE: tuple[float, float, float] = (128 / 255, 0 / 255, 128 / 255)
+BLACK: tuple[float, float, float] = (0.1, 0.1, 0.1)
 
-class FingeredRobotActionSpace(Box):
+class KinRobotActionSpace(Box):
     """An action space for a fingered robot with gripper control.
 
     Actions are bounded relative movements of the base, arm extension, and gripper opening/closing.
@@ -490,7 +504,127 @@ class PDController:
 
         return base_vel, base_ang_vel, v_gripper_base, finger_vel_l
 
-def on_gripper_grasp(arbiter: pymunk.Arbiter, space: pymunk.Space, data: dict[str, Any]) -> bool:
+def object_to_multibody2d(
+    obj: Object,
+    state: ObjectCentricState,
+    static_object_cache: dict[Object, MultiBody2D],
+) -> MultiBody2D:
+    """Create a Body2D instance for objects of standard geom types.
+        This is borrowed from Geom2D
+    """
+    if obj.is_instance(KinRobotType):
+        return _robot_to_multibody2d(obj, state)
+    assert obj.is_instance(Dynamic2DType)
+    is_static = state.get(obj, "static") > 0.5
+    if is_static and obj in static_object_cache:
+        return static_object_cache[obj]
+    geom: Geom2D  # rectangle or circle
+    if obj.is_instance(RectangleType):
+        x = state.get(obj, "x")
+        y = state.get(obj, "y")
+        width = state.get(obj, "width")
+        height = state.get(obj, "height")
+        theta = state.get(obj, "theta")
+        geom = Rectangle(x, y, width, height, theta)
+        # z_order is not used in dynamic2d as the collision
+        # is done in pymunk.
+        z_order = 0
+        rendering_kwargs = {
+            "facecolor": (
+                state.get(obj, "color_r"),
+                state.get(obj, "color_g"),
+                state.get(obj, "color_b"),
+            ),
+            "edgecolor": BLACK,
+        }
+        body = Body2D(geom, z_order, rendering_kwargs)
+        multibody = MultiBody2D(obj.name, [body])
+    return multibody
+
+def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D:
+    """Helper for object_to_multibody2d()."""
+    assert obj.is_instance(KinRobotType)
+    bodies: list[Body2D] = []
+
+    # Base.
+    base_x = state.get(obj, "x")
+    base_y = state.get(obj, "y")
+    base_radius = state.get(obj, "base_radius")
+    circ = Circle(
+        x=base_x,
+        y=base_y,
+        radius=base_radius,
+    )
+    z_order = 0
+    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
+    base = Body2D(circ, z_order, rendering_kwargs, name="base")
+    bodies.append(base)
+
+    # Gripper Base
+    theta = state.get(obj, "theta")
+    arm_joint = state.get(obj, "arm_joint")
+    gripper_base_cx = base_x + np.cos(theta) * arm_joint
+    gripper_base_cy = base_y + np.sin(theta) * arm_joint
+    gripper_base_height = state.get(obj, "gripper_base_height")
+    gripper_base_width = state.get(obj, "gripper_base_width")
+    rect = Rectangle.from_center(
+        center_x=gripper_base_cx,
+        center_y=gripper_base_cy,
+        height=gripper_base_height,
+        width=gripper_base_width,
+        rotation_about_center=theta,
+    )
+    z_order = 0
+    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
+    gripper_base = Body2D(rect, z_order, rendering_kwargs, name="gripper_base")
+    gripper_base_pose = SE2Pose(
+        x=gripper_base_cx,
+        y=gripper_base_cy,
+        theta=theta,
+    )
+    bodies.append(gripper_base)
+
+    # Fingers
+    relative_dx = state.get(obj, "gripper_finger_width") / 2
+    relative_dy_r = -gripper_base_height / 2
+    relative_dy_l = state.get(obj, "finger_gap") - gripper_base_height / 2
+    finger_r_pose = gripper_base_pose * SE2Pose(
+        x=relative_dx,
+        y=relative_dy_r,
+        theta=0.0,
+    )
+    finger_l_pose = gripper_base_pose * SE2Pose(
+        x=relative_dx,
+        y=relative_dy_l,
+        theta=0.0,
+    )
+    finger_r = Rectangle.from_center(
+        center_x=finger_r_pose.x,
+        center_y=finger_r_pose.y,
+        height=state.get(obj, "finger_height"),
+        width=state.get(obj, "finger_width"),
+        rotation_about_center=finger_r_pose.theta,
+    )
+    finger_l = Rectangle.from_center(
+        center_x=finger_l_pose.x,
+        center_y=finger_l_pose.y,
+        height=state.get(obj, "finger_height"),
+        width=state.get(obj, "finger_width"),
+        rotation_about_center=finger_l_pose.theta,
+    )
+    z_order = 0
+    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
+    finger_l_body = Body2D(finger_r, z_order, rendering_kwargs, name="arm")
+    bodies.append(finger_l_body)
+    finger_r_body = Body2D(finger_l, z_order, rendering_kwargs, name="arm")
+    bodies.append(finger_r_body)
+
+    multibody = MultiBody2D(obj.name, bodies)
+    return multibody
+
+def on_gripper_grasp(arbiter: pymunk.Arbiter, 
+                     space: pymunk.Space, 
+                     data: dict[str, Any]) -> bool:
     """Collision callback for gripper grasping objects."""
     robot = data["robot"]
     print("Gripper Collision detected!")
@@ -556,8 +690,124 @@ def render_state(
     plt.close()
     return img
 
+def create_walls_from_world_boundaries(
+    world_min_x: float,
+    world_max_x: float,
+    world_min_y: float,
+    world_max_y: float,
+    min_dx: float,
+    max_dx: float,
+    min_dy: float,
+    max_dy: float,
+) -> dict[Object, dict[str, float]]:
+    """Create wall objects and feature dicts based on world boundaries.
+
+    Velocities are used to determine how large the walls need to be to avoid the
+    possibility that the robot will transport over the wall.
+    """
+    state_dict: dict[Object, dict[str, float]] = {}
+    # Right wall.
+    right_wall = Object("right_wall", RectangleType)
+    side_wall_height = world_max_y - world_min_y
+    state_dict[right_wall] = {
+        "x": world_max_x,
+        "vx": 0.0,
+        "y": world_min_y,
+        "vy": 0.0,
+        "width": 2 * max_dx,  # 2x just for safety
+        "height": side_wall_height,
+        "theta": 0.0,
+        "omega": 0.0,
+        "static": True,
+        "kinematic": False,
+        "dynamic": False,
+        "color_r": BLACK[0],
+        "color_g": BLACK[1],
+        "color_b": BLACK[2]
+    }
+    # Left wall.
+    left_wall = Object("left_wall", RectangleType)
+    state_dict[left_wall] = {
+        "x": world_min_x,
+        "vx": 0.0,
+        "y": world_min_y,
+        "vy": 0.0,
+        "width": 2 * abs(min_dx),  # 2x just for safety
+        "height": side_wall_height,
+        "theta": 0.0,
+        "omega": 0.0,
+        "static": True,
+        "kinematic": False,
+        "dynamic": False,
+        "color_r": BLACK[0],
+        "color_g": BLACK[1],
+        "color_b": BLACK[2]
+    }
+    # Top wall.
+    top_wall = Object("top_wall", RectangleType)
+    horiz_wall_width = 2 * 2 * abs(min_dx) + world_max_x - world_min_x
+    state_dict[top_wall] = {
+        "x": (world_min_x + world_max_x) / 2,
+        "vx": 0.0,
+        "y": world_max_y,
+        "vy": 0.0,
+        "width": horiz_wall_width,
+        "height": 2 * max_dy,
+        "theta": 0.0,
+        "omega": 0.0,
+        "static": True,
+        "kinematic": False,
+        "dynamic": False,
+        "color_r": BLACK[0],
+        "color_g": BLACK[1],
+        "color_b": BLACK[2]
+    }
+    # Bottom wall.
+    bottom_wall = Object("bottom_wall", RectangleType)
+    state_dict[bottom_wall] = {
+        "x": (world_min_x + world_max_x) / 2,
+        "vx": 0.0,
+        "y": world_min_y,
+        "vy": 0.0,
+        "width": horiz_wall_width,
+        "height": 2 * abs(min_dy),
+        "theta": 0.0,
+        "omega": 0.0,
+        "static": True,
+        "kinematic": False,
+        "dynamic": False,
+        "color_r": BLACK[0],
+        "color_g": BLACK[1],
+        "color_b": BLACK[2],
+    }
+    return state_dict
+
+def state_has_collision(
+    state: ObjectCentricState,
+    group1: set[Object],
+    group2: set[Object],
+    static_object_cache: dict[Object, MultiBody2D]
+) -> bool:
+    """Check for collisions between any objects in two groups."""
+    # Create multibodies once.
+    obj_to_multibody = {
+        o: object_to_multibody2d(o, state, static_object_cache) for o in state
+    }
+    # Check pairwise collisions.
+    for obj1 in group1:
+        for obj2 in group2:
+            if obj1 == obj2:
+                continue
+            multibody1 = obj_to_multibody[obj1]
+            multibody2 = obj_to_multibody[obj2]
+            for body1 in multibody1.bodies:
+                for body2 in multibody2.bodies:
+                    if geom2ds_intersect(body1.geom, body2.geom):
+                        return True
+    return False
+
 def get_fingered_robot_action_from_gui_input(
-    action_space: FingeredRobotActionSpace, gui_input: dict[str, Any]
+    action_space: KinRobotActionSpace, gui_input: dict[str, Any]
 ) -> NDArray[np.float32]:
     """Get the mapping from human inputs to actions, derived from action space."""
     # This will be implemented later - placeholder for now

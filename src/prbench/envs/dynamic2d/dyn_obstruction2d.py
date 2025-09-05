@@ -8,9 +8,11 @@ import pymunk
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
-from prbench.envs.geom2d.object_types import (
-    Geom2DRobotEnvTypeFeatures,
+from prbench.envs.dynamic2d.object_types import (
+    Dynamic2DRobotEnvTypeFeatures,
+    KinRobotType,
     RectangleType,
+    DynRectangleType,
 )
 from prbench.envs.geom2d.structs import SE2Pose
 from prbench.envs.dynamic2d.base_env import (
@@ -19,18 +21,21 @@ from prbench.envs.dynamic2d.base_env import (
     Dynamic2DRobotEnvSpec,
 )
 from prbench.envs.dynamic2d.utils import (
+    KinRobotActionSpace,
     DYNAMIC_COLLISION_TYPE,
     STATIC_COLLISION_TYPE,
+    create_walls_from_world_boundaries,
+    state_has_collision
 )
 
 # Define custom object types for the obstruction environment
-TargetBlockType = Type("target_block", parent=RectangleType)
+TargetBlockType = Type("target_block", parent=DynRectangleType)
 TargetSurfaceType = Type("target_surface", parent=RectangleType)
-Geom2DRobotEnvTypeFeatures[TargetBlockType] = list(
-    Geom2DRobotEnvTypeFeatures[RectangleType]
+Dynamic2DRobotEnvTypeFeatures[TargetBlockType] = list(
+    Dynamic2DRobotEnvTypeFeatures[DynRectangleType]
 )
-Geom2DRobotEnvTypeFeatures[TargetSurfaceType] = list(
-    Geom2DRobotEnvTypeFeatures[RectangleType]
+Dynamic2DRobotEnvTypeFeatures[TargetSurfaceType] = list(
+    Dynamic2DRobotEnvTypeFeatures[RectangleType]
 )
 
 # Colors
@@ -73,6 +78,15 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     world_min_y: float = 0.0
     world_max_y: float = 1.0
     
+    # Robot parameters
+    init_robot_pos: tuple[float, float] = (5.0, 5.0)
+    robot_base_radius: float = 0.4
+    robot_arm_length_max: float = 0.8
+    gripper_base_width: float = 0.01
+    gripper_base_height: float = 0.1
+    gripper_finger_width: float = 0.1
+    gripper_finger_height: float = 0.01
+
     # Action space parameters.
     min_dx: float = -5e-2
     max_dx: float = 5e-2
@@ -93,40 +107,76 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
     # Table hyperparameters.
     table_rgb: tuple[float, float, float] = (0.75, 0.75, 0.75)
-    table_height: float = 2.0
-    table_width: float = 10.0
-    table_pose: SE2Pose = SE2Pose(100.0, 100.0, 0.0)
+    table_height: float = 0.1
+    table_width: float = world_max_x - world_min_x
+    # The table pose is defined at the center
+    table_pose: SE2Pose = SE2Pose(world_min_x + table_width / 2, 
+                                  world_min_y + table_height / 2, 
+                                  0.0)
 
-    # Target surface hyperparameters (KINEMATIC).
+    # Target surface hyperparameters.
     target_surface_rgb: tuple[float, float, float] = PURPLE
     target_surface_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
-        SE2Pose(150.0, 120.0, 0.0),
-        SE2Pose(350.0, 120.0, 0.0),
+        SE2Pose(world_min_x, table_pose.y, 0.0),
+        SE2Pose(world_max_x - robot_base_radius, table_pose.y, 0.0),
     )
-    target_surface_height: float = 10.0
-    target_surface_width_addition_bounds: tuple[float, float] = (10.0, 20.0)
+    target_surface_height: float = table_height
+    # This adds to the width of the target block.
+    target_surface_width_addition_bounds: tuple[float, float] = (
+        robot_base_radius / 5,
+        robot_base_radius / 2,
+    )
 
-    # Target block hyperparameters (DYNAMIC).
+    # Target block hyperparameters.
     target_block_rgb: tuple[float, float, float] = PURPLE
     target_block_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
-        SE2Pose(150.0, 200.0, 0.0),
-        SE2Pose(400.0, 300.0, 0.0),
+        SE2Pose(
+            world_min_x + robot_base_radius, table_pose.y + table_height + 1e-6, 0.0
+        ),
+        SE2Pose(
+            world_max_x - robot_base_radius, table_pose.y + table_height + 1e-6, 0.0
+        ),
     )
-    target_block_height_bounds: tuple[float, float] = (15.0, 30.0)
-    target_block_width_bounds: tuple[float, float] = (15.0, 30.0)
+    target_block_height_bounds: tuple[float, float] = (
+        robot_base_radius / 2,
+        2 * robot_base_radius,
+    )
+    target_block_width_bounds: tuple[float, float] = (
+        robot_base_radius / 2,
+        2 * robot_base_radius,
+    )
+    target_block_mass: float = 1.0
 
     # Obstruction hyperparameters (DYNAMIC).
     obstruction_rgb: tuple[float, float, float] = (0.75, 0.1, 0.1)
-    obstruction_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
-        SE2Pose(150.0, 200.0, 0.0),
-        SE2Pose(400.0, 300.0, 0.0),
+    obstruction_init_pose_bounds = (
+        SE2Pose(
+            world_min_x + robot_base_radius, table_pose.y + table_height + 1e-6, 0.0
+        ),
+        SE2Pose(
+            world_max_x - robot_base_radius, table_pose.y + table_height + 1e-6, 0.0
+        ),
     )
-    obstruction_height_bounds: tuple[float, float] = (15.0, 30.0)
-    obstruction_width_bounds: tuple[float, float] = (15.0, 30.0)
-    obstruction_init_on_target_prob: float = 0.7
+    obstruction_height_bounds: tuple[float, float] = (
+        robot_base_radius / 2,
+        2 * robot_base_radius,
+    )
+    obstruction_width_bounds: tuple[float, float] = (
+        robot_base_radius / 2,
+        2 * robot_base_radius,
+    )
+    obstruction_block_mass: float = 1.0
+
+    # NOTE: this is not the "real" probability, but rather, the probability
+    # that we will attempt to sample the obstruction somewhere on the target
+    # surface during each round of rejection sampling during reset().
+    obstruction_init_on_target_prob: float = 0.9
 
     # For sampling initial states.
-    max_initial_state_sampling_attempts: int = 100
+    max_initial_state_sampling_attempts: int = 10_000
+
+    # For rendering.
+    render_dpi: int = 250
 
 
 class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
@@ -145,182 +195,51 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         # Store object references for tracking
         self._target_block: Object | None = None
         self._target_surface: Object | None = None
+        initial_state_dict = self._create_constant_initial_state_dict()
+        self._initial_constant_state = create_state_from_dict(
+                    initial_state_dict, Dynamic2DRobotEnvTypeFeatures
+                )
 
-    def _add_state_to_space(self, state: ObjectCentricState) -> None:
-        """Add objects from the state to the PyMunk space."""
-        if not self.space:
-            return
+    def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
+        init_state_dict: dict[Object, dict[str, float]] = {}
 
-        # Add static objects (table, walls)
-        for obj in state:
-            if obj.name == "table":
-                self._add_table_to_space(obj, state)
-            elif obj.name.startswith("wall"):
-                self._add_wall_to_space(obj, state)
-            elif obj.is_instance(TargetSurfaceType):
-                self._add_target_surface_to_space(obj, state)
-                self._target_surface = obj
-            elif obj.is_instance(TargetBlockType):
-                self._add_target_block_to_space(obj, state)
-                self._target_block = obj
-            elif obj.name.startswith("obstruction"):
-                self._add_obstruction_to_space(obj, state)
+        # Create the table.
+        table = Object("table", RectangleType)
+        init_state_dict[table] = {
+            "x": self._spec.table_pose.x,
+            "vx": 0.0,
+            "y": self._spec.table_pose.y,
+            "vy": 0.0,
+            "theta": self._spec.table_pose.theta,
+            "omega": 0.0,
+            "width": self._spec.table_width,
+            "height": self._spec.table_height,
+            "static": True,
+            "kinematic": False,
+            "dynamic": False,
+            "color_r": self._spec.table_rgb[0],
+            "color_g": self._spec.table_rgb[1],
+            "color_b": self._spec.table_rgb[2],
+        }
 
-    def _add_table_to_space(self, obj: Object, state: ObjectCentricState) -> None:
-        """Add table as a static object."""
-        if not self.space:
-            return
-            
-        x = state.get(obj, "x")
-        y = state.get(obj, "y")
-        width = state.get(obj, "width")
-        height = state.get(obj, "height")
-        theta = state.get(obj, "theta")
+        # Create room walls.
+        assert isinstance(self.action_space, KinRobotActionSpace)
+        min_dx, min_dy = self.action_space.low[:2]
+        max_dx, max_dy = self.action_space.high[:2]
+        wall_state_dict = create_walls_from_world_boundaries(
+            self._spec.world_min_x,
+            self._spec.world_max_x,
+            self._spec.world_min_y,
+            self._spec.world_max_y,
+            min_dx,
+            max_dx,
+            min_dy,
+            max_dy,
+        )
+        init_state_dict.update(wall_state_dict)
 
-        body = self.space.static_body
-        vs = [
-            (-width / 2, -height / 2),
-            (-width / 2, height / 2),
-            (width / 2, height / 2),
-            (width / 2, -height / 2),
-        ]
-        shape = pymunk.Poly(body, vs)
-        shape.body.position = x, y
-        shape.body.angle = theta
-        shape.friction = 1.0
-        shape.collision_type = STATIC_COLLISION_TYPE
-        self.space.add(shape)
-
-
-    def _add_wall_to_space(self, obj: Object, state: ObjectCentricState) -> None:
-        """Add wall as a static object."""
-        if not self.space:
-            return
-            
-        x = state.get(obj, "x")
-        y = state.get(obj, "y")
-        width = state.get(obj, "width")
-        height = state.get(obj, "height")
-        theta = state.get(obj, "theta")
-
-        body = self.space.static_body
-        vs = [
-            (-width / 2, -height / 2),
-            (-width / 2, height / 2),
-            (width / 2, height / 2),
-            (width / 2, -height / 2),
-        ]
-        shape = pymunk.Poly(body, vs)
-        shape.body.position = x, y
-        shape.body.angle = theta
-        shape.friction = 1.0
-        shape.collision_type = STATIC_COLLISION_TYPE
-        self.space.add(shape)
-
-
-    def _add_target_surface_to_space(self, obj: Object, state: ObjectCentricState) -> None:
-        """Add target surface as a kinematic object."""
-        if not self.space:
-            return
-            
-        x = state.get(obj, "x")
-        y = state.get(obj, "y")
-        width = state.get(obj, "width")
-        height = state.get(obj, "height")
-        theta = state.get(obj, "theta")
-
-        body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
-        vs = [
-            (-width / 2, -height / 2),
-            (-width / 2, height / 2),
-            (width / 2, height / 2),
-            (width / 2, -height / 2),
-        ]
-        shape = pymunk.Poly(body, vs)
-        body.position = x, y
-        body.angle = theta
-        shape.friction = 1.0
-        shape.collision_type = STATIC_COLLISION_TYPE  # Kinematic objects act like static for collisions
-        self.space.add(body, shape)
-
-
-    def _add_target_block_to_space(self, obj: Object, state: ObjectCentricState) -> None:
-        """Add target block as a dynamic object."""
-        if not self.space:
-            return
-            
-        x = state.get(obj, "x")
-        y = state.get(obj, "y")
-        width = state.get(obj, "width")
-        height = state.get(obj, "height")
-        theta = state.get(obj, "theta")
-
-        mass = 1.0
-        moment = pymunk.moment_for_box(mass, (width, height))
-        body = pymunk.Body(mass, moment)
-        body.position = x, y
-        body.angle = theta
-
-        vs = [
-            (-width / 2, -height / 2),
-            (-width / 2, height / 2),
-            (width / 2, height / 2),
-            (width / 2, -height / 2),
-        ]
-        shape = pymunk.Poly(body, vs)
-        shape.friction = 1.0
-        shape.collision_type = DYNAMIC_COLLISION_TYPE
-        self.space.add(body, shape)
-
-
-    def _add_obstruction_to_space(self, obj: Object, state: ObjectCentricState) -> None:
-        """Add obstruction as a dynamic object."""
-        if not self.space:
-            return
-            
-        x = state.get(obj, "x")
-        y = state.get(obj, "y")
-        width = state.get(obj, "width")
-        height = state.get(obj, "height")
-        theta = state.get(obj, "theta")
-
-        mass = 1.0
-        moment = pymunk.moment_for_box(mass, (width, height))
-        body = pymunk.Body(mass, moment)
-        body.position = x, y
-        body.angle = theta
-
-        vs = [
-            (-width / 2, -height / 2),
-            (-width / 2, height / 2),
-            (width / 2, height / 2),
-            (width / 2, -height / 2),
-        ]
-        shape = pymunk.Poly(body, vs)
-        shape.friction = 1.0
-        shape.collision_type = DYNAMIC_COLLISION_TYPE
-        self.space.add(body, shape)
-
-
-    def _read_state_from_space(self) -> ObjectCentricState:
-        """Read the current state from the PyMunk space."""
-        if not self.space or not self._current_state:
-            return ObjectCentricState({})
-
-        state = self._current_state.copy()
-
-        # Update dynamic object positions from PyMunk simulation
-        for obj in state:
-            if hasattr(obj, "_pymunk_body") and hasattr(obj, "_pymunk_shape"):
-                body = getattr(obj, "_pymunk_body")
-                # Only update dynamic objects (not static or kinematic)
-                if body.body_type == pymunk.Body.DYNAMIC:
-                    state.set(obj, "x", float(body.position.x))
-                    state.set(obj, "y", float(body.position.y))
-                    state.set(obj, "theta", float(body.angle))
-
-        return state
-
+        return init_state_dict
+    
     def _sample_initial_state(self) -> ObjectCentricState:
         """Sample an initial state for the environment."""
         n = self._spec.max_initial_state_sampling_attempts
@@ -374,110 +293,289 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                 obstructions,
             )
             
-            # Basic validation - ensure objects don't start overlapping too much
-            # The physics simulation will handle the rest
+            # Check initial state validity: goal not satisfied and no collisions.
+            if self._target_satisfied(state, {}):
+                continue
+            full_state = state.copy()
+            full_state.data.update(self._initial_constant_state.data)
+            all_objects = set(full_state)
+            # We use Geom2D collision checker for now, will update it.
+            if state_has_collision(full_state, all_objects, all_objects, {}):
+                continue
             return state
             
         raise RuntimeError(f"Failed to sample initial state after {n} attempts")
 
     def _create_initial_state(
         self,
+        robot_pose: SE2Pose,
         target_surface_pose: SE2Pose,
         target_surface_shape: tuple[float, float],
         target_block_pose: SE2Pose,
         target_block_shape: tuple[float, float],
         obstructions: list[tuple[SE2Pose, tuple[float, float]]],
     ) -> ObjectCentricState:
-        """Create the initial state dictionary."""
+        # Shallow copy should be okay because the constant objects should not
+        # ever change in this method.
         init_state_dict: dict[Object, dict[str, float]] = {}
 
-        # Create the table.
-        table = Object("table", RectangleType)
-        init_state_dict[table] = {
-            "x": self._spec.table_pose.x,
-            "y": self._spec.table_pose.y,
-            "theta": self._spec.table_pose.theta,
-            "width": self._spec.table_width,
-            "height": self._spec.table_height,
-            "static": True,
-            "color_r": self._spec.table_rgb[0],
-            "color_g": self._spec.table_rgb[1],
-            "color_b": self._spec.table_rgb[2],
-            "z_order": 1.0,
+        # Create the robot.
+        robot = Object("robot", KinRobotType)
+        init_state_dict[robot] = {
+            "x": robot_pose.x,
+            "vx": 0.0,
+            "y": robot_pose.y,
+            "vy": 0.0,
+            "theta": robot_pose.theta,
+            "omega": 0.0,
+            "base_radius": self._spec.robot_base_radius,
+            "arm_joint": self._spec.robot_base_radius,
+            "arm_length": self._spec.robot_arm_length_max,
+            "gripper_base_width": self._spec.gripper_base_width,
+            "gripper_base_height": self._spec.gripper_base_height,
+            "finger_gap": self._spec.gripper_base_height,
+            "finger_height": self._spec.gripper_finger_height,
+            "finger_width": self._spec.gripper_finger_width,
         }
 
-        # Create walls
-        wall_thickness = 10.0
-        walls = [
-            ("wall_left", self._spec.world_min_x - wall_thickness/2, (self._spec.world_min_y + self._spec.world_max_y)/2, wall_thickness, self._spec.world_max_y - self._spec.world_min_y),
-            ("wall_right", self._spec.world_max_x + wall_thickness/2, (self._spec.world_min_y + self._spec.world_max_y)/2, wall_thickness, self._spec.world_max_y - self._spec.world_min_y),
-            ("wall_bottom", (self._spec.world_min_x + self._spec.world_max_x)/2, self._spec.world_min_y - wall_thickness/2, self._spec.world_max_x - self._spec.world_min_x, wall_thickness),
-            ("wall_top", (self._spec.world_min_x + self._spec.world_max_x)/2, self._spec.world_max_y + wall_thickness/2, self._spec.world_max_x - self._spec.world_min_x, wall_thickness),
-        ]
-        
-        for wall_name, x, y, width, height in walls:
-            wall = Object(wall_name, RectangleType)
-            init_state_dict[wall] = {
-                "x": x,
-                "y": y,
-                "theta": 0.0,
-                "width": width,
-                "height": height,
-                "static": True,
-                "color_r": BLACK[0],
-                "color_g": BLACK[1],
-                "color_b": BLACK[2],
-                "z_order": 1.0,
-            }
-
-        # Create the target surface (kinematic).
+        # Create the target surface.
         target_surface = Object("target_surface", TargetSurfaceType)
         init_state_dict[target_surface] = {
             "x": target_surface_pose.x,
+            "vx": 0.0,
             "y": target_surface_pose.y,
+            "vy": 0.0,
             "theta": target_surface_pose.theta,
+            "omega": 0.0,
             "width": target_surface_shape[0],
             "height": target_surface_shape[1],
-            "static": False,  # Kinematic objects are not static in the state representation
+            "static": False,
+            "kinematic": True,
+            "dynamic": False,
             "color_r": self._spec.target_surface_rgb[0],
             "color_g": self._spec.target_surface_rgb[1],
             "color_b": self._spec.target_surface_rgb[2],
-            "z_order": 0.0,
         }
 
-        # Create the target block (dynamic).
+        # Create the target block.
         target_block = Object("target_block", TargetBlockType)
         init_state_dict[target_block] = {
             "x": target_block_pose.x,
+            "vx": 0.0,
             "y": target_block_pose.y,
+            "vy": 0.0,
             "theta": target_block_pose.theta,
+            "omega": 0.0,
             "width": target_block_shape[0],
             "height": target_block_shape[1],
             "static": False,
+            "kinematic": False,
+            "dynamic": True,
+            "mass": self._spec.target_block_mass,
+            "moment": pymunk.moment_for_box(
+                self._spec.target_block_mass, target_block_shape
+            ),
             "color_r": self._spec.target_block_rgb[0],
             "color_g": self._spec.target_block_rgb[1],
             "color_b": self._spec.target_block_rgb[2],
-            "z_order": 1.0,
         }
 
-        # Create obstructions (dynamic).
+        # Create obstructions.
         for i, (obstruction_pose, obstruction_shape) in enumerate(obstructions):
             obstruction = Object(f"obstruction{i}", RectangleType)
             init_state_dict[obstruction] = {
                 "x": obstruction_pose.x,
+                "vx": 0.0,
                 "y": obstruction_pose.y,
+                "vy": 0.0,
                 "theta": obstruction_pose.theta,
+                "omega": 0.0,
+                "mass": self._spec.obstruction_block_mass,
+                "moment": pymunk.moment_for_box(
+                    self._spec.obstruction_block_mass, obstruction_shape
+                ),
                 "width": obstruction_shape[0],
                 "height": obstruction_shape[1],
                 "static": False,
+                "kinematic": False,
+                "dynamic": True,
                 "color_r": self._spec.obstruction_rgb[0],
                 "color_g": self._spec.obstruction_rgb[1],
                 "color_b": self._spec.obstruction_rgb[2],
-                "z_order": 1.0,
             }
 
         # Finalize state.
-        return create_state_from_dict(init_state_dict, Geom2DRobotEnvTypeFeatures)
+        return create_state_from_dict(init_state_dict, Dynamic2DRobotEnvTypeFeatures)
+    
+    def _add_state_to_space(self, state: ObjectCentricState) -> None:
+        """Add objects from the state to the PyMunk space."""
+        if not self.space:
+            return
+
+        # Add static objects (table, walls)
+        for obj in state:
+            if obj.name == "table":
+                self._add_table_to_space(obj, state)
+            elif obj.name.startswith("wall"):
+                self._add_wall_to_space(obj, state)
+            elif obj.is_instance(TargetSurfaceType):
+                self._add_target_surface_to_space(obj, state)
+                self._target_surface = obj
+            elif obj.is_instance(TargetBlockType):
+                self._add_target_block_to_space(obj, state)
+                self._target_block = obj
+            elif obj.name.startswith("obstruction"):
+                self._add_obstruction_to_space(obj, state)
+
+    def _add_table_to_space(self, obj: Object, state: ObjectCentricState) -> None:
+        """Add table as a static object."""
+        if not self.space:
+            return
+            
+        x = state.get(obj, "x")
+        y = state.get(obj, "y")
+        width = state.get(obj, "width")
+        height = state.get(obj, "height")
+        theta = state.get(obj, "theta")
+
+        body = self.space.static_body
+        vs = [
+            (-width / 2, -height / 2),
+            (-width / 2, height / 2),
+            (width / 2, height / 2),
+            (width / 2, -height / 2),
+        ]
+        shape = pymunk.Poly(body, vs)
+        shape.body.position = x, y
+        shape.body.angle = theta
+        shape.friction = 1.0
+        shape.collision_type = STATIC_COLLISION_TYPE
+        self.space.add(shape)
+
+    def _add_wall_to_space(self, obj: Object, state: ObjectCentricState) -> None:
+        """Add wall as a static object."""
+        if not self.space:
+            return
+            
+        x = state.get(obj, "x")
+        y = state.get(obj, "y")
+        width = state.get(obj, "width")
+        height = state.get(obj, "height")
+        theta = state.get(obj, "theta")
+
+        body = self.space.static_body
+        vs = [
+            (-width / 2, -height / 2),
+            (-width / 2, height / 2),
+            (width / 2, height / 2),
+            (width / 2, -height / 2),
+        ]
+        shape = pymunk.Poly(body, vs)
+        shape.body.position = x, y
+        shape.body.angle = theta
+        shape.friction = 1.0
+        shape.collision_type = STATIC_COLLISION_TYPE
+        self.space.add(shape)
+
+    def _add_target_surface_to_space(self, obj: Object, state: ObjectCentricState) -> None:
+        """Add target surface as a kinematic object."""
+        if not self.space:
+            return
+            
+        x = state.get(obj, "x")
+        y = state.get(obj, "y")
+        width = state.get(obj, "width")
+        height = state.get(obj, "height")
+        theta = state.get(obj, "theta")
+
+        body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
+        vs = [
+            (-width / 2, -height / 2),
+            (-width / 2, height / 2),
+            (width / 2, height / 2),
+            (width / 2, -height / 2),
+        ]
+        shape = pymunk.Poly(body, vs)
+        body.position = x, y
+        body.angle = theta
+        shape.friction = 1.0
+        shape.collision_type = STATIC_COLLISION_TYPE  # Kinematic objects act like static for collisions
+        self.space.add(body, shape)
+
+    def _add_target_block_to_space(self, obj: Object, state: ObjectCentricState) -> None:
+        """Add target block as a dynamic object."""
+        if not self.space:
+            return
+            
+        x = state.get(obj, "x")
+        y = state.get(obj, "y")
+        width = state.get(obj, "width")
+        height = state.get(obj, "height")
+        theta = state.get(obj, "theta")
+
+        mass = self._spec.target_block_mass
+        moment = pymunk.moment_for_box(mass, (width, height))
+        body = pymunk.Body(mass, moment)
+        body.position = x, y
+        body.angle = theta
+
+        vs = [
+            (-width / 2, -height / 2),
+            (-width / 2, height / 2),
+            (width / 2, height / 2),
+            (width / 2, -height / 2),
+        ]
+        shape = pymunk.Poly(body, vs)
+        shape.friction = 1.0
+        shape.collision_type = DYNAMIC_COLLISION_TYPE
+        self.space.add(body, shape)
+
+    def _add_obstruction_to_space(self, obj: Object, state: ObjectCentricState) -> None:
+        """Add obstruction as a dynamic object."""
+        if not self.space:
+            return
+            
+        x = state.get(obj, "x")
+        y = state.get(obj, "y")
+        width = state.get(obj, "width")
+        height = state.get(obj, "height")
+        theta = state.get(obj, "theta")
+
+        mass = self._spec.obstruction_block_mass
+        moment = pymunk.moment_for_box(mass, (width, height))
+        body = pymunk.Body(mass, moment)
+        body.position = x, y
+        body.angle = theta
+
+        vs = [
+            (-width / 2, -height / 2),
+            (-width / 2, height / 2),
+            (width / 2, height / 2),
+            (width / 2, -height / 2),
+        ]
+        shape = pymunk.Poly(body, vs)
+        shape.friction = 1.0
+        shape.collision_type = DYNAMIC_COLLISION_TYPE
+        self.space.add(body, shape)
+
+    def _read_state_from_space(self) -> ObjectCentricState:
+        """Read the current state from the PyMunk space."""
+        if not self.space or not self._current_state:
+            return ObjectCentricState({})
+
+        state = self._current_state.copy()
+
+        # Update dynamic object positions from PyMunk simulation
+        for obj in state:
+            if hasattr(obj, "_pymunk_body") and hasattr(obj, "_pymunk_shape"):
+                body = getattr(obj, "_pymunk_body")
+                # Only update dynamic objects (not static or kinematic)
+                if body.body_type == pymunk.Body.DYNAMIC:
+                    state.set(obj, "x", float(body.position.x))
+                    state.set(obj, "y", float(body.position.y))
+                    state.set(obj, "theta", float(body.angle))
+
+        return state
 
     def _target_satisfied(self) -> bool:
         """Check if the target block is on the target surface."""

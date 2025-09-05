@@ -17,9 +17,9 @@ from relational_structs import (
 )
 from relational_structs.spaces import ObjectCentricBoxSpace
 
-from prbench.envs.geom2d.object_types import (
-    Geom2DRobotEnvTypeFeatures,
-    RectangleType,
+from prbench.envs.dynamic2d.object_types import (
+    Dynamic2DRobotEnvTypeFeatures,
+    KinRobotType,
 )
 from prbench.envs.dynamic2d.utils import (
     DYNAMIC_COLLISION_TYPE,
@@ -98,7 +98,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         self, spec: Dynamic2DRobotEnvSpec, render_mode: str | None = "rgb_array"
     ) -> None:
         self._spec = spec
-        self._types = {RectangleType}  # Add more types as needed
+        self._types = {KinRobotType}  # Add more types as needed
         self.render_mode = render_mode
         self.observation_space = ObjectCentricStateSpace(self._types)
         self.action_space = FingeredRobotActionSpace(
