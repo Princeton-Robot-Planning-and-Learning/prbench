@@ -30,16 +30,16 @@ class FingeredRobotActionSpace(Box):
 
     def __init__(
         self,
-        min_dx: float = -2.5,
-        max_dx: float = 2.5,
-        min_dy: float = -2.5,
-        max_dy: float = 2.5,
+        min_dx: float = -5e-1,
+        max_dx: float = 5e-1,
+        min_dy: float = -5e-1,
+        max_dy: float = 5e-1,
         min_dtheta: float = -np.pi / 16,
         max_dtheta: float = np.pi / 16,
-        min_darm: float = -5.0,
-        max_darm: float = 5.0,
-        min_dgripper: float = -1.0,
-        max_dgripper: float = 1.0,
+        min_darm: float = -1e-1,
+        max_darm: float = 1e-1,
+        min_dgripper: float = -0.02,
+        max_dgripper: float = 0.02,
     ) -> None:
         low = np.array([min_dx, min_dy, min_dtheta, min_darm, min_dgripper])
         high = np.array([max_dx, max_dy, max_dtheta, max_darm, max_dgripper])
@@ -72,18 +72,17 @@ class KinRobot:
 
     def __init__(
         self,
-        init_pos: Vec2d = Vec2d(100, 300),
-        base_radius: float = 30,
-        arm_length_max: float = 60,
-        gripper_base_width: float = 4,
-        gripper_base_height: float = 50,
-        gripper_finger_width: float = 24,
-        gripper_finger_height: float = 4,
-        gripper_gap_max: float = 50,
+        init_pos: Vec2d = Vec2d(5.0, 5.0),
+        base_radius: float = 0.4,
+        arm_length_max: float = 0.8,
+        gripper_base_width: float = 0.01,
+        gripper_base_height: float = 0.1,
+        gripper_finger_width: float = 0.1,
+        gripper_finger_height: float = 0.01,
         kp_pos: float = 100.0,
-        kv_pos: float = 60.0,
+        kv_pos: float = 20.0,
         kp_rot: float = 500.0,
-        kv_rot: float = 60.0,
+        kv_rot: float = 50.0,
     ) -> None:
         # Robot parameters
         self.base_radius = base_radius
@@ -92,7 +91,7 @@ class KinRobot:
         self.gripper_finger_width = gripper_finger_width
         self.gripper_finger_height = gripper_finger_height
         self.arm_length_max = arm_length_max
-        self.gripper_gap_max = gripper_gap_max
+        self.gripper_gap_max = gripper_base_height
 
         # PD Control parameters
         self.kp_pos = kp_pos

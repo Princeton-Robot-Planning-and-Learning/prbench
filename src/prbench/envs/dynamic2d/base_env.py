@@ -39,21 +39,36 @@ class Dynamic2DRobotEnvSpec:
 
     # The world is oriented like a standard X/Y coordinate frame.
     world_min_x: float = 0.0
-    world_max_x: float = 600.0
+    world_max_x: float = 10.0
     world_min_y: float = 0.0
-    world_max_y: float = 600.0
+    world_max_y: float = 10.0
 
     # Action space parameters.
-    min_dx: float = -2.5
-    max_dx: float = 2.5
-    min_dy: float = -2.5
-    max_dy: float = 2.5
+    min_dx: float = -5e-2
+    max_dx: float = 5e-2
+    min_dy: float = -5e-2
+    max_dy: float = 5e-2
     min_dtheta: float = -np.pi / 16
     max_dtheta: float = np.pi / 16
-    min_darm: float = -5.0
-    max_darm: float = 5.0
-    min_dgripper: float = -1.0
-    max_dgripper: float = 1.0
+    min_darm: float = -1e-1
+    max_darm: float = 1e-1
+    min_dgripper: float = -0.02
+    max_dgripper: float = 0.02
+
+    # Robot parameters
+    init_robot_pos: tuple[float, float] = (5.0, 5.0)
+    robot_base_radius: float = 0.4
+    robot_arm_length_max: float = 0.8
+    gripper_base_width: float = 0.01
+    gripper_base_height: float = 0.1
+    gripper_finger_width: float = 0.1
+    gripper_finger_height: float = 0.01
+
+    # Controller parameters
+    kp_pos: float = 100.0
+    kv_pos: float = 20.0
+    kp_rot: float = 500.0
+    kv_rot: float = 50.0
 
     # Physics parameters
     gravity_y: float = 1000.0
@@ -115,7 +130,19 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         self.space.gravity = 0, self._spec.gravity_y
 
         # Create robot
-        self.robot = KinRobot()
+        self.robot = KinRobot(
+            init_pos=self._spec.init_robot_pos,
+            base_radius=self._spec.robot_base_radius,
+            arm_length_max=self._spec.robot_arm_length_max,
+            gripper_base_width=self._spec.gripper_base_width,
+            gripper_base_height=self._spec.gripper_base_height,
+            gripper_finger_width=self._spec.gripper_finger_width,
+            gripper_finger_height=self._spec.gripper_finger_height,
+            kp_pos=self._spec.kp_pos,
+            kv_pos=self._spec.kv_pos,
+            kp_rot=self._spec.kp_rot,
+            kv_rot=self._spec.kv_rot,
+        )
         self.robot.add_to_space(self.space)
 
         # Set up collision handlers

@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 import numpy as np
 import pymunk
-from pymunk.vec2d import Vec2d
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
@@ -22,7 +21,6 @@ from prbench.envs.dynamic2d.base_env import (
 from prbench.envs.dynamic2d.utils import (
     DYNAMIC_COLLISION_TYPE,
     STATIC_COLLISION_TYPE,
-    FingeredRobotActionSpace,
 )
 
 # Define custom object types for the obstruction environment
@@ -71,38 +69,30 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
     world_min_x: float = 0.0
-    world_max_x: float = 600.0
+    world_max_x: float = (1 + np.sqrt(5)) / 2  # golden ratio :)
     world_min_y: float = 0.0
-    world_max_y: float = 400.0
+    world_max_y: float = 1.0
 
     # Action space parameters.
-    min_dx: float = -2.5
-    max_dx: float = 2.5
-    min_dy: float = -2.5
-    max_dy: float = 2.5
+    min_dx: float = -5e-2
+    max_dx: float = 5e-2
+    min_dy: float = -5e-2
+    max_dy: float = 5e-2
     min_dtheta: float = -np.pi / 16
     max_dtheta: float = np.pi / 16
-    min_darm: float = -5.0
-    max_darm: float = 5.0
-    min_dgripper: float = -1.0
-    max_dgripper: float = 1.0
-
-    # Physics parameters
-    gravity_y: float = 1000.0
-    fps: int = 60
-
+    min_darm: float = -1e-1
+    max_darm: float = 1e-1
+    
     # Robot hyperparameters.
-    robot_base_radius: float = 30.0
-    robot_arm_length: float = 60.0
     robot_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
-        SE2Pose(100.0, 300.0, -np.pi / 2),
-        SE2Pose(500.0, 350.0, -np.pi / 2),
+        SE2Pose(8.0, 8.0, np.pi / 2),
+        SE2Pose(2.0, 2.0, -np.pi / 2),
     )
 
     # Table hyperparameters.
     table_rgb: tuple[float, float, float] = (0.75, 0.75, 0.75)
-    table_height: float = 20.0
-    table_width: float = 400.0
+    table_height: float = 2.0
+    table_width: float = 10.0
     table_pose: SE2Pose = SE2Pose(100.0, 100.0, 0.0)
 
     # Target surface hyperparameters (KINEMATIC).
