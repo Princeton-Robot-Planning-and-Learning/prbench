@@ -22,7 +22,6 @@ from prbench.envs.geom2d.object_types import (
 )
 from prbench.envs.dynamic2d.utils import (
     DYNAMIC_COLLISION_TYPE,
-    GRIPPER_COLLISION_TYPE,
     ROBOT_COLLISION_TYPE,
     STATIC_COLLISION_TYPE,
     FingeredRobotActionSpace,
@@ -40,25 +39,29 @@ class Dynamic2DRobotEnvSpec:
 
     # The world is oriented like a standard X/Y coordinate frame.
     world_min_x: float = 0.0
-    world_max_x: float = 10.0
+    world_max_x: float = 600.0
     world_min_y: float = 0.0
-    world_max_y: float = 10.0
+    world_max_y: float = 600.0
 
     # Action space parameters.
-    min_dx: float = -5e-1
-    max_dx: float = 5e-1
-    min_dy: float = -5e-1
-    max_dy: float = 5e-1
+    min_dx: float = -2.5
+    max_dx: float = 2.5
+    min_dy: float = -2.5
+    max_dy: float = 2.5
     min_dtheta: float = -np.pi / 16
     max_dtheta: float = np.pi / 16
-    min_darm: float = -1e-1
-    max_darm: float = 1e-1
+    min_darm: float = -5.0
+    max_darm: float = 5.0
     min_dgripper: float = -1.0
     max_dgripper: float = 1.0
 
     # Physics parameters
     gravity_y: float = 1000.0
-    fps: int = 60
+    control_freq: int = 60  # Control frequency (actions per second)
+    sim_freq: int = 240     # Simulation frequency (physics steps per second)
+
+    # For rendering.
+    render_dpi: int = 50
 
 
 # Define a simple robot type for Dynamic2D environments
@@ -117,7 +120,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Set up collision handlers
         self.space.on_collision(
-            DYNAMIC_COLLISION_TYPE, GRIPPER_COLLISION_TYPE,
+            DYNAMIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE,
             post_solve=on_gripper_grasp, data=self.robot
         )
         self.space.on_collision(
@@ -130,12 +133,12 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         """Add objects from the state to the PyMunk space."""
 
     @abc.abstractmethod
-    def _sample_initial_state(self) -> ObjectCentricState:
-        """Use self.np_random to sample an initial state."""
-
-    @abc.abstractmethod
     def _read_state_from_space(self) -> ObjectCentricState:
         """Read the current state from the PyMunk space."""
+
+    @abc.abstractmethod
+    def _sample_initial_state(self) -> ObjectCentricState:
+        """Use self.np_random to sample an initial state."""
 
     @abc.abstractmethod
     def _get_reward_and_done(self) -> tuple[float, bool]:
@@ -144,7 +147,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
     def _get_obs(self) -> ObjectCentricState:
         """Get observation by reading from the physics simulation."""
         assert self._current_state is not None, "Need to call reset()"
-        return self._read_state_from_space()
+        return self._current_state.copy()
 
     def _get_info(self) -> dict:
         return {}  # no extra info provided right now
@@ -195,10 +198,6 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         # Add objects to physics space
         self._add_state_to_space(self._current_state)
 
-        # Initially step the physics simulation for one step
-        dt = 1.0 / self._spec.fps
-        self.space.step(dt)
-
         observation = self._get_obs()
         info = self._get_info()
 
@@ -211,12 +210,19 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         assert self.space is not None, "Space not initialized"
         assert self.robot is not None, "Robot not initialized"
 
-        # Update robot with the action
-        self.robot.update(dx, dy, dtheta, darm, dgripper, self.space)
+        # Calculate simulation parameters
+        n_steps = self._spec.sim_freq // self._spec.control_freq
+        dt = 1.0 / self._spec.sim_freq
 
-        # Step the physics simulation
-        dt = 1.0 / self._spec.fps
-        self.space.step(dt)
+        # Multi-step simulation like basic_pymunk.py
+        for _ in range(n_steps):
+            # Update robot with the action (PD control updates velocities)
+            self.robot.update(dx, dy, dtheta, darm, dgripper, dt)
+            # Step physics simulation
+            self.space.step(dt)
+
+        # Drop objects after internal steps (like basic_pymunk.py)
+        self.robot.drop_held_objects(self.space)
 
         # Update current state from simulation
         self._current_state = self._read_state_from_space()

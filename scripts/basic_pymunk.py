@@ -16,7 +16,6 @@ from prbench.envs.geom2d.structs import SE2Pose
 STATIC_COLLISION_TYPE = 0
 DYNAMIC_COLLISION_TYPE = 1
 ROBOT_COLLISION_TYPE = 2
-GRIPPER_COLLISION_TYPE = 3
 HELD_OBJECT_COLLISION_TYPE = 4
 
 
@@ -49,9 +48,9 @@ class KinRobot:
 
         # PDConrtol parameters
         self.kp_pos = 100
-        self.kv_pos = 20
+        self.kv_pos = 60
         self.kp_theta = 500
-        self.kv_theta = 50
+        self.kv_theta = 60
         
         self.base_body = None
         self.base_shape = None
@@ -127,11 +126,10 @@ class KinRobot:
         if left:
             init_rel_pos = SE2Pose(x=half_w, \
                                    y=self._gripper_gap / 2, theta=0.0)
-            finger_shape.collision_type = GRIPPER_COLLISION_TYPE
         else:
             init_rel_pos = SE2Pose(x=half_w, \
                                    y=-self._gripper_gap / 2, theta=0.0)
-            finger_shape.collision_type = ROBOT_COLLISION_TYPE
+        finger_shape.collision_type = ROBOT_COLLISION_TYPE
         init_pose = self.gripper_base_pose * init_rel_pos
         finger_body.position = (init_pose.x, init_pose.y)
         finger_body.angle = init_pose.theta
@@ -146,12 +144,12 @@ class KinRobot:
     @property
     def is_opening_finger(self):
         current_relative_finger_pose = self.gripper_base_pose.inverse * self.left_finger_pose
-        return (current_relative_finger_pose.y - 0.1) >= (self._gripper_gap / 2)
+        return (current_relative_finger_pose.y - 0.01) >= (self._gripper_gap / 2)
     
     @property
     def is_closing_finger(self):
         current_relative_finger_pose = self.gripper_base_pose.inverse * self.left_finger_pose
-        return (current_relative_finger_pose.y + 0.1) <= (self._gripper_gap / 2)
+        return (current_relative_finger_pose.y + 0.01) <= (self._gripper_gap / 2)
     
     def reset_last_state(self):
         # Reset to last state when collide with static objects
@@ -341,7 +339,7 @@ def main():
     screen = pygame.display.set_mode((width, height))
     clock = pygame.time.Clock()
     running = True
-    fps = 30
+    fps = 60
     sim_fps = 240
     font = pygame.font.SysFont("Arial", 16)
 
@@ -388,7 +386,7 @@ def main():
     robot.add_to_space(space)
 
     # Grasping collision handler
-    space.on_collision(DYNAMIC_COLLISION_TYPE, GRIPPER_COLLISION_TYPE, post_solve=on_gripper_grasp, data=robot)
+    space.on_collision(DYNAMIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE, post_solve=on_gripper_grasp, data=robot)
     # Static collision handler
     space.on_collision(STATIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE, pre_solve=on_collision_w_static, data=robot)
 
@@ -443,13 +441,13 @@ def main():
         tgt_theta = tgt_angle
         tgt_arm = max(min(robot.curr_arm_length + darm, robot.arm_length_max), robot.base_radius)
         tgt_gripper = max(min(robot.curr_gripper_gap / 2 + dgripper, robot.gripper_gap_max // 2), 
-                          robot.gripper_finger_height) * 2.0
+                          robot.gripper_finger_height)
         
         n_steps = sim_fps // fps
         dt = 1.0 / sim_fps
         for _ in range(n_steps):
             # Setting velocities based on target position
-            robot.update(tgt_x, tgt_y, tgt_theta, tgt_arm, tgt_gripper, space)
+            robot.update(tgt_x, tgt_y, tgt_theta, tgt_arm, tgt_gripper, dt)
             space.step(dt)
         # Remove objects from hand if gripper is opening
         if robot.is_opening_finger and len(robot.held_objects) > 0:
