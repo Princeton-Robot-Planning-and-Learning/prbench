@@ -65,6 +65,12 @@ def register_all_environments() -> None:
             kwargs={"num_buttons": num_button},
         )
 
+    # PushPullHook2D environment
+    register(
+        id="prbench/PushPullHook2D-v0",
+        entry_point="prbench.envs.geom2d.pushpullhook2d:PushPullHook2DEnv",
+    )
+
     # Motion3D environment.
     _register(
         id="prbench/Motion3D-v0",

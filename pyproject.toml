@@ -13,7 +13,7 @@ dependencies = [
    "numpy",
    "pygame>=2.5.2",
    "relational_structs@git+https://github.com/tomsilver/relational-structs.git",
-   "prpl_utils@git+https://github.com/Princeton-Robot-Planning-and-Learning/prpl-utils",
+   "prpl_utils@git+https://github.com/Princeton-Robot-Planning-and-Learning/prpl-utils.git",
    # Geom2D dependencies
    "tomsgeoms2d@git+https://github.com/tomsilver/toms-geoms-2d.git",
    # TidyBot dependencies
