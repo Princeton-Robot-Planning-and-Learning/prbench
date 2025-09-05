@@ -454,12 +454,15 @@ class PDController:
         kp_arm = getattr(self, "kp_arm", self.kp_pos)
         kv_arm = getattr(self, "kv_arm", self.kv_pos)
         arm_center_omega_vec = base_rot_omega_vec * L_curr * base_ang_vel_curr  # omega x r
+        # Extract prismatic vel from a moving base
         rel_Ldot_curr = (Ldot_curr - base_vel_curr - \
                          arm_center_omega_vec).rotated(-base_ang_curr).x  # R^T * v_gripper_base
         a_L = kp_arm * (tgt_arm - L_curr) + kv_arm * (0.0 - rel_Ldot_curr)
 
         # Integrate prismatic rate
         rel_Ldot_next = rel_Ldot_curr + a_L * dt
+        # Note: We need to use the *next base_ang_vel* to compute the 
+        # world-frame gripper-base velocity
         v_gripper_base = base_vel + \
             base_rot_omega_vec * L_curr * base_ang_vel + \
             Vec2d(rel_Ldot_next, 0.0).rotated(base_ang_curr)
@@ -469,14 +472,18 @@ class PDController:
         kp_finger = getattr(self, "kp_finger", self.kp_pos)
         kv_finger = getattr(self, "kv_finger", self.kv_pos)
         gripper_centr = Vec2d(robot.finger_poses['left'].x, robot.finger_poses['left'].y)
+        # Extract the rotate omega x r contribution
         relative_pos = gripper_centr - base_pos_curr
         finger_rot_omega_vec_base = relative_pos.normalized().rotated(math.pi / 2)
         finger_rot_omega_vec = finger_rot_omega_vec_base * relative_pos.length \
-            * base_ang_vel_curr  # omega x r
+            * base_ang_vel_curr
+        # We only care about y-dir as finger only moves in y in the base frame
         rel_gdot_curr = (finger_vel_abs_w - base_vel_curr - \
-                            finger_rot_omega_vec).rotated(-base_ang_curr).y # We only care about y-dir
+                            finger_rot_omega_vec).rotated(-base_ang_curr).y
         a_g = kp_finger * (tgt_gripper - g_curr) + kv_finger * (0.0 - rel_gdot_curr)
         rel_gdot_next = rel_gdot_curr + a_g * dt
+        # Finger world velocity, similar to gripper-base vel but with the additional 
+        # primistamic part in y-dir
         finger_vel_l = base_vel + \
             finger_rot_omega_vec_base * relative_pos.length * base_ang_vel + \
             Vec2d(rel_Ldot_next, rel_gdot_next).rotated(base_ang_curr)
