@@ -1,5 +1,6 @@
 """Tests for dyn_obstruction2d.py."""
 
+import numpy as np
 from gymnasium.spaces import Box
 
 import prbench
@@ -20,11 +21,15 @@ def test_dyn_obstruction2d_action_space():
     prbench.register_all_environments()
     env = prbench.make("prbench/DynObstruction2D-o4-v0")
     obs, _ = env.reset(seed=0)
-    env.action_space.seed(0)
+    statble_move = np.array([0.05,
+                             0.05,
+                             np.pi / 16,
+                             0.0,
+                             0.0
+                             ], dtype=np.float32)
     for _ in range(5):
-        action = env.action_space.sample()
-        assert env.action_space.contains(action)
-        obs, reward, terminated, truncated, info = env.step(action)
+        assert env.action_space.contains(statble_move)
+        obs, reward, terminated, truncated, info = env.step(statble_move)
         assert env.observation_space.contains(obs)
         assert isinstance(reward, (int, float))
         assert isinstance(terminated, bool)

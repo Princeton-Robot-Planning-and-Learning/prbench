@@ -73,6 +73,18 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     world_min_y: float = 0.0
     world_max_y: float = 1.0
     
+    # Action space parameters.
+    min_dx: float = -5e-2
+    max_dx: float = 5e-2
+    min_dy: float = -5e-2
+    max_dy: float = 5e-2
+    min_dtheta: float = -np.pi / 16
+    max_dtheta: float = np.pi / 16
+    min_darm: float = -5e-2
+    max_darm: float = 5e-2
+    min_dgripper: float = -0.02
+    max_dgripper: float = 0.02
+
     # Robot hyperparameters.
     robot_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
         SE2Pose(8.0, 8.0, np.pi / 2),

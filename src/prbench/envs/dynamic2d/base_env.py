@@ -69,13 +69,13 @@ class Dynamic2DRobotEnvSpec:
     # Controller parameters
     kp_pos: float = 50.0
     kv_pos: float = 5.0
-    kp_rot: float = 20.0
+    kp_rot: float = 50.0
     kv_rot: float = 5.0
 
     # Physics parameters
     gravity_y: float = 1000.0
-    control_freq: int = 2  # Control frequency (actions per second)
-    sim_freq: int = 20     # Simulation frequency (physics steps per second)
+    control_freq: int = 10  # Control frequency (actions per second)
+    sim_freq: int = 60     # Simulation frequency (physics steps per second)
 
     # For rendering.
     render_dpi: int = 50
@@ -247,7 +247,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Calculate simulation parameters
         n_steps = self._spec.sim_freq // self._spec.control_freq
-        dt = 1.0 / self._spec.sim_freq
+        dt = 1.0 / self._spec.control_freq
 
         # Calculate target positions
         tgt_x = self.robot.base_pose.x + dx
