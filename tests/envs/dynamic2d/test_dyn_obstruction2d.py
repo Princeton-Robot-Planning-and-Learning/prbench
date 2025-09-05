@@ -24,10 +24,10 @@ def test_dyn_obstruction2d_action_space():
     statble_move = np.array([0.05,
                              0.05,
                              np.pi / 16,
-                             0.0,
-                             0.0
+                             0.05,
+                             -0.02
                              ], dtype=np.float32)
-    for _ in range(5):
+    for _ in range(100):
         assert env.action_space.contains(statble_move)
         obs, reward, terminated, truncated, info = env.step(statble_move)
         assert env.observation_space.contains(obs)

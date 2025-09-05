@@ -136,8 +136,6 @@ class KinRobot:
     @property
     def base_pose(self) -> SE2Pose:
         """Get the base pose as SE2Pose."""
-        if self._base_body is None:
-            return SE2Pose(x=0.0, y=0.0, theta=0.0)
         return SE2Pose(
             x=self._base_body.position.x,
             y=self._base_body.position.y,
@@ -147,8 +145,6 @@ class KinRobot:
     @property
     def base_vel(self) -> tuple[Vec2d, float]:
         """Get the base linear and angular velocity."""
-        if self._base_body is None:
-            return Vec2d(0.0, 0.0), 0.0
         return self._base_body.velocity, self._base_body.angular_velocity
 
     def create_gripper_base(self) -> None:
@@ -231,12 +227,14 @@ class KinRobot:
     @property
     def curr_gripper(self) -> float:
         """Get the current gripper opening."""
-        return self._gripper_gap
+        relative_finger_pose = self.gripper_base_pose.inverse * self.finger_poses['left']
+        return relative_finger_pose.y + self.gripper_base_height / 2
 
     @property
     def curr_arm_length(self) -> float:
         """Get the current arm length."""
-        return self._arm_length
+        relative_pose = self.base_pose.inverse * self.gripper_base_pose
+        return relative_pose.x
 
     def reset_last_state(self) -> None:
         """Reset to last state when collide with static objects."""
@@ -431,6 +429,8 @@ class PDController:
         base_vel_curr = robot.base_vel[0]          # Vec2d(vx, vy) in world
         base_ang_curr = robot.base_pose.theta
         base_ang_vel_curr = robot.base_vel[1]      # scalar omega
+        base_rot_omega_vec = Vec2d(math.cos(base_ang_curr + math.pi / 2),
+                               math.sin(base_ang_curr + math.pi / 2))
 
         L_curr = robot.curr_arm_length             # current arm length (scalar)
         Ldot_curr = robot.gripper_base_vel[0]
@@ -453,30 +453,35 @@ class PDController:
         # PD on arm length
         kp_arm = getattr(self, "kp_arm", self.kp_pos)
         kv_arm = getattr(self, "kv_arm", self.kv_pos)
-        rel_Ldot_curr = (Ldot_curr - base_vel_curr).rotated(-base_ang_curr).x  # R^T * v_gripper_base
+        arm_center_omega_vec = base_rot_omega_vec * L_curr * base_ang_vel_curr  # omega x r
+        rel_Ldot_curr = (Ldot_curr - base_vel_curr - \
+                         arm_center_omega_vec).rotated(-base_ang_curr).x  # R^T * v_gripper_base
         a_L = kp_arm * (tgt_arm - L_curr) + kv_arm * (0.0 - rel_Ldot_curr)
 
         # Integrate prismatic rate
         rel_Ldot_next = rel_Ldot_curr + a_L * dt
-        v_gripper_base = base_vel + Vec2d(rel_Ldot_next, 0.0).rotated(base_ang_curr)
+        v_gripper_base = base_vel + \
+            base_rot_omega_vec * L_curr * base_ang_vel + \
+            Vec2d(rel_Ldot_next, 0.0).rotated(base_ang_curr)
 
         # === 3) Gripper-base world velocity = rigid motion + prismatic contribution ===
         # Use *updated* base_vel & base_ang_vel for consistency in this control step
-        # v_rigid = base_vel + self._cross2d(base_ang_vel, r_w)
-        # v_prismatic = Vec2d(Ldot * ex_w.x, Ldot * ex_w.y)             # R * [Ldot, 0]
-        # v_gripper_base = v_rigid + v_prismatic
+        kp_finger = getattr(self, "kp_finger", self.kp_pos)
+        kv_finger = getattr(self, "kv_finger", self.kv_pos)
+        gripper_centr = Vec2d(robot.finger_poses['left'].x, robot.finger_poses['left'].y)
+        relative_pos = gripper_centr - base_pos_curr
+        finger_rot_omega_vec_base = relative_pos.normalized().rotated(math.pi / 2)
+        finger_rot_omega_vec = finger_rot_omega_vec_base * relative_pos.length \
+            * base_ang_vel_curr  # omega x r
+        rel_gdot_curr = (finger_vel_abs_w - base_vel_curr - \
+                            finger_rot_omega_vec).rotated(-base_ang_curr).y # We only care about y-dir
+        a_g = kp_finger * (tgt_gripper - g_curr) + kv_finger * (0.0 - rel_gdot_curr)
+        rel_gdot_next = rel_gdot_curr + a_g * dt
+        finger_vel_l = base_vel + \
+            finger_rot_omega_vec_base * relative_pos.length * base_ang_vel + \
+            Vec2d(rel_Ldot_next, rel_gdot_next).rotated(base_ang_curr)
 
-        # # === 4) Finger PD along gripper-base y, then map to world ===
-        # # Finger moves along +y of gripper-base (same orientation as base here).
-        # kp_f = getattr(self, "kp_finger", self.kp_pos)
-        # kv_f = getattr(self, "kv_finger", self.kv_pos)
-        # gdot_curr = finger_vel_abs_w.dot(ey_w)
-        # a_g = kp_f * (tgt_gripper - g_curr) + kv_f * (0.0 - gdot_curr)
-        # gdot = gdot_curr + a_g * dt
-
-        # v_finger_world = v_gripper_base + gdot * ey_w       # add relative [0, gdot] in world
-
-        return base_vel, base_ang_vel, v_gripper_base, Vec2d(0.0, 0.0)  # Finger vel not implemented yet
+        return base_vel, base_ang_vel, v_gripper_base, finger_vel_l
 
 def on_gripper_grasp(arbiter: pymunk.Arbiter, space: pymunk.Space, data: dict[str, Any]) -> bool:
     """Collision callback for gripper grasping objects."""

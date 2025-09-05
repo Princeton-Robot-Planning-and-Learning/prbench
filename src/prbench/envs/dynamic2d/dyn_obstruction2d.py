@@ -80,8 +80,8 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     max_dy: float = 5e-2
     min_dtheta: float = -np.pi / 16
     max_dtheta: float = np.pi / 16
-    min_darm: float = -5e-2
-    max_darm: float = 5e-2
+    min_darm: float = -1e-1
+    max_darm: float = 1e-1
     min_dgripper: float = -0.02
     max_dgripper: float = 0.02
 
