@@ -21,7 +21,7 @@ def test_dyn_obstruction2d_action_space():
     """Tests that the actions are valid and the step function works."""
     prbench.register_all_environments()
     env = prbench.make("prbench/DynObstruction2D-o3-v0")
-    obs, _ = env.reset(seed=0)
+    _obs, _ = env.reset(seed=0)
     statble_move = np.array([0.05, 0.05, np.pi / 16, 0.05, -0.02], dtype=np.float32)
     # Check the control precision
     # zeros = np.zeros_like(obs)
@@ -29,10 +29,10 @@ def test_dyn_obstruction2d_action_space():
     # zeros[1] += statble_move[1]
     # zeros[2] += statble_move[2]
     # desired_obs_next = obs + statble_move
-    img = env.render()
+    _img = env.render()
     # iio.imwrite("unit_test_videos/init.png", img)
-    for i in range(10):
-        obs, reward, terminated, truncated, info = env.step(statble_move)
+    for _ in range(10):
+        _obs, _reward, _terminated, _truncated, _info = env.step(statble_move)
         # img = env.render()
         # iio.imwrite(f"unit_test_videos/step_{i}.png", img)
 
@@ -49,7 +49,7 @@ def test_dyn_obstruction2d_different_obstruction_counts():
         # Take a few steps to ensure environment works
         for _ in range(3):
             action = env.action_space.sample()
-            obs, reward, terminated, truncated, info = env.step(action)
+            obs, reward, terminated, _truncated, _info = env.step(action)
             assert env.observation_space.contains(obs)
             assert isinstance(reward, (int, float))
             if terminated:
@@ -69,6 +69,6 @@ def test_dyn_obstruction2d_reset_consistency():
 
         # Environment should not be terminated at start
         action = env.action_space.sample()
-        obs, reward, terminated, truncated, info = env.step(action)
+        _obs, reward, _terminated, _truncated, _info = env.step(action)
         # First step should give -1 reward (goal not satisfied immediately)
         assert reward == -1.0

@@ -80,7 +80,10 @@ class KinRobotActionSpace(Box):
             md_table_str += (
                 f"\n| {idx} | {feature} | {description} | {lb:.3f} | {ub:.3f} |"
             )
-        return f"The entries of an array in this Box space correspond to the following action features:\n{md_table_str}\n"
+        return (
+            f"The entries of an array in this Box space correspond to the "
+            f"following action features:\n{md_table_str}\n"
+        )
 
 
 class KinRobot:
@@ -493,18 +496,6 @@ class PDController:
         self.kp_rot = kp_rot
         self.kv_rot = kv_rot
 
-    def _R(self, theta: float) -> tuple[Vec2d, Vec2d]:
-        """Return world-frame unit basis of the base frame: (ex_w, ey_w)."""
-        c, s = math.cos(theta), math.sin(theta)
-        ex_w = Vec2d(c, s)  # base x-axis in world
-        ey_w = Vec2d(-s, c)  # base y-axis in world
-        return ex_w, ey_w
-
-    def _cross2d(self, omega: float, v: Vec2d) -> Vec2d:
-        """2D angular × vector = perpendicular vector scaled by omega."""
-        # [0,0,omega] x [vx,vy,0] = [0,0, omega*vx*k?] -> in 2D gives (-omega*vy, omega*vx)
-        return Vec2d(-omega * v.y, omega * v.x)
-
     def compute_control(
         self,
         robot: KinRobot,
@@ -648,6 +639,9 @@ def object_to_multibody2d(
         }
         body = Body2D(geom, z_order, rendering_kwargs)
         multibody = MultiBody2D(obj.name, [body])
+    else:
+        # For now, we only support RectangleType in Dynamic2D
+        raise NotImplementedError(f"Object type {obj.type} not supported in Dynamic2D")
     return multibody
 
 
