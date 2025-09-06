@@ -66,6 +66,12 @@ def register_all_environments() -> None:
             kwargs={"num_buttons": num_button},
         )
 
+    # PushPullHook2D environment
+    register(
+        id="prbench/PushPullHook2D-v0",
+        entry_point="prbench.envs.geom2d.pushpullhook2d:PushPullHook2DEnv",
+    )
+
     # ******* Dynamic2D Environments *******
 
     # DynObstruction2D environment with different numbers of obstructions.

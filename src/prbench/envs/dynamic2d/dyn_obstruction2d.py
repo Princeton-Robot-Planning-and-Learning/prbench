@@ -633,8 +633,9 @@ class DynObstruction2DEnv(ConstantObjectDynamic2DEnv):
 
     def _create_env_markdown_description(self) -> str:
         # Count obstruction objects (exclude target_surface, target_block, and robot)
-        num_obstructions = len([obj for obj in self._constant_objects
-                               if obj.name.startswith("obstruct")])
+        num_obstructions = len(
+            [obj for obj in self._constant_objects if obj.name.startswith("obstruct")]
+        )
         # pylint: disable=line-too-long
         if num_obstructions > 0:
             obstruction_sentence = f"\nThe target surface may be initially obstructed. In this environment, there are always {num_obstructions} obstacle blocks.\n"
