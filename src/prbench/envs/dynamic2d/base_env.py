@@ -37,10 +37,6 @@ from prbench.envs.dynamic2d.utils import (
     render_state
 )
 
-def debug(arbiter: pymunk.Arbiter, space: pymunk.Space, data: Any) -> bool:
-    print("DEBUG COLLISION")
-    return True
-
 @dataclass(frozen=True)
 class Dynamic2DRobotEnvSpec:
     """Scene specification for a Dynamic2DRobotEnv."""
@@ -79,7 +75,7 @@ class Dynamic2DRobotEnvSpec:
     kv_rot: float = 5.0
 
     # Physics parameters
-    gravity_y: float = 1000.0
+    gravity_y: float = -9.8
     control_freq: int = 20  # Control frequency (actions per second)
     sim_freq: int = 120     # Simulation frequency (physics steps per second)
 
@@ -144,7 +140,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
     def _setup_physics_space(self) -> None:
         """Set up the PyMunk physics space."""
         self.space = pymunk.Space()
-        self.space.gravity = 0, -self._spec.gravity_y
+        self.space.gravity = 0, self._spec.gravity_y
 
         # Create robot
         self.robot = KinRobot(
@@ -170,10 +166,6 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         self.space.on_collision(
             STATIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE,
             pre_solve=on_collision_w_static, data=self.robot
-        )
-        self.space.on_collision(
-            DYNAMIC_COLLISION_TYPE, STATIC_COLLISION_TYPE,
-            begin=debug, data=self.robot
         )
 
     def _reset_robot_in_space(self, obj: Object, state: ObjectCentricState) -> None:
@@ -276,10 +268,12 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Calculate simulation parameters
         dt = 1.0 / self._spec.control_freq
+        n_steps = self._spec.sim_freq // self._spec.control_freq
 
         # Stepping physics to let things settle
         if self.space:
-            self.space.step(dt)
+            for _ in range(n_steps):
+                self.space.step(dt)
 
         self._read_state_from_space()
         observation = self._get_obs()
@@ -342,9 +336,9 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         assert self.render_mode == "rgb_array"
         assert self._current_state is not None, "Need to call reset()"
         render_input_state = self._current_state.copy()
-        # if self._initial_constant_state is not None:
-        #     # Merge the initial constant state with the current state.
-        #     render_input_state.data.update(self._initial_constant_state.data)
+        if self._initial_constant_state is not None:
+            # Merge the initial constant state with the current state.
+            render_input_state.data.update(self._initial_constant_state.data)
         return render_state(
             render_input_state,
             self._static_object_body_cache,

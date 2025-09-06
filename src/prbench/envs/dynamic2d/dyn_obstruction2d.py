@@ -449,7 +449,8 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         self.space.add(b2, shape)
         b2.position = x, y
         b2.angle = theta
-        self._state_obj_to_pymunk_body_idx[obj] = b2.id
+        # Do not add static objects to the state-to-body mapping.
+        # self._state_obj_to_pymunk_body_idx[obj] = b2.id
 
     def _add_target_surface_to_space(self, obj: Object, state: ObjectCentricState) -> None:
         """Add target surface as a kinematic object."""
@@ -543,7 +544,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         if not self.space or not self._current_state:
             return ObjectCentricState({})
 
-        state = self.full_state.copy()
+        state = self._current_state.copy()
 
         # Update dynamic object positions from PyMunk simulation
         for obj, pymunk_id in self._state_obj_to_pymunk_body_idx.items():

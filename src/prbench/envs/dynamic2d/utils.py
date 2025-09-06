@@ -875,6 +875,8 @@ def render_state_on_ax(
     def _render_order(obj: Object) -> int:
         if obj.is_instance(KinRobotType):
             return -1
+        if state.get(obj, "static"):
+            return 1000
         return int(state.get(obj, "z_order"))
 
     for obj in sorted(state, key=_render_order):
