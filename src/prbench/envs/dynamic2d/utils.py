@@ -16,13 +16,12 @@ from prpl_utils.utils import fig2data
 
 from numpy.typing import NDArray
 from pymunk.vec2d import Vec2d
-from prbench.envs.geom2d.structs import SE2Pose, MultiBody2D, Body2D, ZOrder
+from prbench.envs.geom2d.structs import SE2Pose, MultiBody2D, Body2D, ZOrder, z_orders_may_collide
 from prbench.envs.geom2d.utils import geom2ds_intersect
 from prbench.envs.dynamic2d.object_types import (
     RectangleType,
     KinRobotType,
-    Dynamic2DType,
-    DynRectangleType
+    Dynamic2DType
 )
 
 # Collision types from the basic_pymunk.py script
@@ -246,6 +245,42 @@ class KinRobot:
         """Get the current arm length."""
         relative_pose = self.base_pose.inverse * self.gripper_base_pose
         return relative_pose.x
+
+    def reset_positions(self,
+                        base_x: float,
+                        base_y: float,
+                        base_theta: float,
+                        arm_length: float,
+                        gripper_gap: float) -> None:
+        """Reset robot to specified positions."""
+        self._base_body.position = (base_x, base_y)
+        self._base_body.angle = base_theta
+        
+        base_to_gripper = SE2Pose(x=arm_length, y=0.0, theta=0.0)
+        gripper_pose = self.base_pose * base_to_gripper
+        self._gripper_base_body.position = (gripper_pose.x, gripper_pose.y)
+        self._gripper_base_body.angle = gripper_pose.theta
+
+        gripper_to_left_finger = SE2Pose(
+            x=self.gripper_finger_width / 2,
+            y=gripper_gap - self.gripper_base_height / 2,
+            theta=0.0,
+        )
+        left_finger_pose = gripper_pose * gripper_to_left_finger
+        self._left_finger_body.position = (left_finger_pose.x, left_finger_pose.y)
+        self._left_finger_body.angle = left_finger_pose.theta
+        gripper_to_right_finger = SE2Pose(
+            x=self.gripper_finger_width / 2,
+            y=-self.gripper_base_height / 2,
+            theta=0.0,
+        )
+        right_finger_pose = gripper_pose * gripper_to_right_finger
+        self._right_finger_body.position = (right_finger_pose.x, right_finger_pose.y)
+        self._right_finger_body.angle = right_finger_pose.theta
+
+        # Update last state
+        self.update_last_state()
+
 
     def reset_last_state(self) -> None:
         """Reset to last state when collide with static objects."""
@@ -536,9 +571,7 @@ def object_to_multibody2d(
         height = state.get(obj, "height")
         theta = state.get(obj, "theta")
         geom = Rectangle.from_center(x, y, width, height, theta)
-        # z_order is not used in dynamic2d as the collision
-        # is done in pymunk.
-        z_order = ZOrder.ALL
+        z_order = ZOrder(int(state.get(obj, "z_order")))
         rendering_kwargs = {
             "facecolor": (
                 state.get(obj, "color_r"),
@@ -584,7 +617,7 @@ def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D
         width=gripper_base_width,
         rotation_about_center=theta,
     )
-    z_order = ZOrder.ALL
+    z_order = ZOrder.SURFACE
     rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
     gripper_base = Body2D(rect, z_order, rendering_kwargs, name="gripper_base")
     gripper_base_pose = SE2Pose(
@@ -622,7 +655,7 @@ def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D
         width=state.get(obj, "finger_width"),
         rotation_about_center=finger_l_pose.theta,
     )
-    z_order = ZOrder.ALL
+    z_order = ZOrder.SURFACE
     rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
     finger_l_body = Body2D(finger_r, z_order, rendering_kwargs, name="arm")
     bodies.append(finger_l_body)
@@ -686,7 +719,7 @@ def create_walls_from_world_boundaries(
     right_wall = Object("right_wall", RectangleType)
     side_wall_height = world_max_y - world_min_y
     state_dict[right_wall] = {
-        "x": world_max_x,
+        "x": world_max_x + max_dx,
         "vx": 0.0,
         "y": (world_min_y + world_max_y) / 2,
         "vy": 0.0,
@@ -699,12 +732,13 @@ def create_walls_from_world_boundaries(
         "dynamic": False,
         "color_r": BLACK[0],
         "color_g": BLACK[1],
-        "color_b": BLACK[2]
+        "color_b": BLACK[2],
+        "z_order": ZOrder.ALL.value,
     }
     # Left wall.
     left_wall = Object("left_wall", RectangleType)
     state_dict[left_wall] = {
-        "x": world_min_x,
+        "x": world_min_x + min_dx,
         "vx": 0.0,
         "y": (world_min_y + world_max_y) / 2,
         "vy": 0.0,
@@ -717,7 +751,8 @@ def create_walls_from_world_boundaries(
         "dynamic": False,
         "color_r": BLACK[0],
         "color_g": BLACK[1],
-        "color_b": BLACK[2]
+        "color_b": BLACK[2],
+        "z_order": ZOrder.ALL.value,
     }
     # Top wall.
     top_wall = Object("top_wall", RectangleType)
@@ -725,7 +760,7 @@ def create_walls_from_world_boundaries(
     state_dict[top_wall] = {
         "x": (world_min_x + world_max_x) / 2,
         "vx": 0.0,
-        "y": world_max_y,
+        "y": world_max_y + max_dy,
         "vy": 0.0,
         "width": horiz_wall_width,
         "height": 2 * max_dy,
@@ -736,14 +771,15 @@ def create_walls_from_world_boundaries(
         "dynamic": False,
         "color_r": BLACK[0],
         "color_g": BLACK[1],
-        "color_b": BLACK[2]
+        "color_b": BLACK[2],
+        "z_order": ZOrder.ALL.value,
     }
     # Bottom wall.
     bottom_wall = Object("bottom_wall", RectangleType)
     state_dict[bottom_wall] = {
         "x": (world_min_x + world_max_x) / 2,
         "vx": 0.0,
-        "y": world_min_y,
+        "y": world_min_y + min_dy,
         "vy": 0.0,
         "width": horiz_wall_width,
         "height": 2 * abs(min_dy),
@@ -755,6 +791,7 @@ def create_walls_from_world_boundaries(
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
+        "z_order": ZOrder.ALL.value,
     }
     return state_dict
 
@@ -762,7 +799,8 @@ def state_has_collision(
     state: ObjectCentricState,
     group1: set[Object],
     group2: set[Object],
-    static_object_cache: dict[Object, MultiBody2D]
+    static_object_cache: dict[Object, MultiBody2D],
+    ignore_z_orders: bool = False,
 ) -> bool:
     """Check for collisions between any objects in two groups."""
     # Create multibodies once.
@@ -778,6 +816,11 @@ def state_has_collision(
             multibody2 = obj_to_multibody[obj2]
             for body1 in multibody1.bodies:
                 for body2 in multibody2.bodies:
+                    if not (
+                        ignore_z_orders
+                        or z_orders_may_collide(body1.z_order, body2.z_order)
+                    ):
+                        continue
                     if geom2ds_intersect(body1.geom, body2.geom):
                         return True
     return False
@@ -828,7 +871,7 @@ def render_state_on_ax(
     def _render_order(obj: Object) -> int:
         if obj.is_instance(KinRobotType):
             return -1
-        return 0
+        return int(state.get(obj, "z_order"))
 
     for obj in sorted(state, key=_render_order):
         body = object_to_multibody2d(obj, state, static_object_body_cache)

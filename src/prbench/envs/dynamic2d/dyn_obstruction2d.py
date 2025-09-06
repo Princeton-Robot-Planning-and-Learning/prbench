@@ -14,7 +14,7 @@ from prbench.envs.dynamic2d.object_types import (
     RectangleType,
     DynRectangleType,
 )
-from prbench.envs.geom2d.structs import SE2Pose, MultiBody2D
+from prbench.envs.geom2d.structs import SE2Pose, MultiBody2D, ZOrder
 from prbench.envs.dynamic2d.base_env import (
     ConstantObjectDynamic2DEnv,
     Dynamic2DRobotEnv,
@@ -53,20 +53,6 @@ def sample_se2_pose(
     y = rng.uniform(lb.y, ub.y)
     theta = rng.uniform(lb.theta, ub.theta)
     return SE2Pose(x, y, theta)
-
-
-def is_on_dynamic(
-    space: pymunk.Space,
-    top_obj: Object,
-    bottom_obj: Object,
-    tol: float = 2.5,
-) -> bool:
-    """Check if top object is on bottom object in the physics simulation."""
-    # Get PyMunk bodies for both objects
-    top_body = getattr(top_obj, "_pymunk_body", None)
-    bottom_body = getattr(bottom_obj, "_pymunk_body", None)
-    
-    return False
 
 
 @dataclass(frozen=True)
@@ -132,10 +118,10 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     target_block_rgb: tuple[float, float, float] = PURPLE
     target_block_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
         SE2Pose(
-            world_min_x + robot_base_radius, table_pose.y + table_height + 1e-6, 0.0
+            world_min_x + robot_base_radius, table_pose.y + table_height / 2 + 1e-6, 0.0
         ),
         SE2Pose(
-            world_max_x - robot_base_radius, table_pose.y + table_height + 1e-6, 0.0
+            world_max_x - robot_base_radius, table_pose.y + table_height / 2 + 1e-6, 0.0
         ),
     )
     target_block_height_bounds: tuple[float, float] = (
@@ -152,10 +138,10 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     obstruction_rgb: tuple[float, float, float] = (0.75, 0.1, 0.1)
     obstruction_init_pose_bounds = (
         SE2Pose(
-            world_min_x + robot_base_radius, table_pose.y + table_height + 1e-6, 0.0
+            world_min_x + robot_base_radius, table_pose.y + table_height / 2 + 1e-6, 0.0
         ),
         SE2Pose(
-            world_max_x - robot_base_radius, table_pose.y + table_height + 1e-6, 0.0
+            world_max_x - robot_base_radius, table_pose.y + table_height / 2 + 1e-6, 0.0
         ),
     )
     obstruction_height_bounds: tuple[float, float] = (
@@ -221,6 +207,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
             "color_r": self._spec.table_rgb[0],
             "color_g": self._spec.table_rgb[1],
             "color_b": self._spec.table_rgb[2],
+            "z_order": ZOrder.ALL.value,
         }
 
         # Create room walls.
@@ -360,14 +347,15 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
             "color_r": self._spec.target_surface_rgb[0],
             "color_g": self._spec.target_surface_rgb[1],
             "color_b": self._spec.target_surface_rgb[2],
+            "z_order": ZOrder.NONE.value,
         }
 
         # Create the target block.
         target_block = Object("target_block", TargetBlockType)
         init_state_dict[target_block] = {
-            "x": target_block_pose.x,
+            "x": target_block_pose.x + target_block_shape[0] / 2,
             "vx": 0.0,
-            "y": target_block_pose.y,
+            "y": target_block_pose.y + target_block_shape[1] / 2,
             "vy": 0.0,
             "theta": target_block_pose.theta,
             "omega": 0.0,
@@ -383,15 +371,16 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
             "color_r": self._spec.target_block_rgb[0],
             "color_g": self._spec.target_block_rgb[1],
             "color_b": self._spec.target_block_rgb[2],
+            "z_order": ZOrder.ALL.value,
         }
 
         # Create obstructions.
         for i, (obstruction_pose, obstruction_shape) in enumerate(obstructions):
             obstruction = Object(f"obstruction{i}", RectangleType)
             init_state_dict[obstruction] = {
-                "x": obstruction_pose.x,
+                "x": obstruction_pose.x + obstruction_shape[0] / 2,
                 "vx": 0.0,
-                "y": obstruction_pose.y,
+                "y": obstruction_pose.y + obstruction_shape[1] / 2,
                 "vy": 0.0,
                 "theta": obstruction_pose.theta,
                 "omega": 0.0,
@@ -407,6 +396,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                 "color_r": self._spec.obstruction_rgb[0],
                 "color_g": self._spec.obstruction_rgb[1],
                 "color_b": self._spec.obstruction_rgb[2],
+                "z_order": ZOrder.ALL.value,
             }
 
         # Finalize state.
@@ -431,6 +421,8 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                 self._target_block = obj
             elif obj.name.startswith("obstruction"):
                 self._add_obstruction_to_space(obj, state)
+            elif obj.is_instance(KinRobotType):
+                self._reset_robot_in_space(obj, state)
 
     def _add_table_to_space(self, obj: Object, state: ObjectCentricState) -> None:
         """Add table as a static object."""

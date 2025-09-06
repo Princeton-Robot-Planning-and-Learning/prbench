@@ -16,3 +16,5 @@
         }
     ]
 }
+// tests/envs/geom2d/test_obstruction2d.py::test_obstruction2d_observation_space
+// tests/envs/dynamic2d/test_dyn_obstruction2d.py::test_dyn_obstruction2d_action_space

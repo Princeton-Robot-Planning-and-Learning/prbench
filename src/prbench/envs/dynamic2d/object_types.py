@@ -24,6 +24,7 @@ Dynamic2DRobotEnvTypeFeatures[Dynamic2DType] = [
     "color_r",
     "color_g",
     "color_b",
+    "z_order",
 ]
 # Specific types.
 # For kinematic and static blocks, they don't have mass and moment.

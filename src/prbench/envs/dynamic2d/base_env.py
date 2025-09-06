@@ -165,6 +165,24 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             pre_solve=on_collision_w_static, data=self.robot
         )
 
+    def _reset_robot_in_space(self, obj: Object, state: ObjectCentricState) -> None:
+        """Reset the robot in the PyMunk space."""
+        if not self.space:
+            return
+        robot_base_x = state.get_feature(obj, "x")
+        robot_base_y = state.get_feature(obj, "y")
+        robot_theta = state.get_feature(obj, "theta")
+        robot_arm = state.get_feature(obj, "arm_length")
+        robot_gripper = state.get_feature(obj, "gripper_gap")
+        assert self.robot is not None, "Robot not initialized"
+        self.robot.reset_positions(
+            base_x=robot_base_x,
+            base_y=robot_base_y,
+            theta=robot_theta,
+            arm_length=robot_arm,
+            gripper_gap=robot_gripper,
+        )
+
     @abc.abstractmethod
     def _add_state_to_space(self, state: ObjectCentricState) -> None:
         """Add objects from the state to the PyMunk space."""
