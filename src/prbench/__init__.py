@@ -67,7 +67,7 @@ def register_all_environments() -> None:
         )
 
     # ******* Dynamic2D Environments *******
-    
+
     # DynObstruction2D environment with different numbers of obstructions.
     num_obstructions = [0, 1, 2, 3, 4]
     for num_obstruction in num_obstructions:

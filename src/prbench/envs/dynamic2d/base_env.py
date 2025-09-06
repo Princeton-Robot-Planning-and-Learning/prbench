@@ -17,25 +17,26 @@ from relational_structs import (
 )
 from relational_structs.spaces import ObjectCentricBoxSpace
 
-from prbench.envs.geom2d.structs import MultiBody2D
 from prbench.envs.dynamic2d.object_types import (
     Dynamic2DRobotEnvTypeFeatures,
+    DynRectangleType,
     KinRobotType,
     RectangleType,
-    DynRectangleType,
 )
 from prbench.envs.dynamic2d.utils import (
     DYNAMIC_COLLISION_TYPE,
     ROBOT_COLLISION_TYPE,
     STATIC_COLLISION_TYPE,
-    KinRobotActionSpace,
     KinRobot,
+    KinRobotActionSpace,
     PDController,
     get_fingered_robot_action_from_gui_input,
     on_collision_w_static,
     on_gripper_grasp,
-    render_state
+    render_state,
 )
+from prbench.envs.geom2d.structs import MultiBody2D
+
 
 @dataclass(frozen=True)
 class Dynamic2DRobotEnvSpec:
@@ -77,14 +78,10 @@ class Dynamic2DRobotEnvSpec:
     # Physics parameters
     gravity_y: float = -9.8
     control_freq: int = 20  # Control frequency (actions per second)
-    sim_freq: int = 120     # Simulation frequency (physics steps per second)
+    sim_freq: int = 120  # Simulation frequency (physics steps per second)
 
     # For rendering.
     render_dpi: int = 50
-
-
-# Define a simple robot type for Dynamic2D environments
-FingeredRobotType = Object("fingered_robot", None)
 
 
 class Dynamic2DRobotEnv(gymnasium.Env):
@@ -144,7 +141,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Create robot
         self.robot = KinRobot(
-            init_pos=self._spec.init_robot_pos,
+            init_pos=pymunk.Vec2d(*self._spec.init_robot_pos),
             base_radius=self._spec.robot_base_radius,
             arm_length_max=self._spec.robot_arm_length_max,
             gripper_base_width=self._spec.gripper_base_width,
@@ -160,12 +157,16 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Set up collision handlers
         self.space.on_collision(
-            DYNAMIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE,
-            post_solve=on_gripper_grasp, data=self.robot
+            DYNAMIC_COLLISION_TYPE,
+            ROBOT_COLLISION_TYPE,
+            post_solve=on_gripper_grasp,
+            data=self.robot,
         )
         self.space.on_collision(
-            STATIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE,
-            pre_solve=on_collision_w_static, data=self.robot
+            STATIC_COLLISION_TYPE,
+            ROBOT_COLLISION_TYPE,
+            pre_solve=on_collision_w_static,
+            data=self.robot,
         )
 
     def _reset_robot_in_space(self, obj: Object, state: ObjectCentricState) -> None:
@@ -185,7 +186,8 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             arm_length=robot_arm,
             gripper_gap=robot_gripper,
         )
-        self._state_obj_to_pymunk_body_idx[obj] = self.robot.body_id
+        body_id = self.robot.body_id
+        self._state_obj_to_pymunk_body_idx[obj] = body_id
 
     def _add_state_to_space(self, state: ObjectCentricState) -> None:
         """Add objects from the state to the PyMunk space."""
@@ -230,6 +232,8 @@ class Dynamic2DRobotEnv(gymnasium.Env):
     @property
     def full_state(self) -> ObjectCentricState:
         """Get the full state, which includes both dynamic and static objects."""
+        if self._current_state is None:
+            raise RuntimeError("Current state is not initialized")
         full_state = self._current_state.copy()
         if self._initial_constant_state is not None:
             # Merge the initial constant state with the current state.
@@ -296,8 +300,10 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         tgt_x = self.robot.base_pose.x + dx
         tgt_y = self.robot.base_pose.y + dy
         tgt_theta = self.robot.base_pose.theta + dtheta
-        tgt_arm = max(min(self.robot.curr_arm_length + darm, self.robot.arm_length_max), 
-                      self.robot.base_radius)
+        tgt_arm = max(
+            min(self.robot.curr_arm_length + darm, self.robot.arm_length_max),
+            self.robot.base_radius,
+        )
         tgt_gripper = max(
             min(self.robot.curr_gripper + dgripper, self.robot.gripper_gap_max),
             self.robot.gripper_finger_height * 2,
@@ -307,13 +313,13 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         s = time.time()
         for _ in range(n_steps):
             # Use PD control to compute base and gripper velocities
-            base_vel, base_ang_vel, gripper_base_vel, finger_vel = self.pd_controller.compute_control(
-                self.robot, tgt_x, tgt_y, tgt_theta, tgt_arm, tgt_gripper, dt)
+            base_vel, base_ang_vel, gripper_base_vel, finger_vel = (
+                self.pd_controller.compute_control(
+                    self.robot, tgt_x, tgt_y, tgt_theta, tgt_arm, tgt_gripper, dt
+                )
+            )
             # Update robot with the vel (PD control updates velocities)
-            self.robot.update(base_vel, 
-                              base_ang_vel, 
-                              gripper_base_vel, 
-                              finger_vel)
+            self.robot.update(base_vel, base_ang_vel, gripper_base_vel, finger_vel)
             # Step physics simulation
             self.space.step(dt)
         e = time.time()
@@ -331,7 +337,10 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         return observation, reward, terminated, truncated, info
 
     def render(self) -> NDArray[np.uint8]:  # type: ignore
-        """Render the current state. To be implemented."""
+        """Render the current state.
+
+        To be implemented.
+        """
         # This will be implemented later
         assert self.render_mode == "rgb_array"
         assert self._current_state is not None, "Need to call reset()"
@@ -350,7 +359,9 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         )
 
 
-class ConstantObjectDynamic2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
+class ConstantObjectDynamic2DEnv(
+    gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]
+):
     """Defined by an object-centric Dynamic2D environment and a constant object set.
 
     The point of this pattern is to allow implementing object-centric environments with
@@ -368,7 +379,9 @@ class ConstantObjectDynamic2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.f
         self._dynamic2d_env = self._create_object_centric_dynamic2d_env(*args, **kwargs)
         # Create a Box version of the observation space by extracting the constant
         # objects from an exemplar state.
-        assert isinstance(self._dynamic2d_env.observation_space, ObjectCentricStateSpace)
+        assert isinstance(
+            self._dynamic2d_env.observation_space, ObjectCentricStateSpace
+        )
         exemplar_object_centric_state, _ = self._dynamic2d_env.reset()
         obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
         obj_names = self._get_constant_object_names(exemplar_object_centric_state)
@@ -403,7 +416,9 @@ class ConstantObjectDynamic2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.f
         self.render_mode = render_mode
 
     @abc.abstractmethod
-    def _create_object_centric_dynamic2d_env(self, *args, **kwargs) -> Dynamic2DRobotEnv:
+    def _create_object_centric_dynamic2d_env(
+        self, *args, **kwargs
+    ) -> Dynamic2DRobotEnv:
         """Create the underlying object-centric environment."""
 
     @abc.abstractmethod

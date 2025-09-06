@@ -8,26 +8,26 @@ import pymunk
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
-from prbench.envs.dynamic2d.object_types import (
-    Dynamic2DRobotEnvTypeFeatures,
-    KinRobotType,
-    RectangleType,
-    DynRectangleType,
-)
-from prbench.envs.geom2d.structs import SE2Pose, MultiBody2D, ZOrder
 from prbench.envs.dynamic2d.base_env import (
     ConstantObjectDynamic2DEnv,
     Dynamic2DRobotEnv,
     Dynamic2DRobotEnvSpec,
 )
+from prbench.envs.dynamic2d.object_types import (
+    Dynamic2DRobotEnvTypeFeatures,
+    DynRectangleType,
+    KinRobotType,
+    RectangleType,
+)
 from prbench.envs.dynamic2d.utils import (
-    KinRobotActionSpace,
     DYNAMIC_COLLISION_TYPE,
     STATIC_COLLISION_TYPE,
+    KinRobotActionSpace,
     create_walls_from_world_boundaries,
+    is_on,
     state_has_collision,
-    is_on
 )
+from prbench.envs.geom2d.structs import MultiBody2D, SE2Pose, ZOrder
 
 # Define custom object types for the obstruction environment
 TargetBlockType = Type("target_block", parent=DynRectangleType)
@@ -64,7 +64,7 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     world_max_x: float = (1 + np.sqrt(5)) / 2  # golden ratio :)
     world_min_y: float = 0.0
     world_max_y: float = 1.0
-    
+
     # Robot parameters
     init_robot_pos: tuple[float, float] = (0.5, 0.5)
     robot_base_radius: float = 0.1
@@ -97,9 +97,9 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     table_height: float = 0.1
     table_width: float = world_max_x - world_min_x
     # The table pose is defined at the center
-    table_pose: SE2Pose = SE2Pose(world_min_x + table_width / 2, 
-                                  world_min_y + table_height / 2, 
-                                  0.0)
+    table_pose: SE2Pose = SE2Pose(
+        world_min_x + table_width / 2, world_min_y + table_height / 2, 0.0
+    )
 
     # Target surface hyperparameters.
     target_surface_rgb: tuple[float, float, float] = PURPLE
@@ -167,7 +167,10 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
 
 class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
-    """Dynamic environment where a block must be placed on an obstructed target using PyMunk physics."""
+    """Dynamic environment where a block must be placed on an obstructed target.
+
+    Uses PyMunk physics simulation.
+    """
 
     def __init__(
         self,
@@ -178,14 +181,14 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         super().__init__(spec, **kwargs)
         self._num_obstructions = num_obstructions
         self._spec: DynObstruction2DEnvSpec = spec  # for type checking
-        
+
         # Store object references for tracking
         self._target_block: Object | None = None
         self._target_surface: Object | None = None
         initial_state_dict = self._create_constant_initial_state_dict()
         self._initial_constant_state = create_state_from_dict(
-                    initial_state_dict, Dynamic2DRobotEnvTypeFeatures
-                )
+            initial_state_dict, Dynamic2DRobotEnvTypeFeatures
+        )
 
     def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
         init_state_dict: dict[Object, dict[str, float]] = {}
@@ -227,7 +230,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         init_state_dict.update(wall_state_dict)
 
         return init_state_dict
-    
+
     def _sample_initial_state(self) -> ObjectCentricState:
         """Sample an initial state for the environment."""
         n = self._spec.max_initial_state_sampling_attempts
@@ -253,7 +256,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                 target_block_shape[0] + target_surface_width_addition,
                 self._spec.target_surface_height,
             )
-            
+
             obstructions: list[tuple[SE2Pose, tuple[float, float]]] = []
             for _ in range(self._num_obstructions):
                 obstruction_shape = (
@@ -275,7 +278,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                     pose_bounds = self._spec.obstruction_init_pose_bounds
                 obstruction_pose = sample_se2_pose(pose_bounds, self.np_random)
                 obstructions.append((obstruction_pose, obstruction_shape))
-            
+
             state = self._create_initial_state(
                 robot_pose,
                 target_surface_pose,
@@ -284,18 +287,19 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                 target_block_shape,
                 obstructions,
             )
-            
+
             # Check initial state validity: goal not satisfied and no collisions.
             if self._target_satisfied(state, {}):
                 continue
             full_state = state.copy()
-            full_state.data.update(self._initial_constant_state.data)
+            if self._initial_constant_state is not None:
+                full_state.data.update(self._initial_constant_state.data)
             all_objects = set(full_state)
             # We use Geom2D collision checker for now, will update it.
             if state_has_collision(full_state, all_objects, all_objects, {}):
                 continue
             return state
-            
+
         raise RuntimeError(f"Failed to sample initial state after {n} attempts")
 
     def _create_initial_state(
@@ -401,7 +405,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
 
         # Finalize state.
         return create_state_from_dict(init_state_dict, Dynamic2DRobotEnvTypeFeatures)
-    
+
     def _add_state_to_space(self, state: ObjectCentricState) -> None:
         """Add objects from the state to the PyMunk space."""
         if not self.space:
@@ -422,12 +426,13 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
             elif obj.is_instance(KinRobotType):
                 self._reset_robot_in_space(obj, state)
 
-
-    def _add_static_obstacle_to_space(self, obj: Object, state: ObjectCentricState) -> None:
+    def _add_static_obstacle_to_space(
+        self, obj: Object, state: ObjectCentricState
+    ) -> None:
         """Add wall as a static object."""
         if not self.space:
             return
-            
+
         x = state.get(obj, "x")
         y = state.get(obj, "y")
         width = state.get(obj, "width")
@@ -452,11 +457,13 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         # Do not add static objects to the state-to-body mapping.
         # self._state_obj_to_pymunk_body_idx[obj] = b2.id
 
-    def _add_target_surface_to_space(self, obj: Object, state: ObjectCentricState) -> None:
+    def _add_target_surface_to_space(
+        self, obj: Object, state: ObjectCentricState
+    ) -> None:
         """Add target surface as a kinematic object."""
         if not self.space:
             return
-            
+
         x = state.get(obj, "x")
         y = state.get(obj, "y")
         width = state.get(obj, "width")
@@ -479,11 +486,13 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         body.angle = theta
         self._state_obj_to_pymunk_body_idx[obj] = body.id
 
-    def _add_target_block_to_space(self, obj: Object, state: ObjectCentricState) -> None:
+    def _add_target_block_to_space(
+        self, obj: Object, state: ObjectCentricState
+    ) -> None:
         """Add target block as a dynamic object."""
         if not self.space:
             return
-            
+
         x = state.get(obj, "x")
         y = state.get(obj, "y")
         width = state.get(obj, "width")
@@ -513,7 +522,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         """Add obstruction as a dynamic object."""
         if not self.space:
             return
-            
+
         x = state.get(obj, "x")
         y = state.get(obj, "y")
         width = state.get(obj, "width")
@@ -542,7 +551,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
     def _read_state_from_space(self) -> None:
         """Read the current state from the PyMunk space."""
         if not self.space or not self._current_state:
-            return ObjectCentricState({})
+            return
 
         state = self._current_state.copy()
 
@@ -559,19 +568,19 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                         state.set(obj, "vx", body.velocity.x)
                         state.set(obj, "vy", body.velocity.y)
                         state.set(obj, "omega", body.angular_velocity)
-                        state.set(obj, "arm_joint", self.robot.curr_arm_length)
-                        state.set(obj, "finger_gap", self.robot.curr_gripper)
+                        if self.robot is not None:
+                            state.set(obj, "arm_joint", self.robot.curr_arm_length)
+                            state.set(obj, "finger_gap", self.robot.curr_gripper)
                         break
-                    else:
-                        # Update object state from body
-                        state.set(obj, "x", body.position.x)
-                        state.set(obj, "y", body.position.y)
-                        state.set(obj, "theta", body.angle)
-                        state.set(obj, "vx", body.velocity.x)
-                        state.set(obj, "vy", body.velocity.y)
-                        state.set(obj, "omega", body.angular_velocity)
-                        break
-        
+                    # Update object state from body
+                    state.set(obj, "x", body.position.x)
+                    state.set(obj, "y", body.position.y)
+                    state.set(obj, "theta", body.angle)
+                    state.set(obj, "vx", body.velocity.x)
+                    state.set(obj, "vy", body.velocity.y)
+                    state.set(obj, "omega", body.angular_velocity)
+                    break
+
         self._current_state = state
 
     def _target_satisfied(
@@ -580,7 +589,8 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         static_object_body_cache: dict[Object, MultiBody2D],
     ) -> bool:
         """Check if the target condition is satisfied.
-            This is borrowed from geom2d obstruction env for now.
+
+        This is borrowed from geom2d obstruction env for now.
         """
         target_objects = state.get_objects(TargetBlockType)
         assert len(target_objects) == 1
@@ -605,7 +615,9 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
 class DynObstruction2DEnv(ConstantObjectDynamic2DEnv):
     """Dynamic Obstruction 2D env with a constant number of objects."""
 
-    def _create_object_centric_dynamic2d_env(self, *args, **kwargs) -> Dynamic2DRobotEnv:
+    def _create_object_centric_dynamic2d_env(
+        self, *args, **kwargs
+    ) -> Dynamic2DRobotEnv:
         return ObjectCentricDynObstruction2DEnv(*args, **kwargs)
 
     def _get_constant_object_names(
@@ -620,7 +632,8 @@ class DynObstruction2DEnv(ConstantObjectDynamic2DEnv):
         return constant_objects
 
     def _create_env_markdown_description(self) -> str:
-        num_obstructions = len(self._constant_objects) - 2  # Exclude target surface and block
+        # Exclude target surface and block
+        num_obstructions = len(self._constant_objects) - 2
         # pylint: disable=line-too-long
         if num_obstructions > 0:
             obstruction_sentence = f"\nThe target surface may be initially obstructed. In this environment, there are always {num_obstructions} obstacle blocks.\n"

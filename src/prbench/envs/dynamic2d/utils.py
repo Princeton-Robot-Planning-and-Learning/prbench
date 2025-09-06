@@ -1,28 +1,31 @@
 """Utilities for Dynamic2D PyMunk-based environments."""
 
+import math
 from typing import Any
 
-import math
+import matplotlib.pyplot as plt
 import numpy as np
 import pymunk
 from gymnasium.spaces import Box
-import matplotlib.pyplot as plt
-from relational_structs import (
-    Object,
-    ObjectCentricState
-)
-from tomsgeoms2d.structs import Geom2D, Rectangle, Circle
-from prpl_utils.utils import fig2data
-
 from numpy.typing import NDArray
+from prpl_utils.utils import fig2data
 from pymunk.vec2d import Vec2d
-from prbench.envs.geom2d.structs import SE2Pose, MultiBody2D, Body2D, ZOrder, z_orders_may_collide
-from prbench.envs.geom2d.utils import geom2ds_intersect
+from relational_structs import Object, ObjectCentricState
+from tomsgeoms2d.structs import Circle, Geom2D, Rectangle
+
 from prbench.envs.dynamic2d.object_types import (
-    RectangleType,
+    Dynamic2DType,
     KinRobotType,
-    Dynamic2DType
+    RectangleType,
 )
+from prbench.envs.geom2d.structs import (
+    Body2D,
+    MultiBody2D,
+    SE2Pose,
+    ZOrder,
+    z_orders_may_collide,
+)
+from prbench.envs.geom2d.utils import geom2ds_intersect
 
 # Collision types from the basic_pymunk.py script
 STATIC_COLLISION_TYPE = 0
@@ -33,10 +36,12 @@ HELD_OBJECT_COLLISION_TYPE = 3
 PURPLE: tuple[float, float, float] = (128 / 255, 0 / 255, 128 / 255)
 BLACK: tuple[float, float, float] = (0.1, 0.1, 0.1)
 
+
 class KinRobotActionSpace(Box):
     """An action space for a fingered robot with gripper control.
 
-    Actions are bounded relative movements of the base, arm extension, and gripper opening/closing.
+    Actions are bounded relative movements of the base, arm extension, and gripper
+    opening/closing.
     """
 
     def __init__(
@@ -123,7 +128,9 @@ class KinRobot:
         self.create_base()
         self.create_gripper_base()
         self._left_finger_body, self._left_finger_shape = self.create_finger()
-        self._right_finger_body, self._right_finger_shape = self.create_finger(left=False)
+        self._right_finger_body, self._right_finger_shape = self.create_finger(
+            left=False
+        )
 
     def add_to_space(self, space: pymunk.Space) -> None:
         """Add robot components to the PyMunk space."""
@@ -151,7 +158,7 @@ class KinRobot:
             y=self._base_body.position.y,
             theta=self._base_body.angle,
         )
-    
+
     @property
     def base_vel(self) -> tuple[Vec2d, float]:
         """Get the base linear and angular velocity."""
@@ -161,7 +168,12 @@ class KinRobot:
         """Create the gripper base."""
         half_w = self.gripper_base_width / 2
         half_h = self.gripper_base_height / 2
-        vs = [(-half_w, half_h), (-half_w, -half_h), (half_w, -half_h), (half_w, half_h)]
+        vs = [
+            (-half_w, half_h),
+            (-half_w, -half_h),
+            (half_w, -half_h),
+            (half_w, half_h),
+        ]
         self._gripper_base_body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
         self._gripper_base_shape = pymunk.Poly(self._gripper_base_body, vs)
         self._gripper_base_shape.friction = 1
@@ -185,13 +197,21 @@ class KinRobot:
     @property
     def gripper_base_vel(self) -> tuple[Vec2d, float]:
         """Get the gripper base linear and angular velocity."""
-        return self._gripper_base_body.velocity, self._gripper_base_body.angular_velocity
+        return (
+            self._gripper_base_body.velocity,
+            self._gripper_base_body.angular_velocity,
+        )
 
     def create_finger(self, left: bool = True) -> tuple[pymunk.Body, pymunk.Shape]:
         """Create a gripper finger."""
         half_w = self.gripper_finger_width / 2
         half_h = self.gripper_finger_height / 2
-        vs = [(-half_w, half_h), (-half_w, -half_h), (half_w, -half_h), (half_w, half_h)]
+        vs = [
+            (-half_w, half_h),
+            (-half_w, -half_h),
+            (half_w, -half_h),
+            (half_w, half_h),
+        ]
         finger_body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
         finger_shape = pymunk.Poly(finger_body, vs)
         finger_shape.friction = 1
@@ -200,12 +220,10 @@ class KinRobot:
 
         if left:
             init_rel_pos = SE2Pose(
-                x=half_w, y=self._gripper_gap -self.gripper_base_height / 2, theta=0.0
+                x=half_w, y=self._gripper_gap - self.gripper_base_height / 2, theta=0.0
             )
         else:
-            init_rel_pos = SE2Pose(
-                x=half_w, y=-self.gripper_base_height / 2, theta=0.0
-            )
+            init_rel_pos = SE2Pose(x=half_w, y=-self.gripper_base_height / 2, theta=0.0)
         init_pose = self.gripper_base_pose * init_rel_pos
         finger_body.position = (init_pose.x, init_pose.y)
         finger_body.angle = init_pose.theta
@@ -226,18 +244,27 @@ class KinRobot:
                 theta=self._right_finger_body.angle,
             ),
         }
-    
+
     @property
     def finger_vels(self) -> dict[str, tuple[Vec2d, float]]:
         """Get the left finger linear and angular velocity."""
         return {
-            "left": (self._left_finger_body.velocity, self._left_finger_body.angular_velocity),
-            "right": (self._right_finger_body.velocity, self._right_finger_body.angular_velocity),
+            "left": (
+                self._left_finger_body.velocity,
+                self._left_finger_body.angular_velocity,
+            ),
+            "right": (
+                self._right_finger_body.velocity,
+                self._right_finger_body.angular_velocity,
+            ),
         }
+
     @property
     def curr_gripper(self) -> float:
         """Get the current gripper opening."""
-        relative_finger_pose = self.gripper_base_pose.inverse * self.finger_poses['left']
+        relative_finger_pose = (
+            self.gripper_base_pose.inverse * self.finger_poses["left"]
+        )
         return relative_finger_pose.y + self.gripper_base_height / 2
 
     @property
@@ -247,20 +274,22 @@ class KinRobot:
         return relative_pose.x
 
     @property
-    def body_id(self) -> dict[str, int]:
+    def body_id(self) -> int:
         """Get the base id in pymunk space."""
         return self._base_body.id
 
-    def reset_positions(self,
-                        base_x: float,
-                        base_y: float,
-                        base_theta: float,
-                        arm_length: float,
-                        gripper_gap: float) -> None:
+    def reset_positions(
+        self,
+        base_x: float,
+        base_y: float,
+        base_theta: float,
+        arm_length: float,
+        gripper_gap: float,
+    ) -> None:
         """Reset robot to specified positions."""
         self._base_body.position = (base_x, base_y)
         self._base_body.angle = base_theta
-        
+
         base_to_gripper = SE2Pose(x=arm_length, y=0.0, theta=0.0)
         gripper_pose = self.base_pose * base_to_gripper
         self._gripper_base_body.position = (gripper_pose.x, gripper_pose.y)
@@ -290,12 +319,12 @@ class KinRobot:
         """Reset to last state when collide with static objects."""
         self._base_body.position = self._base_position
         self._base_body.angle = self._base_angle
-        
+
         gripper_base_rel_pos = SE2Pose(x=self._arm_length, y=0.0, theta=0.0)
         gripper_base_pose = self.base_pose * gripper_base_rel_pos
         self._gripper_base_body.position = (gripper_base_pose.x, gripper_base_pose.y)
         self._gripper_base_body.angle = gripper_base_pose.theta
-        
+
         left_finger_rel_pos = SE2Pose(
             x=self.gripper_finger_width / 2,
             y=self._gripper_gap - self.gripper_base_height / 2,
@@ -304,7 +333,7 @@ class KinRobot:
         left_finger_pose = gripper_base_pose * left_finger_rel_pos
         self._left_finger_body.position = (left_finger_pose.x, left_finger_pose.y)
         self._left_finger_body.angle = left_finger_pose.theta
-        
+
         right_finger_rel_pos = SE2Pose(
             x=self.gripper_finger_width / 2,
             y=-self.gripper_base_height / 2,
@@ -312,7 +341,10 @@ class KinRobot:
         )
         right_finger_pose = gripper_base_pose * right_finger_rel_pos
         if self._right_finger_body:
-            self._right_finger_body.position = (right_finger_pose.x, right_finger_pose.y)
+            self._right_finger_body.position = (
+                right_finger_pose.x,
+                right_finger_pose.y,
+            )
             self._right_finger_body.angle = right_finger_pose.theta
 
         # Update held objects
@@ -323,12 +355,16 @@ class KinRobot:
 
     def update_last_state(self) -> None:
         """Update the last state tracking variables."""
-        self._base_position = Vec2d(self._base_body.position.x, self._base_body.position.y)
+        self._base_position = Vec2d(
+            self._base_body.position.x, self._base_body.position.y
+        )
         self._base_angle = self._base_body.angle
-        
+
         relative_pose = self.base_pose.inverse * self.gripper_base_pose
         self._arm_length = relative_pose.x
-        relative_finger_pose = self.gripper_base_pose.inverse * self.finger_poses['left']
+        relative_finger_pose = (
+            self.gripper_base_pose.inverse * self.finger_poses["left"]
+        )
         self._gripper_gap = relative_finger_pose.y + self.gripper_base_height / 2
 
     def update(
@@ -336,7 +372,7 @@ class KinRobot:
         base_vel: Vec2d,
         base_ang_vel: float,
         gripper_base_vel: Vec2d,
-        finger_vel_l: Vec2d
+        finger_vel_l: Vec2d,
     ) -> None:
         """Update the body velocities using PD control."""
         # Update robot last state
@@ -377,15 +413,17 @@ class KinRobot:
         """Drop held objects if gripper is opening."""
         if self.is_opening_finger and len(self.held_objects) > 0:
             for obj, _ in self.held_objects:
-                self.del_from_hand_space((obj, obj.shapes[0]), space)
+                self.del_from_hand_space((obj, list(obj.shapes)[0]), space)
             self.held_objects = []
 
-    def is_grasping(self, contact_point_set: pymunk.ContactPointSet, tgt_body: pymunk.Body) -> bool:
+    def is_grasping(
+        self, contact_point_set: pymunk.ContactPointSet, tgt_body: pymunk.Body
+    ) -> bool:
         """Check if robot is grasping a target body."""
         # Checker 0: If robot is closing gripper
         if not self.is_closing_finger:
             return False
-        # Checker 1: If contact normal is roughly perpendicular 
+        # Checker 1: If contact normal is roughly perpendicular
         # to gripper_base_body base
         normal = contact_point_set.normal
         if not self._gripper_base_body:
@@ -408,7 +446,9 @@ class KinRobot:
     def add_to_hand(self, obj: tuple[pymunk.Body, pymunk.Shape]) -> None:
         """Add an object to the robot's hand."""
         obj_body, _ = obj
-        obj_pose = SE2Pose(x=obj_body.position.x, y=obj_body.position.y, theta=obj_body.angle)
+        obj_pose = SE2Pose(
+            x=obj_body.position.x, y=obj_body.position.y, theta=obj_body.angle
+        )
         gripper_base_pose = SE2Pose(
             x=self._gripper_base_body.position.x,
             y=self._gripper_base_body.position.y,
@@ -417,7 +457,9 @@ class KinRobot:
         relative_obj_pose = gripper_base_pose.inverse * obj_pose
         self.held_objects.append((obj_body, relative_obj_pose))
 
-    def del_from_hand_space(self, obj: tuple[pymunk.Body, pymunk.Shape], space: pymunk.Space) -> None:
+    def del_from_hand_space(
+        self, obj: tuple[pymunk.Body, pymunk.Shape], space: pymunk.Space
+    ) -> None:
         """Remove an object from hand and make it dynamic."""
         mass = 1.0
         kinematic_body, kinematic_shape = obj
@@ -454,8 +496,8 @@ class PDController:
     def _R(self, theta: float) -> tuple[Vec2d, Vec2d]:
         """Return world-frame unit basis of the base frame: (ex_w, ey_w)."""
         c, s = math.cos(theta), math.sin(theta)
-        ex_w = Vec2d(c, s)     # base x-axis in world
-        ey_w = Vec2d(-s, c)    # base y-axis in world
+        ex_w = Vec2d(c, s)  # base x-axis in world
+        ey_w = Vec2d(-s, c)  # base y-axis in world
         return ex_w, ey_w
 
     def _cross2d(self, omega: float, v: Vec2d) -> Vec2d:
@@ -469,76 +511,94 @@ class PDController:
         tgt_x: float,
         tgt_y: float,
         tgt_theta: float,
-        tgt_arm: float,       # target arm length L*
-        tgt_gripper: float,   # target finger opening g*
+        tgt_arm: float,  # target arm length L*
+        tgt_gripper: float,  # target finger opening g*
         dt: float,
     ) -> tuple[Vec2d, float, Vec2d, Vec2d]:
-        """Compute base vel, base ang vel, gripper-base vel (world), finger vel (world)."""
+        """Compute base vel, base ang vel, gripper-base vel (world), finger vel
+        (world)."""
         # === 0) Read current state ===
         base_pos_curr = Vec2d(robot.base_pose.x, robot.base_pose.y)
-        base_vel_curr = robot.base_vel[0]          # Vec2d(vx, vy) in world
+        base_vel_curr = robot.base_vel[0]  # Vec2d(vx, vy) in world
         base_ang_curr = robot.base_pose.theta
-        base_ang_vel_curr = robot.base_vel[1]      # scalar omega
-        base_rot_omega_vec = Vec2d(math.cos(base_ang_curr + math.pi / 2),
-                               math.sin(base_ang_curr + math.pi / 2))
+        base_ang_vel_curr = robot.base_vel[1]  # scalar omega
+        base_rot_omega_vec = Vec2d(
+            math.cos(base_ang_curr + math.pi / 2), math.sin(base_ang_curr + math.pi / 2)
+        )
 
-        L_curr = robot.curr_arm_length             # current arm length (scalar)
+        L_curr = robot.curr_arm_length  # current arm length (scalar)
         Ldot_curr = robot.gripper_base_vel[0]
 
         # If available (recommended), provide current gripper opening and its rate:
-        g_curr = robot.curr_gripper                 # opening distance
-        finger_vel_abs_w = robot.finger_vels['left'][0]  # Vec2d
+        g_curr = robot.curr_gripper  # opening distance
+        finger_vel_abs_w = robot.finger_vels["left"][0]  # Vec2d
 
         # === 1) Base PD (same as yours, but keep structure tidy) ===
         base_pos_tgt = Vec2d(tgt_x, tgt_y)
-        a_base_lin = self.kp_pos * (base_pos_tgt - base_pos_curr) \
-                + self.kv_pos * (Vec2d(0, 0) - base_vel_curr)
+        a_base_lin = self.kp_pos * (base_pos_tgt - base_pos_curr) + self.kv_pos * (
+            Vec2d(0, 0) - base_vel_curr
+        )
         base_vel = base_vel_curr + a_base_lin * dt
 
-        a_base_ang = self.kp_rot * (tgt_theta - base_ang_curr) \
-                + self.kv_rot * (0.0 - base_ang_vel_curr)
+        a_base_ang = self.kp_rot * (tgt_theta - base_ang_curr) + self.kv_rot * (
+            0.0 - base_ang_vel_curr
+        )
         base_ang_vel = base_ang_vel_curr + a_base_ang * dt
 
         # === 2) Arm prismatic rate via PD on length in the base frame ===
         # PD on arm length
         kp_arm = getattr(self, "kp_arm", self.kp_pos)
         kv_arm = getattr(self, "kv_arm", self.kv_pos)
-        arm_center_omega_vec = base_rot_omega_vec * L_curr * base_ang_vel_curr  # omega x r
+        arm_center_omega_vec = (
+            base_rot_omega_vec * L_curr * base_ang_vel_curr
+        )  # omega x r
         # Extract prismatic vel from a moving base
-        rel_Ldot_curr = (Ldot_curr - base_vel_curr - \
-                         arm_center_omega_vec).rotated(-base_ang_curr).x  # R^T * v_gripper_base
+        rel_Ldot_curr = (
+            (Ldot_curr - base_vel_curr - arm_center_omega_vec).rotated(-base_ang_curr).x
+        )  # R^T * v_gripper_base
         a_L = kp_arm * (tgt_arm - L_curr) + kv_arm * (0.0 - rel_Ldot_curr)
 
         # Integrate prismatic rate
         rel_Ldot_next = rel_Ldot_curr + a_L * dt
-        # Note: We need to use the *next base_ang_vel* to compute the 
+        # Note: We need to use the *next base_ang_vel* to compute the
         # world-frame gripper-base velocity
-        v_gripper_base = base_vel + \
-            base_rot_omega_vec * L_curr * base_ang_vel + \
-            Vec2d(rel_Ldot_next, 0.0).rotated(base_ang_curr)
+        v_gripper_base = (
+            base_vel
+            + base_rot_omega_vec * L_curr * base_ang_vel
+            + Vec2d(rel_Ldot_next, 0.0).rotated(base_ang_curr)
+        )
 
         # === 3) Gripper-base world velocity = rigid motion + prismatic contribution ===
         # Use *updated* base_vel & base_ang_vel for consistency in this control step
         kp_finger = getattr(self, "kp_finger", self.kp_pos)
         kv_finger = getattr(self, "kv_finger", self.kv_pos)
-        gripper_centr = Vec2d(robot.finger_poses['left'].x, robot.finger_poses['left'].y)
+        gripper_centr = Vec2d(
+            robot.finger_poses["left"].x, robot.finger_poses["left"].y
+        )
         # Extract the rotate omega x r contribution
         relative_pos = gripper_centr - base_pos_curr
         finger_rot_omega_vec_base = relative_pos.normalized().rotated(math.pi / 2)
-        finger_rot_omega_vec = finger_rot_omega_vec_base * relative_pos.length \
-            * base_ang_vel_curr
+        finger_rot_omega_vec = (
+            finger_rot_omega_vec_base * relative_pos.length * base_ang_vel_curr
+        )
         # We only care about y-dir as finger only moves in y in the base frame
-        rel_gdot_curr = (finger_vel_abs_w - base_vel_curr - \
-                            finger_rot_omega_vec).rotated(-base_ang_curr).y
+        rel_gdot_curr = (
+            (finger_vel_abs_w - base_vel_curr - finger_rot_omega_vec)
+            .rotated(-base_ang_curr)
+            .y
+        )
         a_g = kp_finger * (tgt_gripper - g_curr) + kv_finger * (0.0 - rel_gdot_curr)
         rel_gdot_next = rel_gdot_curr + a_g * dt
-        # Finger world velocity, similar to gripper-base vel but with the additional 
+        # Finger world velocity, similar to gripper-base vel but with the additional
         # primistamic part in y-dir
-        finger_vel_l = base_vel + \
-            finger_rot_omega_vec_base * relative_pos.length * base_ang_vel + \
-            Vec2d(rel_Ldot_next, rel_gdot_next).rotated(base_ang_curr)
+        finger_vel_l = (
+            base_vel
+            + finger_rot_omega_vec_base * relative_pos.length * base_ang_vel
+            + Vec2d(rel_Ldot_next, rel_gdot_next).rotated(base_ang_curr)
+        )
 
         return base_vel, base_ang_vel, v_gripper_base, finger_vel_l
+
 
 def rectangle_object_to_geom(
     state: ObjectCentricState,
@@ -553,13 +613,15 @@ def rectangle_object_to_geom(
     assert isinstance(geom, Rectangle)
     return geom
 
+
 def object_to_multibody2d(
     obj: Object,
     state: ObjectCentricState,
     static_object_cache: dict[Object, MultiBody2D],
 ) -> MultiBody2D:
     """Create a Body2D instance for objects of standard geom types.
-        This is borrowed from Geom2D
+
+    This is borrowed from Geom2D
     """
     if obj.is_instance(KinRobotType):
         return _robot_to_multibody2d(obj, state)
@@ -587,6 +649,7 @@ def object_to_multibody2d(
         body = Body2D(geom, z_order, rendering_kwargs)
         multibody = MultiBody2D(obj.name, [body])
     return multibody
+
 
 def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D:
     """Helper for object_to_multibody2d()."""
@@ -669,9 +732,8 @@ def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D
     multibody = MultiBody2D(obj.name, bodies)
     return multibody
 
-def on_gripper_grasp(arbiter: pymunk.Arbiter, 
-                     space: pymunk.Space, 
-                     robot: KinRobot) -> bool:
+
+def on_gripper_grasp(arbiter: pymunk.Arbiter, space: pymunk.Space, robot: Any) -> None:
     """Collision callback for gripper grasping objects."""
     print("Gripper Collision detected!")
     dynamic_body = arbiter.bodies[0]
@@ -689,17 +751,17 @@ def on_gripper_grasp(arbiter: pymunk.Arbiter,
         robot.add_to_hand((kinematic_body, shape))
         # Remove the dynamic body from the space
         space.remove(dynamic_body, arbiter.shapes[0])
-        return True
-    return False
 
 
-def on_collision_w_static(arbiter: pymunk.Arbiter, space: pymunk.Space, robot: KinRobot) -> bool:
+def on_collision_w_static(
+    arbiter: pymunk.Arbiter, space: pymunk.Space, robot: Any
+) -> None:
     """Collision callback for robot colliding with static objects."""
     del arbiter
     del space
     print("Static Collision detected!")
     robot.reset_last_state()
-    return True
+
 
 def create_walls_from_world_boundaries(
     world_min_x: float,
@@ -797,6 +859,7 @@ def create_walls_from_world_boundaries(
     }
     return state_dict
 
+
 def state_has_collision(
     state: ObjectCentricState,
     group1: set[Object],
@@ -827,6 +890,7 @@ def state_has_collision(
                         return True
     return False
 
+
 def is_on(
     state: ObjectCentricState,
     top: Object,
@@ -851,6 +915,7 @@ def is_on(
             return False
     return True
 
+
 def get_fingered_robot_action_from_gui_input(
     action_space: KinRobotActionSpace, gui_input: dict[str, Any]
 ) -> NDArray[np.float32]:
@@ -859,6 +924,7 @@ def get_fingered_robot_action_from_gui_input(
     del gui_input  # Unused for now
     action = np.zeros(action_space.shape, action_space.dtype)
     return action
+
 
 def render_state_on_ax(
     state: ObjectCentricState,
