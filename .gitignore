@@ -170,3 +170,4 @@ cython_debug/
 # unused xml and debug files
 src/prbench/envs/tidybot/tidybot_robot_env.xml
 scripts/tidybot/debug/
+unit_test_videos
