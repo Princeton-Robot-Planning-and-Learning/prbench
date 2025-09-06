@@ -77,7 +77,7 @@ class Dynamic2DRobotEnvSpec:
 
     # Physics parameters
     gravity_y: float = -9.8
-    control_freq: int = 20  # Control frequency (actions per second)
+    control_freq: int = 10  # Control frequency (actions per second)
     sim_freq: int = 120  # Simulation frequency (physics steps per second)
 
     # For rendering.
@@ -310,7 +310,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         )
 
         # Multi-step simulation like basic_pymunk.py
-        s = time.time()
+        # s = time.time()
         for _ in range(n_steps):
             # Use PD control to compute base and gripper velocities
             base_vel, base_ang_vel, gripper_base_vel, finger_vel = (
@@ -322,8 +322,8 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             self.robot.update(base_vel, base_ang_vel, gripper_base_vel, finger_vel)
             # Step physics simulation
             self.space.step(dt)
-        e = time.time()
-        print(f"Stepped {n_steps} physics steps in {e - s:.4f} seconds")
+        # e = time.time()
+        # print(f"Stepped {n_steps} physics steps in {e - s:.4f} seconds")
         # Drop objects after internal steps (like basic_pymunk.py)
         self.robot.drop_held_objects(self.space)
 
