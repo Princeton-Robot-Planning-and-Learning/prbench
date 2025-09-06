@@ -21,6 +21,8 @@ from prbench.envs.geom2d.structs import MultiBody2D
 from prbench.envs.dynamic2d.object_types import (
     Dynamic2DRobotEnvTypeFeatures,
     KinRobotType,
+    RectangleType,
+    DynRectangleType,
 )
 from prbench.envs.dynamic2d.utils import (
     DYNAMIC_COLLISION_TYPE,
@@ -35,6 +37,9 @@ from prbench.envs.dynamic2d.utils import (
     render_state
 )
 
+def debug(arbiter: pymunk.Arbiter, space: pymunk.Space, data: Any) -> bool:
+    print("DEBUG COLLISION")
+    return True
 
 @dataclass(frozen=True)
 class Dynamic2DRobotEnvSpec:
@@ -75,8 +80,8 @@ class Dynamic2DRobotEnvSpec:
 
     # Physics parameters
     gravity_y: float = 1000.0
-    control_freq: int = 10  # Control frequency (actions per second)
-    sim_freq: int = 60     # Simulation frequency (physics steps per second)
+    control_freq: int = 20  # Control frequency (actions per second)
+    sim_freq: int = 120     # Simulation frequency (physics steps per second)
 
     # For rendering.
     render_dpi: int = 50
@@ -99,7 +104,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         self, spec: Dynamic2DRobotEnvSpec, render_mode: str | None = "rgb_array"
     ) -> None:
         self._spec = spec
-        self._types = {KinRobotType}  # Add more types as needed
+        self._types = {KinRobotType, RectangleType, DynRectangleType}
         self.render_mode = render_mode
         self.observation_space = ObjectCentricStateSpace(self._types)
         self.action_space = KinRobotActionSpace(
@@ -127,6 +132,8 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Initialized by reset().
         self._current_state: ObjectCentricState | None = None
+        # Some objects may map to multiple pymunk bodies (e.g., the robot).
+        self._state_obj_to_pymunk_body_idx: dict[Object, int] = {}
         # Maintain an independent initial_constant_state, including static objects
         # that never change throughout the lifetime of the environment.
         self._initial_constant_state: ObjectCentricState | None = None
@@ -137,7 +144,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
     def _setup_physics_space(self) -> None:
         """Set up the PyMunk physics space."""
         self.space = pymunk.Space()
-        self.space.gravity = 0, self._spec.gravity_y
+        self.space.gravity = 0, -self._spec.gravity_y
 
         # Create robot
         self.robot = KinRobot(
@@ -164,31 +171,44 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             STATIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE,
             pre_solve=on_collision_w_static, data=self.robot
         )
+        self.space.on_collision(
+            DYNAMIC_COLLISION_TYPE, STATIC_COLLISION_TYPE,
+            begin=debug, data=self.robot
+        )
 
     def _reset_robot_in_space(self, obj: Object, state: ObjectCentricState) -> None:
         """Reset the robot in the PyMunk space."""
         if not self.space:
             return
-        robot_base_x = state.get_feature(obj, "x")
-        robot_base_y = state.get_feature(obj, "y")
-        robot_theta = state.get_feature(obj, "theta")
-        robot_arm = state.get_feature(obj, "arm_length")
-        robot_gripper = state.get_feature(obj, "gripper_gap")
+        robot_base_x = state.get(obj, "x")
+        robot_base_y = state.get(obj, "y")
+        robot_theta = state.get(obj, "theta")
+        robot_arm = state.get(obj, "arm_joint")
+        robot_gripper = state.get(obj, "finger_gap")
         assert self.robot is not None, "Robot not initialized"
         self.robot.reset_positions(
             base_x=robot_base_x,
             base_y=robot_base_y,
-            theta=robot_theta,
+            base_theta=robot_theta,
             arm_length=robot_arm,
             gripper_gap=robot_gripper,
         )
+        self._state_obj_to_pymunk_body_idx[obj] = self.robot.body_id
 
-    @abc.abstractmethod
     def _add_state_to_space(self, state: ObjectCentricState) -> None:
         """Add objects from the state to the PyMunk space."""
+        if not self.space:
+            return
+        for obj in state:
+            if obj.type == KinRobotType:
+                self._reset_robot_in_space(obj, state)
+            else:
+                # Add other objects (e.g., rectangles) to the space.
+                # This will be implemented in subclasses.
+                pass
 
     @abc.abstractmethod
-    def _read_state_from_space(self) -> ObjectCentricState:
+    def _read_state_from_space(self) -> None:
         """Read the current state from the PyMunk space."""
 
     @abc.abstractmethod
@@ -218,8 +238,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
     @property
     def full_state(self) -> ObjectCentricState:
         """Get the full state, which includes both dynamic and static objects."""
-        current_state = self._read_state_from_space()
-        full_state = current_state.copy()
+        full_state = self._current_state.copy()
         if self._initial_constant_state is not None:
             # Merge the initial constant state with the current state.
             full_state.data.update(self._initial_constant_state.data)
@@ -243,6 +262,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         # Set up new physics space
         self._setup_physics_space()
         self._static_object_body_cache = {}
+        self._state_obj_to_pymunk_body_idx = {}
 
         # For testing purposes only, the options may specify an initial scene.
         if options is not None and "init_state" in options:
@@ -252,8 +272,16 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             self._current_state = self._sample_initial_state()
 
         # Add objects to physics space
-        self._add_state_to_space(self._current_state)
-        self._current_state = self._read_state_from_space()
+        self._add_state_to_space(self.full_state)
+
+        # Calculate simulation parameters
+        dt = 1.0 / self._spec.control_freq
+
+        # Stepping physics to let things settle
+        if self.space:
+            self.space.step(dt)
+
+        self._read_state_from_space()
         observation = self._get_obs()
         info = self._get_info()
 
@@ -300,7 +328,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         self.robot.drop_held_objects(self.space)
 
         # Update current state from simulation
-        self._current_state = self._read_state_from_space()
+        self._read_state_from_space()
 
         reward, terminated = self._get_reward_and_done()
         truncated = False  # no maximum horizon, by default
@@ -314,9 +342,9 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         assert self.render_mode == "rgb_array"
         assert self._current_state is not None, "Need to call reset()"
         render_input_state = self._current_state.copy()
-        if self._initial_constant_state is not None:
-            # Merge the initial constant state with the current state.
-            render_input_state.data.update(self._initial_constant_state.data)
+        # if self._initial_constant_state is not None:
+        #     # Merge the initial constant state with the current state.
+        #     render_input_state.data.update(self._initial_constant_state.data)
         return render_state(
             render_input_state,
             self._static_object_body_cache,

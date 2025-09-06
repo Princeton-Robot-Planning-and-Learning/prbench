@@ -18,7 +18,9 @@ DYNAMIC_COLLISION_TYPE = 1
 ROBOT_COLLISION_TYPE = 2
 HELD_OBJECT_COLLISION_TYPE = 4
 
-
+def debug(arbiter: pymunk.Arbiter, space: pymunk.Space, data) -> bool:
+    print("DEBUG COLLISION")
+    return True
 
 class KinRobot:
     def __init__(self, 
@@ -349,10 +351,14 @@ def main():
     draw_options = pymunk.pygame_util.DrawOptions(screen)
 
     # Ground
-    shape = pymunk.Segment(space.static_body, (5, 500), (595, 500), 1.0)
+    sg = 1
+    b2 = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
+    points = [(-width / 2, -sg), (-width / 2, sg), (width / 2, sg), (width / 2, -sg)]
+    shape = pymunk.Poly(b2, points)
     shape.friction = 1.0
-    shape.collision_type = STATIC_COLLISION_TYPE
-    space.add(shape)
+    shape.density = 1.0
+    space.add(b2, shape)
+    b2.position = Vec2d(width / 2, height - 10)
 
     # Obstacle
     # shape = pymunk.Segment(space.static_body, (200, 450), (300, 450), 1.0)
@@ -389,6 +395,14 @@ def main():
     space.on_collision(DYNAMIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE, post_solve=on_gripper_grasp, data=robot)
     # Static collision handler
     space.on_collision(STATIC_COLLISION_TYPE, ROBOT_COLLISION_TYPE, pre_solve=on_collision_w_static, data=robot)
+
+    space.on_collision(
+                DYNAMIC_COLLISION_TYPE, STATIC_COLLISION_TYPE,
+                begin=debug, data=robot
+            )
+
+    for b in space.bodies:
+        print(b.id, b.body_type)
 
     while running:
         for event in pygame.event.get():

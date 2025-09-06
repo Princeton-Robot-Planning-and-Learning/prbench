@@ -1,6 +1,7 @@
 """Tests for dyn_obstruction2d.py."""
 
 import numpy as np
+import imageio.v2 as iio
 from gymnasium.spaces import Box
 
 import prbench
@@ -33,8 +34,12 @@ def test_dyn_obstruction2d_action_space():
     # zeros[1] += statble_move[1]
     # zeros[2] += statble_move[2]
     # desired_obs_next = obs + statble_move
-    for _ in range(3):
+    img = env.render()
+    iio.imwrite("unit_test_videos/init.png", img)
+    for i in range(10):
         obs, reward, terminated, truncated, info = env.step(statble_move)
+        img = env.render()
+        iio.imwrite(f"unit_test_videos/step_{i}.png", img)
         
 
 

@@ -246,6 +246,11 @@ class KinRobot:
         relative_pose = self.base_pose.inverse * self.gripper_base_pose
         return relative_pose.x
 
+    @property
+    def body_id(self) -> dict[str, int]:
+        """Get the base id in pymunk space."""
+        return self._base_body.id
+
     def reset_positions(self,
                         base_x: float,
                         base_y: float,
@@ -280,7 +285,6 @@ class KinRobot:
 
         # Update last state
         self.update_last_state()
-
 
     def reset_last_state(self) -> None:
         """Reset to last state when collide with static objects."""
