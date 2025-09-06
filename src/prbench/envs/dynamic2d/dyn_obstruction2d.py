@@ -14,7 +14,7 @@ from prbench.envs.dynamic2d.object_types import (
     RectangleType,
     DynRectangleType,
 )
-from prbench.envs.geom2d.structs import SE2Pose
+from prbench.envs.geom2d.structs import SE2Pose, MultiBody2D
 from prbench.envs.dynamic2d.base_env import (
     ConstantObjectDynamic2DEnv,
     Dynamic2DRobotEnv,
@@ -25,7 +25,8 @@ from prbench.envs.dynamic2d.utils import (
     DYNAMIC_COLLISION_TYPE,
     STATIC_COLLISION_TYPE,
     create_walls_from_world_boundaries,
-    state_has_collision
+    state_has_collision,
+    is_on
 )
 
 # Define custom object types for the obstruction environment
@@ -79,9 +80,9 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     world_max_y: float = 1.0
     
     # Robot parameters
-    init_robot_pos: tuple[float, float] = (5.0, 5.0)
-    robot_base_radius: float = 0.4
-    robot_arm_length_max: float = 0.8
+    init_robot_pos: tuple[float, float] = (0.5, 0.5)
+    robot_base_radius: float = 0.1
+    robot_arm_length_max: float = 2 * robot_base_radius
     gripper_base_width: float = 0.01
     gripper_base_height: float = 0.1
     gripper_finger_width: float = 0.1
@@ -101,8 +102,8 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
     # Robot hyperparameters.
     robot_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
-        SE2Pose(8.0, 8.0, np.pi / 2),
-        SE2Pose(2.0, 2.0, -np.pi / 2),
+        SE2Pose(0.2, 0.2, -np.pi / 2),
+        SE2Pose(0.8, 0.8, np.pi / 2),
     )
 
     # Table hyperparameters.
@@ -245,6 +246,9 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         n = self._spec.max_initial_state_sampling_attempts
         for _ in range(n):
             # Sample all randomized values.
+            robot_pose = sample_se2_pose(
+                self._spec.robot_init_pose_bounds, self.np_random
+            )
             target_block_pose = sample_se2_pose(
                 self._spec.target_block_init_pose_bounds, self.np_random
             )
@@ -286,6 +290,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                 obstructions.append((obstruction_pose, obstruction_shape))
             
             state = self._create_initial_state(
+                robot_pose,
                 target_surface_pose,
                 target_surface_shape,
                 target_block_pose,
@@ -577,18 +582,31 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
 
         return state
 
-    def _target_satisfied(self) -> bool:
-        """Check if the target block is on the target surface."""
-        if not self.space or not self._target_block or not self._target_surface:
-            return False
-        
-        return is_on_dynamic(self.space, self._target_block, self._target_surface)
+    def _target_satisfied(
+        self,
+        state: ObjectCentricState,
+        static_object_body_cache: dict[Object, MultiBody2D],
+    ) -> bool:
+        """Check if the target condition is satisfied.
+            This is borrowed from geom2d obstruction env for now.
+        """
+        target_objects = state.get_objects(TargetBlockType)
+        assert len(target_objects) == 1
+        target_object = target_objects[0]
+        target_surfaces = state.get_objects(TargetSurfaceType)
+        assert len(target_surfaces) == 1
+        target_surface = target_surfaces[0]
+        return is_on(state, target_object, target_surface, static_object_body_cache)
 
     def _get_reward_and_done(self) -> tuple[float, bool]:
         """Calculate reward and termination."""
         # Terminate when target object is on the target surface. Give -1 reward
         # at every step until then to encourage fast completion.
-        terminated = self._target_satisfied()
+        assert self._current_state is not None
+        terminated = self._target_satisfied(
+            self._current_state,
+            self._static_object_body_cache,
+        )
         return -1.0, terminated
 
 

@@ -17,6 +17,7 @@ from relational_structs import (
 )
 from relational_structs.spaces import ObjectCentricBoxSpace
 
+from prbench.envs.geom2d.structs import MultiBody2D
 from prbench.envs.dynamic2d.object_types import (
     Dynamic2DRobotEnvTypeFeatures,
     KinRobotType,
@@ -25,7 +26,7 @@ from prbench.envs.dynamic2d.utils import (
     DYNAMIC_COLLISION_TYPE,
     ROBOT_COLLISION_TYPE,
     STATIC_COLLISION_TYPE,
-    FingeredRobotActionSpace,
+    KinRobotActionSpace,
     KinRobot,
     PDController,
     get_fingered_robot_action_from_gui_input,
@@ -101,7 +102,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         self._types = {KinRobotType}  # Add more types as needed
         self.render_mode = render_mode
         self.observation_space = ObjectCentricStateSpace(self._types)
-        self.action_space = FingeredRobotActionSpace(
+        self.action_space = KinRobotActionSpace(
             min_dx=self._spec.min_dx,
             max_dx=self._spec.max_dx,
             min_dy=self._spec.min_dy,
@@ -129,6 +130,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         # Maintain an independent initial_constant_state, including static objects
         # that never change throughout the lifetime of the environment.
         self._initial_constant_state: ObjectCentricState | None = None
+        self._static_object_body_cache: dict[Object, MultiBody2D] = {}
 
         super().__init__()
 
@@ -222,6 +224,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Set up new physics space
         self._setup_physics_space()
+        self._static_object_body_cache = {}
 
         # For testing purposes only, the options may specify an initial scene.
         if options is not None and "init_state" in options:
@@ -232,7 +235,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Add objects to physics space
         self._add_state_to_space(self._current_state)
-
+        self._current_state = self._read_state_from_space()
         observation = self._get_obs()
         info = self._get_info()
 
@@ -291,12 +294,20 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         """Render the current state. To be implemented."""
         # This will be implemented later
         assert self.render_mode == "rgb_array"
-        # Return a placeholder black image
-        return render_state(self.space, 
-                            self._spec.world_min_x,
-                            self._spec.world_max_x,
-                            self._spec.world_min_y,
-                            self._spec.world_max_y)
+        assert self._current_state is not None, "Need to call reset()"
+        render_input_state = self._current_state.copy()
+        if self._initial_constant_state is not None:
+            # Merge the initial constant state with the current state.
+            render_input_state.data.update(self._initial_constant_state.data)
+        return render_state(
+            render_input_state,
+            self._static_object_body_cache,
+            self._spec.world_min_x,
+            self._spec.world_max_x,
+            self._spec.world_min_y,
+            self._spec.world_max_y,
+            self._spec.render_dpi,
+        )
 
 
 class ConstantObjectDynamic2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
@@ -324,12 +335,12 @@ class ConstantObjectDynamic2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.f
         self._constant_objects = [obj_name_to_obj[o] for o in obj_names]
         # This is a Box space with some extra functionality to allow easy vectorizing.
         self.observation_space = self._dynamic2d_env.observation_space.to_box(
-            self._constant_objects, Geom2DRobotEnvTypeFeatures
+            self._constant_objects, Dynamic2DRobotEnvTypeFeatures
         )
         self.action_space = self._dynamic2d_env.action_space
         assert isinstance(self.observation_space, ObjectCentricBoxSpace)
         # The action space already inherits from Box, so we don't need to change it.
-        assert isinstance(self.action_space, FingeredRobotActionSpace)
+        assert isinstance(self.action_space, KinRobotActionSpace)
         # Add descriptions to metadata for doc generation.
         obs_md = self.observation_space.create_markdown_description()
         act_md = self.action_space.create_markdown_description()
@@ -398,5 +409,5 @@ class ConstantObjectDynamic2DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.f
     ) -> NDArray[np.float32]:
         """Get the mapping from human inputs to actions."""
         # This will be implemented later
-        assert isinstance(self.action_space, FingeredRobotActionSpace)
+        assert isinstance(self.action_space, KinRobotActionSpace)
         return get_fingered_robot_action_from_gui_input(self.action_space, gui_input)

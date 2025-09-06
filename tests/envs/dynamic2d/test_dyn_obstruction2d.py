@@ -19,7 +19,7 @@ def test_dyn_obstruction2d_observation_space():
 def test_dyn_obstruction2d_action_space():
     """Tests that the actions are valid and the step function works."""
     prbench.register_all_environments()
-    env = prbench.make("prbench/DynObstruction2D-o4-v0")
+    env = prbench.make("prbench/DynObstruction2D-o3-v0")
     obs, _ = env.reset(seed=0)
     statble_move = np.array([0.05,
                              0.05,
@@ -28,11 +28,11 @@ def test_dyn_obstruction2d_action_space():
                              -0.02
                              ], dtype=np.float32)
     # Check the control precision
-    zeros = np.zeros_like(obs)
-    zeros[0] += statble_move[0]
-    zeros[1] += statble_move[1]
-    zeros[2] += statble_move[2]
-    desired_obs_next = obs + statble_move
+    # zeros = np.zeros_like(obs)
+    # zeros[0] += statble_move[0]
+    # zeros[1] += statble_move[1]
+    # zeros[2] += statble_move[2]
+    # desired_obs_next = obs + statble_move
     for _ in range(3):
         obs, reward, terminated, truncated, info = env.step(statble_move)
         

@@ -11,15 +11,12 @@ from relational_structs import (
     Object,
     ObjectCentricState
 )
-from tomsgeoms2d.structs import Geom2D, Rectangle
+from tomsgeoms2d.structs import Geom2D, Rectangle, Circle
+from prpl_utils.utils import fig2data
 
 from numpy.typing import NDArray
 from pymunk.vec2d import Vec2d
-from pymunk.examples.shapes_for_draw_demos import fill_space
-from prpl_utils.utils import fig2data
-import pymunk.matplotlib_util
-
-from prbench.envs.geom2d.structs import SE2Pose, MultiBody2D, Body2D
+from prbench.envs.geom2d.structs import SE2Pose, MultiBody2D, Body2D, ZOrder
 from prbench.envs.geom2d.utils import geom2ds_intersect
 from prbench.envs.dynamic2d.object_types import (
     RectangleType,
@@ -504,6 +501,19 @@ class PDController:
 
         return base_vel, base_ang_vel, v_gripper_base, finger_vel_l
 
+def rectangle_object_to_geom(
+    state: ObjectCentricState,
+    rect_obj: Object,
+    static_object_cache: dict[Object, MultiBody2D],
+) -> Rectangle:
+    """Helper to extract a rectangle for an object."""
+    assert rect_obj.is_instance(RectangleType)
+    multibody = object_to_multibody2d(rect_obj, state, static_object_cache)
+    assert len(multibody.bodies) == 1
+    geom = multibody.bodies[0].geom
+    assert isinstance(geom, Rectangle)
+    return geom
+
 def object_to_multibody2d(
     obj: Object,
     state: ObjectCentricState,
@@ -525,10 +535,10 @@ def object_to_multibody2d(
         width = state.get(obj, "width")
         height = state.get(obj, "height")
         theta = state.get(obj, "theta")
-        geom = Rectangle(x, y, width, height, theta)
+        geom = Rectangle.from_center(x, y, width, height, theta)
         # z_order is not used in dynamic2d as the collision
         # is done in pymunk.
-        z_order = 0
+        z_order = ZOrder.ALL
         rendering_kwargs = {
             "facecolor": (
                 state.get(obj, "color_r"),
@@ -555,7 +565,7 @@ def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D
         y=base_y,
         radius=base_radius,
     )
-    z_order = 0
+    z_order = ZOrder.ALL
     rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
     base = Body2D(circ, z_order, rendering_kwargs, name="base")
     bodies.append(base)
@@ -574,7 +584,7 @@ def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D
         width=gripper_base_width,
         rotation_about_center=theta,
     )
-    z_order = 0
+    z_order = ZOrder.ALL
     rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
     gripper_base = Body2D(rect, z_order, rendering_kwargs, name="gripper_base")
     gripper_base_pose = SE2Pose(
@@ -585,7 +595,7 @@ def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D
     bodies.append(gripper_base)
 
     # Fingers
-    relative_dx = state.get(obj, "gripper_finger_width") / 2
+    relative_dx = state.get(obj, "finger_width") / 2
     relative_dy_r = -gripper_base_height / 2
     relative_dy_l = state.get(obj, "finger_gap") - gripper_base_height / 2
     finger_r_pose = gripper_base_pose * SE2Pose(
@@ -612,7 +622,7 @@ def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D
         width=state.get(obj, "finger_width"),
         rotation_about_center=finger_l_pose.theta,
     )
-    z_order = 0
+    z_order = ZOrder.ALL
     rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
     finger_l_body = Body2D(finger_r, z_order, rendering_kwargs, name="arm")
     bodies.append(finger_l_body)
@@ -656,40 +666,6 @@ def on_collision_w_static(arbiter: pymunk.Arbiter, space: pymunk.Space, data: di
     robot.reset_last_state()
     return True
 
-def render_state(
-    space: pymunk.Space,
-    world_min_x: float = 0.0,
-    world_max_x: float = 10.0,
-    world_min_y: float = 0.0,
-    world_max_y: float = 10.0,
-    render_dpi: int = 150,
-) -> NDArray[np.uint8]:
-    """Render a state from the physics space to an image.
-    """
-
-    figsize = (
-        world_max_x - world_min_x,
-        world_max_y - world_min_y,
-    )
-    fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=render_dpi)
-    pad_x = (world_max_x - world_min_x) / 25
-    pad_y = (world_max_y - world_min_y) / 25
-    ax.set_xlim(world_min_x - pad_x, world_max_x + pad_x)
-    ax.set_ylim(world_min_y - pad_y, world_max_y + pad_y)
-    ax.axis("off")
-    plt.tight_layout()
-
-    captions = fill_space(space, (1,1,0,1))
-    for caption in captions:
-        x, y = caption[0]
-        y = y - 15
-        ax.text(x, y, caption[1], fontsize=12)
-    o = pymunk.matplotlib_util.DrawOptions(ax)
-    space.debug_draw(o)
-    img = fig2data(fig)
-    plt.close()
-    return img
-
 def create_walls_from_world_boundaries(
     world_min_x: float,
     world_max_x: float,
@@ -712,7 +688,7 @@ def create_walls_from_world_boundaries(
     state_dict[right_wall] = {
         "x": world_max_x,
         "vx": 0.0,
-        "y": world_min_y,
+        "y": (world_min_y + world_max_y) / 2,
         "vy": 0.0,
         "width": 2 * max_dx,  # 2x just for safety
         "height": side_wall_height,
@@ -730,7 +706,7 @@ def create_walls_from_world_boundaries(
     state_dict[left_wall] = {
         "x": world_min_x,
         "vx": 0.0,
-        "y": world_min_y,
+        "y": (world_min_y + world_max_y) / 2,
         "vy": 0.0,
         "width": 2 * abs(min_dx),  # 2x just for safety
         "height": side_wall_height,
@@ -806,6 +782,30 @@ def state_has_collision(
                         return True
     return False
 
+def is_on(
+    state: ObjectCentricState,
+    top: Object,
+    bottom: Object,
+    static_object_cache: dict[Object, MultiBody2D],
+    tol: float = 0.025,
+) -> bool:
+    """Checks top object is completely on the bottom one.
+
+    Only rectangles are currently supported.
+
+    Assumes that "up" is positive y.
+    """
+    top_geom = rectangle_object_to_geom(state, top, static_object_cache)
+    bottom_geom = rectangle_object_to_geom(state, bottom, static_object_cache)
+    # The bottom-most vertices of top_geom should be contained within the bottom
+    # geom when those vertices are offset by tol.
+    sorted_vertices = sorted(top_geom.vertices, key=lambda v: v[1])
+    for x, y in sorted_vertices[:2]:
+        offset_y = y - tol
+        if not bottom_geom.contains_point(x, offset_y):
+            return False
+    return True
+
 def get_fingered_robot_action_from_gui_input(
     action_space: KinRobotActionSpace, gui_input: dict[str, Any]
 ) -> NDArray[np.float32]:
@@ -814,3 +814,57 @@ def get_fingered_robot_action_from_gui_input(
     del gui_input  # Unused for now
     action = np.zeros(action_space.shape, action_space.dtype)
     return action
+
+def render_state_on_ax(
+    state: ObjectCentricState,
+    ax: plt.Axes,
+    static_object_body_cache: dict[Object, MultiBody2D] | None = None,
+) -> None:
+    """Render a state on an existing plt.Axes."""
+    if static_object_body_cache is None:
+        static_object_body_cache = {}
+
+    # Sort objects by ascending z order, with the robot first.
+    def _render_order(obj: Object) -> int:
+        if obj.is_instance(KinRobotType):
+            return -1
+        return 0
+
+    for obj in sorted(state, key=_render_order):
+        body = object_to_multibody2d(obj, state, static_object_body_cache)
+        body.plot(ax)
+
+
+def render_state(
+    state: ObjectCentricState,
+    static_object_body_cache: dict[Object, MultiBody2D] | None = None,
+    world_min_x: float = 0.0,
+    world_max_x: float = 10.0,
+    world_min_y: float = 0.0,
+    world_max_y: float = 10.0,
+    render_dpi: int = 150,
+) -> NDArray[np.uint8]:
+    """Render a state.
+
+    Useful for viz and debugging.
+    """
+    if static_object_body_cache is None:
+        static_object_body_cache = {}
+
+    figsize = (
+        world_max_x - world_min_x,
+        world_max_y - world_min_y,
+    )
+    fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=render_dpi)
+
+    render_state_on_ax(state, ax, static_object_body_cache)
+
+    pad_x = (world_max_x - world_min_x) / 25
+    pad_y = (world_max_y - world_min_y) / 25
+    ax.set_xlim(world_min_x - pad_x, world_max_x + pad_x)
+    ax.set_ylim(world_min_y - pad_y, world_max_y + pad_y)
+    ax.axis("off")
+    plt.tight_layout()
+    img = fig2data(fig)
+    plt.close()
+    return img
