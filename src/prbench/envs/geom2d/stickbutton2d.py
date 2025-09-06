@@ -347,7 +347,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
                 break
         if terminated:
             return 1.0, terminated
-        
+
         return -1.0, terminated
 
 
