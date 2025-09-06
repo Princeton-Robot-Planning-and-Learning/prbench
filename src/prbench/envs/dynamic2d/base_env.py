@@ -138,6 +138,8 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         """Set up the PyMunk physics space."""
         self.space = pymunk.Space()
         self.space.gravity = 0, self._spec.gravity_y
+        # self.space.collision_slop = 0.9
+        # self.collision_bias = 0.9
 
         # Create robot
         self.robot = KinRobot(
@@ -321,7 +323,10 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             # Update robot with the vel (PD control updates velocities)
             self.robot.update(base_vel, base_ang_vel, gripper_base_vel, finger_vel)
             # Step physics simulation
-            self.space.step(dt)
+            for _ in range(10):
+                self.space.step(dt / 10.0)
+            # Update current state from simulation
+            self._read_state_from_space()
         # e = time.time()
         # print(f"Stepped {n_steps} physics steps in {e - s:.4f} seconds")
         # Drop objects after internal steps (like basic_pymunk.py)

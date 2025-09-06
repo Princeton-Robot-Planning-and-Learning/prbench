@@ -4,6 +4,7 @@ import inspect
 from dataclasses import dataclass
 
 import numpy as np
+from numpy.typing import NDArray
 import pymunk
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
@@ -26,6 +27,7 @@ from prbench.envs.dynamic2d.utils import (
     create_walls_from_world_boundaries,
     is_on,
     state_has_collision,
+    render_state
 )
 from prbench.envs.geom2d.structs import MultiBody2D, SE2Pose, ZOrder
 
@@ -449,7 +451,8 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         shape = pymunk.Poly(b2, vs)
         shape.friction = 1.0
         shape.density = 1.0
-        shape.group = 1
+        # shape.group = 1
+        shape.elasticity = 0.99
         shape.collision_type = STATIC_COLLISION_TYPE
         self.space.add(b2, shape)
         b2.position = x, y
@@ -611,6 +614,31 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         )
         return -1.0, terminated
 
+    def render(self) -> NDArray[np.uint8]:  # type: ignore
+        """Render the current state.
+
+        To be implemented.
+        """
+        # This will be implemented later
+        assert self.render_mode == "rgb_array"
+        assert self._current_state is not None, "Need to call reset()"
+        render_input_state = self._current_state.copy()
+        if self._initial_constant_state is not None:
+            # Merge the initial constant state with the current state.
+            for obj, feature in self._initial_constant_state.data.items():
+                if obj.name == "table":
+                    # Skip table because it is already in current_state
+                    continue
+                render_input_state.data[obj] = feature
+        return render_state(
+            render_input_state,
+            self._static_object_body_cache,
+            self._spec.world_min_x,
+            self._spec.world_max_x,
+            self._spec.world_min_y,
+            self._spec.world_max_y,
+            self._spec.render_dpi,
+        )
 
 class DynObstruction2DEnv(ConstantObjectDynamic2DEnv):
     """Dynamic Obstruction 2D env with a constant number of objects."""
