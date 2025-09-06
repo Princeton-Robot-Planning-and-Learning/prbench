@@ -671,9 +671,8 @@ def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D
 
 def on_gripper_grasp(arbiter: pymunk.Arbiter, 
                      space: pymunk.Space, 
-                     data: dict[str, Any]) -> bool:
+                     robot: KinRobot) -> bool:
     """Collision callback for gripper grasping objects."""
-    robot = data["robot"]
     print("Gripper Collision detected!")
     dynamic_body = arbiter.bodies[0]
     if robot.is_grasping(arbiter.contact_point_set, dynamic_body):
@@ -694,9 +693,8 @@ def on_gripper_grasp(arbiter: pymunk.Arbiter,
     return False
 
 
-def on_collision_w_static(arbiter: pymunk.Arbiter, space: pymunk.Space, data: dict[str, Any]) -> bool:
+def on_collision_w_static(arbiter: pymunk.Arbiter, space: pymunk.Space, robot: KinRobot) -> bool:
     """Collision callback for robot colliding with static objects."""
-    robot = data["robot"]
     del arbiter
     del space
     print("Static Collision detected!")
