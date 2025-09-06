@@ -4,9 +4,15 @@
 ### Description
 A 2D physics-based environment where the goal is to place a target block onto a target surface using a fingered robot with PyMunk physics simulation. The block must be completely on the surface.
 
-The target surface may be initially obstructed. In this environment, there are always 1 obstacle blocks.
-
 The robot has a movable circular base and an extendable arm with gripper fingers. Objects can be grasped and released through gripper actions. All objects follow realistic physics including gravity, friction, and collisions.
+
+**Observation Space**: The observation is a fixed-size vector containing the state of all objects:
+- **Robot**: position (x,y), orientation (θ), velocities (vx,vy,ω), arm extension, gripper gap
+- **Target Block**: position, orientation, velocities, dimensions (dynamic physics object)
+- **Target Surface**: position, orientation, dimensions (kinematic physics object)
+
+
+Each object includes physics properties like mass, moment of inertia (for dynamic objects), and color information for rendering.
 
 ### Initial State Distribution
 ![initial state GIF](assets/initial_state_gifs/DynObstruction2D-o0.gif)
@@ -78,7 +84,11 @@ The entries of an array in this Box space correspond to the following action fea
 
 
 ### Rewards
-A penalty of -1.0 is given at every time step until termination, which occurs when the target block is "on" the target surface. The definition of "on" is implemented using physics-based collision detection:
+A penalty of -1.0 is given at every time step until termination, which occurs when the target block is completely "on" the target surface.
+
+**Termination Condition**: The episode terminates when the target block is successfully placed on the target surface. The "on" condition requires that the bottom vertices of the target block are within the bounds of the target surface, accounting for physics-based positioning.
+
+The definition of "on" is implemented using geometric collision detection:
 ```python
 def is_on(
     state: ObjectCentricState,
@@ -105,6 +115,28 @@ def is_on(
     return True
 ```
 
+**Physics Integration**: Since this environment uses PyMunk physics simulation, objects have realistic dynamics including:
+- Gravity (objects fall if not supported)
+- Friction between surfaces
+- Collision response and momentum transfer
+- Realistic grasping and manipulation dynamics
+
 
 ### References
-This is a physics-based version of manipulation environments commonly used in robotics research. It extends the geometric obstruction environment to include realistic physics simulation using PyMunk, enabling more realistic robot manipulation scenarios.
+This is a physics-based version of manipulation environments commonly used in robotics research. It extends the geometric obstruction environment to include realistic physics simulation using PyMunk.
+
+**Key Features**:
+- **PyMunk Physics Engine**: Provides realistic 2D rigid body dynamics
+- **Dynamic Objects**: Target and obstruction blocks have mass, inertia, and respond to forces
+- **Kinematic Robot**: Multi-DOF robot with base movement, arm extension, and gripper control
+- **Collision Detection**: Physics-based collision handling for grasping and object interactions
+- **Gravity Simulation**: Objects fall and settle naturally under gravitational forces
+
+**Research Applications**:
+- Robot manipulation learning with realistic physics
+- Grasping and placement strategy development  
+- Multi-object interaction scenarios
+- Physics-aware motion planning validation
+- Comparative studies between geometric and physics-based environments
+
+This environment enables more realistic evaluation of manipulation policies compared to purely geometric versions, as agents must account for momentum, friction, and gravitational effects.
