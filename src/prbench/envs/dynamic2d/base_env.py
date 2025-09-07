@@ -76,8 +76,8 @@ class Dynamic2DRobotEnvSpec:
 
     # Physics parameters
     gravity_y: float = -9.8
-    control_freq: int = 10  # Control frequency (actions per second)
-    sim_freq: int = 120  # Simulation frequency (rendering per second)
+    control_hz: int = 10  # Control frequency (fps in rendering)
+    sim_hz: int = 100  # Simulation frequency (dt in simulation)
 
     # For rendering.
     render_dpi: int = 50
@@ -257,12 +257,10 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         self._add_state_to_space(self.full_state)
 
         # Calculate simulation parameters
-        dt = 1.0 / self._spec.control_freq
-        n_steps = self._spec.sim_freq // self._spec.control_freq
-
+        dt = 1.0 / self._spec.sim_hz
         # Stepping physics to let things settle
         assert self.pymunk_space is not None, "Space not initialized"
-        for _ in range(n_steps):
+        for _ in range(self._spec.sim_hz):
             self.pymunk_space.step(dt)
 
         observation = self._get_obs()
@@ -278,8 +276,9 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         assert self.robot is not None, "Robot not initialized"
 
         # Calculate simulation parameters
-        n_steps = self._spec.sim_freq // self._spec.control_freq
-        dt = 1.0 / self._spec.control_freq
+        sim_dt = 1.0 / self._spec.sim_hz
+        control_dt = 1.0 / self._spec.control_hz
+        n_steps = self._spec.sim_hz // self._spec.control_hz
 
         # Calculate target positions
         tgt_x = self.robot.base_pose.x + dx
@@ -299,13 +298,14 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             # Use PD control to compute base and gripper velocities
             base_vel, base_ang_vel, gripper_base_vel, finger_vel = (
                 self.pd_controller.compute_control(
-                    self.robot, tgt_x, tgt_y, tgt_theta, tgt_arm, tgt_gripper, dt
+                    self.robot, tgt_x, tgt_y, tgt_theta, tgt_arm, tgt_gripper, control_dt
                 )
             )
             # Update robot with the vel (PD control updates velocities)
             self.robot.update(base_vel, base_ang_vel, gripper_base_vel, finger_vel)
-            # Step physics simulation
-            self.pymunk_space.step(dt)
+            # Step physics simulation (more fine-grained than control freq)
+            for _ in range(self._spec.sim_hz // n_steps):
+                self.pymunk_space.step(sim_dt)
 
         # Drop objects after internal steps
         if self.robot.is_opening_finger:

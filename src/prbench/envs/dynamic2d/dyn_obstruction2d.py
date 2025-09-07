@@ -93,7 +93,7 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
     # Table hyperparameters.
     table_rgb: tuple[float, float, float] = (0.75, 0.75, 0.75)
-    table_height: float = 0.1
+    table_height: float = 0.2
     table_width: float = world_max_x - world_min_x
     # The table pose is defined at the center
     table_pose: SE2Pose = SE2Pose(
@@ -124,12 +124,12 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
         ),
     )
     target_block_height_bounds: tuple[float, float] = (
-        robot_base_radius / 2,
-        2 * robot_base_radius,
+        0.2,
+        0.2,
     )
     target_block_width_bounds: tuple[float, float] = (
-        robot_base_radius / 2,
-        2 * robot_base_radius,
+        0.2,
+        0.2,
     )
     target_block_mass: float = 1.0
 
@@ -425,6 +425,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                     shape = pymunk.Poly(b2, vs)
                     shape.friction = 1.0
                     shape.density = 1.0
+                    shape.mass = 1.0
                     shape.elasticity = 0.99
                     shape.collision_type = STATIC_COLLISION_TYPE
                     self.pymunk_space.add(b2, shape)
@@ -435,7 +436,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                     # Dynamic objects
                     mass = state.get(obj, "mass")
                     moment = pymunk.moment_for_box(mass, (width, height))
-                    body = pymunk.Body(mass, moment)
+                    body = pymunk.Body()
                     vs = [
                         (-width / 2, -height / 2),
                         (-width / 2, height / 2),
@@ -446,6 +447,9 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                     shape.friction = 1.0
                     shape.density = 1.0
                     shape.collision_type = DYNAMIC_COLLISION_TYPE
+                    shape.mass = mass
+                    shape.body.moment = moment
+                    shape.body.mass = mass
                     self.pymunk_space.add(body, shape)
                     body.position = x, y
                     body.angle = theta
