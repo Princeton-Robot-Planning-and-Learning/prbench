@@ -3,9 +3,9 @@
 # import imageio.v2 as iio
 import numpy as np
 from gymnasium.spaces import Box
+from relational_structs import ObjectCentricState
 
 import prbench
-from relational_structs import ObjectCentricState
 
 
 def test_dyn_obstruction2d_observation_space():
@@ -23,7 +23,7 @@ def test_dyn_obstruction2d_action_space():
     prbench.register_all_environments()
     env = prbench.make("prbench/DynObstruction2D-o3-v0")
     obs, _ = env.reset(seed=0)
-    statble_move = np.array([0.05, 0.05, np.pi / 16, 0.0, 0.0], dtype=np.float32)
+    stable_move = np.array([0.05, 0.05, np.pi / 16, 0.0, 0.0], dtype=np.float32)
     # Check the control precision of base movements
     for s in range(5):
         obs, _ = env.reset(seed=s)
@@ -35,21 +35,27 @@ def test_dyn_obstruction2d_action_space():
         robot_theta = state.get(robot_object, "theta")
         robot_arm_length = state.get(robot_object, "arm_length")
         robot_finger_gap = state.get(robot_object, "finger_gap")
-        obs_, _, _, _, _ = env.step(statble_move)
+        obs_, _, _, _, _ = env.step(stable_move)
         state_: ObjectCentricState = env.observation_space.devectorize(obs_)
         robot_x_ = state_.get(robot_object, "x")
         robot_y_ = state_.get(robot_object, "y")
         robot_theta_ = state_.get(robot_object, "theta")
         robot_arm_length_ = state_.get(robot_object, "arm_length")
         robot_finger_gap_ = state_.get(robot_object, "finger_gap")
-        assert np.isclose(robot_x + statble_move[0], robot_x_, atol=1e-3)
-        assert np.isclose(robot_y + statble_move[1], robot_y_, atol=1e-3)
-        assert np.isclose(robot_theta + statble_move[2], robot_theta_, atol=1e-2) # 0.5 degree
-        assert np.isclose(robot_arm_length + statble_move[3], robot_arm_length_, atol=1e-3)
-        assert np.isclose(robot_finger_gap - statble_move[4], robot_finger_gap_, atol=1e-3)
+        assert np.isclose(robot_x + stable_move[0], robot_x_, atol=1e-3)
+        assert np.isclose(robot_y + stable_move[1], robot_y_, atol=1e-3)
+        assert np.isclose(
+            robot_theta + stable_move[2], robot_theta_, atol=1e-2
+        )  # 0.5 degree
+        assert np.isclose(
+            robot_arm_length + stable_move[3], robot_arm_length_, atol=1e-3
+        )
+        assert np.isclose(
+            robot_finger_gap - stable_move[4], robot_finger_gap_, atol=1e-3
+        )
 
     obs, _ = env.reset(seed=0)
-    statble_move = np.array([0.0, 0.0, 0.0, 0.05, -0.02], dtype=np.float32)
+    stable_move = np.array([0.0, 0.0, 0.0, 0.05, -0.02], dtype=np.float32)
     # Check the control precision of base movements
     for s in [1, 2]:
         obs, _ = env.reset(seed=s)
@@ -61,18 +67,25 @@ def test_dyn_obstruction2d_action_space():
         robot_theta = state.get(robot_object, "theta")
         robot_arm_length = state.get(robot_object, "arm_joint")
         robot_finger_gap = state.get(robot_object, "finger_gap")
-        obs_, _, _, _, _ = env.step(statble_move)
+        obs_, _, _, _, _ = env.step(stable_move)
         state_: ObjectCentricState = env.observation_space.devectorize(obs_)
         robot_x_ = state_.get(robot_object, "x")
         robot_y_ = state_.get(robot_object, "y")
         robot_theta_ = state_.get(robot_object, "theta")
         robot_arm_length_ = state_.get(robot_object, "arm_joint")
         robot_finger_gap_ = state_.get(robot_object, "finger_gap")
-        assert np.isclose(robot_x + statble_move[0], robot_x_, atol=1e-3)
-        assert np.isclose(robot_y + statble_move[1], robot_y_, atol=1e-3)
-        assert np.isclose(robot_theta + statble_move[2], robot_theta_, atol=1e-2) # 0.5 degree
-        assert np.isclose(robot_arm_length + statble_move[3], robot_arm_length_, atol=1e-3)
-        assert np.isclose(robot_finger_gap + statble_move[4], robot_finger_gap_, atol=1e-3)
+        assert np.isclose(robot_x + stable_move[0], robot_x_, atol=1e-3)
+        assert np.isclose(robot_y + stable_move[1], robot_y_, atol=1e-3)
+        assert np.isclose(
+            robot_theta + stable_move[2], robot_theta_, atol=1e-2
+        )  # 0.5 degree
+        assert np.isclose(
+            robot_arm_length + stable_move[3], robot_arm_length_, atol=1e-3
+        )
+        assert np.isclose(
+            robot_finger_gap + stable_move[4], robot_finger_gap_, atol=1e-3
+        )
+
 
 def test_dyn_obstruction2d_different_obstruction_counts():
     """Tests that different numbers of obstructions work."""

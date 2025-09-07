@@ -19,8 +19,6 @@ Dynamic2DRobotEnvTypeFeatures[Dynamic2DType] = [
     "vy",
     "omega",
     "static",
-    "kinematic",
-    "dynamic",
     "color_r",
     "color_g",
     "color_b",
@@ -28,20 +26,19 @@ Dynamic2DRobotEnvTypeFeatures[Dynamic2DType] = [
 ]
 # Specific types.
 # For kinematic and static blocks, they don't have mass and moment.
-RectangleType = Type("rectangle", parent=Dynamic2DType)
-Dynamic2DRobotEnvTypeFeatures[RectangleType] = Dynamic2DRobotEnvTypeFeatures[
+KinRectangleType = Type("rectangle", parent=Dynamic2DType)
+Dynamic2DRobotEnvTypeFeatures[KinRectangleType] = Dynamic2DRobotEnvTypeFeatures[
     Dynamic2DType
 ] + [
     "width",
     "height",
 ]
 # For dynamic blocks, they have mass and moment of inertia.
-DynRectangleType = Type("dyn_rectangle", parent=RectangleType)
+DynRectangleType = Type("dyn_rectangle", parent=KinRectangleType)
 Dynamic2DRobotEnvTypeFeatures[DynRectangleType] = Dynamic2DRobotEnvTypeFeatures[
-    RectangleType
+    KinRectangleType
 ] + [
     "mass",
-    "moment",
 ]
 
 # A robot with a circle base, a rectangle gripper_base, and two rectangle grippers.

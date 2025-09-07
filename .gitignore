@@ -171,3 +171,5 @@ cython_debug/
 src/prbench/envs/tidybot/tidybot_robot_env.xml
 scripts/tidybot/debug/
 unit_test_videos
+.vscode/
+debug.png

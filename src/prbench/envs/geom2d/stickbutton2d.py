@@ -18,15 +18,12 @@ from prbench.envs.geom2d.object_types import (
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
 )
-from prbench.envs.geom2d.structs import ZOrder
+from prbench.envs.geom2d.structs import SE2Pose, ZOrder
 from prbench.envs.geom2d.utils import (
-    BLACK,
     CRVRobotActionSpace,
-    SE2Pose,
     create_walls_from_world_boundaries,
-    sample_se2_pose,
-    state_has_collision,
 )
+from prbench.envs.utils import BLACK, sample_se2_pose, state_2d_has_collision
 
 
 @dataclass(frozen=True)
@@ -155,7 +152,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
             stick = obj_name_to_obj["stick"]
             full_state = state.copy()
             full_state.data.update(self._initial_constant_state.data)
-            if not state_has_collision(full_state, {stick}, set(full_state), {}):
+            if not state_2d_has_collision(full_state, {stick}, set(full_state), {}):
                 break
         else:
             raise RuntimeError("Failed to sample target pose.")
@@ -179,7 +176,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
                 new_button = obj_name_to_obj[f"button{len(button_positions)}"]
                 full_state = state.copy()
                 full_state.data.update(self._initial_constant_state.data)
-                if not state_has_collision(
+                if not state_2d_has_collision(
                     full_state, {new_button}, set(full_state), {}
                 ):
                     button_positions.append(button_position)
@@ -313,7 +310,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         full_state = self._current_state.copy()
         full_state.data.update(self._initial_constant_state.data)
         for button in self._current_state.get_objects(CircleType):
-            if state_has_collision(
+            if state_2d_has_collision(
                 full_state,
                 {button},
                 {robot, stick},

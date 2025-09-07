@@ -3,38 +3,34 @@
 import math
 from typing import Any
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pymunk
 from gymnasium.spaces import Box
 from numpy.typing import NDArray
-from prpl_utils.utils import fig2data
 from pymunk.vec2d import Vec2d
 from relational_structs import Object, ObjectCentricState
-from tomsgeoms2d.structs import Circle, Geom2D, Rectangle
+from tomsgeoms2d.structs import Circle, Rectangle
 
 from prbench.envs.dynamic2d.object_types import (
-    Dynamic2DType,
+    KinRectangleType,
     KinRobotType,
-    RectangleType,
 )
 from prbench.envs.geom2d.structs import (
     Body2D,
     MultiBody2D,
     SE2Pose,
     ZOrder,
-    z_orders_may_collide,
 )
-from prbench.envs.geom2d.utils import geom2ds_intersect
+from prbench.envs.utils import (
+    BLACK,
+    PURPLE,
+)
 
 # Collision types from the basic_pymunk.py script
 STATIC_COLLISION_TYPE = 0
 DYNAMIC_COLLISION_TYPE = 1
 ROBOT_COLLISION_TYPE = 2
 HELD_OBJECT_COLLISION_TYPE = 3
-
-PURPLE: tuple[float, float, float] = (128 / 255, 0 / 255, 128 / 255)
-BLACK: tuple[float, float, float] = (0.1, 0.1, 0.1)
 
 
 class KinRobotActionSpace(Box):
@@ -87,7 +83,19 @@ class KinRobotActionSpace(Box):
 
 
 class KinRobot:
-    """Robot implementation using PyMunk physics engine with PD control."""
+    """Robot implementation using PyMunk physics engine with four bodies.
+
+    The robot has a circular base, a rectangular gripper base, and two rectangular
+    fingers. The gripper base is attached to the robot base via a kinematic arm that can
+    extend and retract. The fingers can open and close to grasp objects.
+
+    The robot can held objects by closing the fingers around them.
+
+    The robot will be revert to the last valid state when colliding with static objects.
+
+    The robot is controlled via setting the velocities of the bodies, which can be
+    computed using a PD controller.
+    """
 
     def __init__(
         self,
@@ -98,10 +106,8 @@ class KinRobot:
         gripper_base_height: float = 0.1,
         gripper_finger_width: float = 0.1,
         gripper_finger_height: float = 0.01,
-        kp_pos: float = 100.0,
-        kv_pos: float = 20.0,
-        kp_rot: float = 80.0,
-        kv_rot: float = 10.0,
+        finger_move_thresh: float = 0.001,
+        grasping_theta_thresh: float = 0.1,
     ) -> None:
         # Robot parameters
         self.base_radius = base_radius
@@ -111,12 +117,8 @@ class KinRobot:
         self.gripper_finger_height = gripper_finger_height
         self.arm_length_max = arm_length_max
         self.gripper_gap_max = gripper_base_height
-
-        # PD Control parameters
-        self.kp_pos = kp_pos
-        self.kv_pos = kv_pos
-        self.kp_rot = kp_rot
-        self.kv_rot = kv_rot
+        self.finger_move_thresh = finger_move_thresh
+        self.grasping_theta_thresh = grasping_theta_thresh
 
         # Track last robot state
         self._base_position = init_pos
@@ -127,7 +129,7 @@ class KinRobot:
         self.is_opening_finger = False
         self.is_closing_finger = False
 
-        # Body and shape references (Protected)
+        # Body and shape references
         self.create_base()
         self.create_gripper_base()
         self._left_finger_body, self._left_finger_shape = self.create_finger()
@@ -289,14 +291,18 @@ class KinRobot:
         arm_length: float,
         gripper_gap: float,
     ) -> None:
-        """Reset robot to specified positions."""
+        """Reset robot to specified positions with zero velocity."""
         self._base_body.position = (base_x, base_y)
+        self._base_body.velocity = (0.0, 0.0)
         self._base_body.angle = base_theta
+        self._base_body.angular_velocity = 0.0
 
         base_to_gripper = SE2Pose(x=arm_length, y=0.0, theta=0.0)
         gripper_pose = self.base_pose * base_to_gripper
         self._gripper_base_body.position = (gripper_pose.x, gripper_pose.y)
+        self._gripper_base_body.velocity = (0.0, 0.0)
         self._gripper_base_body.angle = gripper_pose.theta
+        self._gripper_base_body.angular_velocity = 0.0
 
         gripper_to_left_finger = SE2Pose(
             x=self.gripper_finger_width / 2,
@@ -305,7 +311,9 @@ class KinRobot:
         )
         left_finger_pose = gripper_pose * gripper_to_left_finger
         self._left_finger_body.position = (left_finger_pose.x, left_finger_pose.y)
+        self._left_finger_body.velocity = (0.0, 0.0)
         self._left_finger_body.angle = left_finger_pose.theta
+        self._left_finger_body.angular_velocity = 0.0
         gripper_to_right_finger = SE2Pose(
             x=self.gripper_finger_width / 2,
             y=-self.gripper_base_height / 2,
@@ -313,12 +321,14 @@ class KinRobot:
         )
         right_finger_pose = gripper_pose * gripper_to_right_finger
         self._right_finger_body.position = (right_finger_pose.x, right_finger_pose.y)
+        self._right_finger_body.velocity = (0.0, 0.0)
         self._right_finger_body.angle = right_finger_pose.theta
+        self._right_finger_body.angular_velocity = 0.0
 
         # Update last state
         self.update_last_state()
 
-    def reset_last_state(self) -> None:
+    def revert_to_last_state(self) -> None:
         """Reset to last state when collide with static objects."""
         self._base_body.position = self._base_position
         self._base_body.angle = self._base_angle
@@ -402,10 +412,10 @@ class KinRobot:
         # Update finger opening/closing status
         rel_vel = finger_vel_l - gripper_base_vel
         rel_vel.rotated(-self._gripper_base_body.angle)
-        if rel_vel.y > 0.01:
+        if rel_vel.y > self.finger_move_thresh:
             self.is_opening_finger = True
             self.is_closing_finger = False
-        elif rel_vel.y < -0.01:
+        elif rel_vel.y < -self.finger_move_thresh:
             self.is_closing_finger = True
             self.is_opening_finger = False
         else:
@@ -433,7 +443,7 @@ class KinRobot:
             return False
         dtheta = abs(self._gripper_base_body.angle - normal.angle)
         dtheta = min(dtheta, 2 * np.pi - dtheta)
-        theta_ok = abs(dtheta - np.pi / 2) < 0.1
+        theta_ok = abs(dtheta - np.pi / 2) < self.grasping_theta_thresh
         if not theta_ok:
             return False
         # Checker 2: If the body is within the grasping area
@@ -524,7 +534,7 @@ class PDController:
         g_curr = robot.curr_gripper  # opening distance
         finger_vel_abs_w = robot.finger_vels["left"][0]  # Vec2d
 
-        # === 1) Base PD (same as yours, but keep structure tidy) ===
+        # === 1) Base PD ===
         base_pos_tgt = Vec2d(tgt_x, tgt_y)
         a_base_lin = self.kp_pos * (base_pos_tgt - base_pos_curr) + self.kv_pos * (
             Vec2d(0, 0) - base_vel_curr
@@ -591,61 +601,7 @@ class PDController:
         return base_vel, base_ang_vel, v_gripper_base, finger_vel_l
 
 
-def rectangle_object_to_geom(
-    state: ObjectCentricState,
-    rect_obj: Object,
-    static_object_cache: dict[Object, MultiBody2D],
-) -> Rectangle:
-    """Helper to extract a rectangle for an object."""
-    assert rect_obj.is_instance(RectangleType)
-    multibody = object_to_multibody2d(rect_obj, state, static_object_cache)
-    assert len(multibody.bodies) == 1
-    geom = multibody.bodies[0].geom
-    assert isinstance(geom, Rectangle)
-    return geom
-
-
-def object_to_multibody2d(
-    obj: Object,
-    state: ObjectCentricState,
-    static_object_cache: dict[Object, MultiBody2D],
-) -> MultiBody2D:
-    """Create a Body2D instance for objects of standard geom types.
-
-    This is borrowed from Geom2D
-    """
-    if obj.is_instance(KinRobotType):
-        return _robot_to_multibody2d(obj, state)
-    assert obj.is_instance(Dynamic2DType)
-    is_static = state.get(obj, "static") > 0.5
-    if is_static and obj in static_object_cache:
-        return static_object_cache[obj]
-    geom: Geom2D  # rectangle or circle
-    if obj.is_instance(RectangleType):
-        x = state.get(obj, "x")
-        y = state.get(obj, "y")
-        width = state.get(obj, "width")
-        height = state.get(obj, "height")
-        theta = state.get(obj, "theta")
-        geom = Rectangle.from_center(x, y, width, height, theta)
-        z_order = ZOrder(int(state.get(obj, "z_order")))
-        rendering_kwargs = {
-            "facecolor": (
-                state.get(obj, "color_r"),
-                state.get(obj, "color_g"),
-                state.get(obj, "color_b"),
-            ),
-            "edgecolor": BLACK,
-        }
-        body = Body2D(geom, z_order, rendering_kwargs)
-        multibody = MultiBody2D(obj.name, [body])
-    else:
-        # For now, we only support RectangleType in Dynamic2D
-        raise NotImplementedError(f"Object type {obj.type} not supported in Dynamic2D")
-    return multibody
-
-
-def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D:
+def kin_robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D:
     """Helper for object_to_multibody2d()."""
     assert obj.is_instance(KinRobotType)
     bodies: list[Body2D] = []
@@ -727,7 +683,9 @@ def _robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D
     return multibody
 
 
-def on_gripper_grasp(arbiter: pymunk.Arbiter, space: pymunk.Space, robot: Any) -> None:
+def on_gripper_grasp(
+    arbiter: pymunk.Arbiter, space: pymunk.Space, robot: KinRobot
+) -> None:
     """Collision callback for gripper grasping objects."""
     print("Gripper Collision detected!")
     dynamic_body = arbiter.bodies[0]
@@ -748,13 +706,13 @@ def on_gripper_grasp(arbiter: pymunk.Arbiter, space: pymunk.Space, robot: Any) -
 
 
 def on_collision_w_static(
-    arbiter: pymunk.Arbiter, space: pymunk.Space, robot: Any
+    arbiter: pymunk.Arbiter, space: pymunk.Space, robot: KinRobot
 ) -> None:
     """Collision callback for robot colliding with static objects."""
     del arbiter
     del space
     print("Static Collision detected!")
-    robot.reset_last_state()
+    robot.revert_to_last_state()
 
 
 def create_walls_from_world_boundaries(
@@ -774,7 +732,7 @@ def create_walls_from_world_boundaries(
     """
     state_dict: dict[Object, dict[str, float]] = {}
     # Right wall.
-    right_wall = Object("right_wall", RectangleType)
+    right_wall = Object("right_wall", KinRectangleType)
     side_wall_height = world_max_y - world_min_y
     state_dict[right_wall] = {
         "x": world_max_x + max_dx,
@@ -786,15 +744,13 @@ def create_walls_from_world_boundaries(
         "theta": 0.0,
         "omega": 0.0,
         "static": True,
-        "kinematic": False,
-        "dynamic": False,
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
         "z_order": ZOrder.ALL.value,
     }
     # Left wall.
-    left_wall = Object("left_wall", RectangleType)
+    left_wall = Object("left_wall", KinRectangleType)
     state_dict[left_wall] = {
         "x": world_min_x + min_dx,
         "vx": 0.0,
@@ -805,15 +761,13 @@ def create_walls_from_world_boundaries(
         "theta": 0.0,
         "omega": 0.0,
         "static": True,
-        "kinematic": False,
-        "dynamic": False,
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
         "z_order": ZOrder.ALL.value,
     }
     # Top wall.
-    top_wall = Object("top_wall", RectangleType)
+    top_wall = Object("top_wall", KinRectangleType)
     horiz_wall_width = 2 * 2 * abs(min_dx) + world_max_x - world_min_x
     state_dict[top_wall] = {
         "x": (world_min_x + world_max_x) / 2,
@@ -825,15 +779,13 @@ def create_walls_from_world_boundaries(
         "theta": 0.0,
         "omega": 0.0,
         "static": True,
-        "kinematic": False,
-        "dynamic": False,
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
         "z_order": ZOrder.ALL.value,
     }
     # Bottom wall.
-    bottom_wall = Object("bottom_wall", RectangleType)
+    bottom_wall = Object("bottom_wall", KinRectangleType)
     state_dict[bottom_wall] = {
         "x": (world_min_x + world_max_x) / 2,
         "vx": 0.0,
@@ -844,70 +796,12 @@ def create_walls_from_world_boundaries(
         "theta": 0.0,
         "omega": 0.0,
         "static": True,
-        "kinematic": False,
-        "dynamic": False,
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
         "z_order": ZOrder.ALL.value,
     }
     return state_dict
-
-
-def state_has_collision(
-    state: ObjectCentricState,
-    group1: set[Object],
-    group2: set[Object],
-    static_object_cache: dict[Object, MultiBody2D],
-    ignore_z_orders: bool = False,
-) -> bool:
-    """Check for collisions between any objects in two groups."""
-    # Create multibodies once.
-    obj_to_multibody = {
-        o: object_to_multibody2d(o, state, static_object_cache) for o in state
-    }
-    # Check pairwise collisions.
-    for obj1 in group1:
-        for obj2 in group2:
-            if obj1 == obj2:
-                continue
-            multibody1 = obj_to_multibody[obj1]
-            multibody2 = obj_to_multibody[obj2]
-            for body1 in multibody1.bodies:
-                for body2 in multibody2.bodies:
-                    if not (
-                        ignore_z_orders
-                        or z_orders_may_collide(body1.z_order, body2.z_order)
-                    ):
-                        continue
-                    if geom2ds_intersect(body1.geom, body2.geom):
-                        return True
-    return False
-
-
-def is_on(
-    state: ObjectCentricState,
-    top: Object,
-    bottom: Object,
-    static_object_cache: dict[Object, MultiBody2D],
-    tol: float = 0.025,
-) -> bool:
-    """Checks top object is completely on the bottom one.
-
-    Only rectangles are currently supported.
-
-    Assumes that "up" is positive y.
-    """
-    top_geom = rectangle_object_to_geom(state, top, static_object_cache)
-    bottom_geom = rectangle_object_to_geom(state, bottom, static_object_cache)
-    # The bottom-most vertices of top_geom should be contained within the bottom
-    # geom when those vertices are offset by tol.
-    sorted_vertices = sorted(top_geom.vertices, key=lambda v: v[1])
-    for x, y in sorted_vertices[:2]:
-        offset_y = y - tol
-        if not bottom_geom.contains_point(x, offset_y):
-            return False
-    return True
 
 
 def get_fingered_robot_action_from_gui_input(
@@ -946,62 +840,5 @@ def get_fingered_robot_action_from_gui_input(
     # Open the gripper by default.
     if "space" in keys_pressed:
         action[4] = low[4]
-        
+
     return action
-
-
-def render_state_on_ax(
-    state: ObjectCentricState,
-    ax: plt.Axes,
-    static_object_body_cache: dict[Object, MultiBody2D] | None = None,
-) -> None:
-    """Render a state on an existing plt.Axes."""
-    if static_object_body_cache is None:
-        static_object_body_cache = {}
-
-    # Sort objects by ascending z order, with the robot first.
-    def _render_order(obj: Object) -> int:
-        if obj.is_instance(KinRobotType):
-            return -1
-        if state.get(obj, "static"):
-            return 1000
-        return int(state.get(obj, "z_order"))
-
-    for obj in sorted(state, key=_render_order):
-        body = object_to_multibody2d(obj, state, static_object_body_cache)
-        body.plot(ax)
-
-
-def render_state(
-    state: ObjectCentricState,
-    static_object_body_cache: dict[Object, MultiBody2D] | None = None,
-    world_min_x: float = 0.0,
-    world_max_x: float = 10.0,
-    world_min_y: float = 0.0,
-    world_max_y: float = 10.0,
-    render_dpi: int = 150,
-) -> NDArray[np.uint8]:
-    """Render a state.
-
-    Useful for viz and debugging.
-    """
-    if static_object_body_cache is None:
-        static_object_body_cache = {}
-
-    figsize = (
-        world_max_x - world_min_x,
-        world_max_y - world_min_y,
-    )
-    fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=render_dpi)
-
-    render_state_on_ax(state, ax, static_object_body_cache)
-
-    pad_x = (world_max_x - world_min_x) / 25
-    pad_y = (world_max_y - world_min_y) / 25
-    ax.set_xlim(world_min_x - pad_x, world_max_x + pad_x)
-    ax.set_ylim(world_min_y - pad_y, world_max_y + pad_y)
-    ax.axis("off")
-    plt.tight_layout()
-    img = fig2data(fig)
-    plt.close()
-    return img
