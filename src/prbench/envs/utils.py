@@ -8,16 +8,13 @@ from relational_structs import (
     Object,
     ObjectCentricState,
 )
-from tomsgeoms2d.structs import Circle, Geom2D, Rectangle
+from tomsgeoms2d.structs import Circle, Geom2D, Lobject, Rectangle
 from tomsgeoms2d.utils import geom2ds_intersect
 
 from prbench.envs.dynamic2d.object_types import (
     DynRectangleType,
     KinRectangleType,
     KinRobotType,
-)
-from prbench.envs.dynamic2d.utils import (
-    kin_robot_to_multibody2d,
 )
 from prbench.envs.geom2d.object_types import (
     CircleType,
@@ -32,11 +29,6 @@ from prbench.envs.geom2d.structs import (
     SE2Pose,
     ZOrder,
     z_orders_may_collide,
-)
-from prbench.envs.geom2d.utils import (
-    crv_robot_to_multibody2d,
-    geom2d_double_rectangle_to_multibody2d,
-    geom2d_lobject_to_multibody2d,
 )
 
 PURPLE: tuple[float, float, float] = (128 / 255, 0 / 255, 128 / 255)
@@ -114,7 +106,7 @@ def render_2dstate_on_ax(
 
     # Sort objects by ascending z order, with the robot first.
     def _render_order(obj: Object) -> int:
-        if obj.is_instance(CRVRobotType):
+        if obj.is_instance(CRVRobotType) or obj.is_instance(KinRobotType):
             return -1
         return int(state.get(obj, "z_order"))
 
@@ -156,6 +148,298 @@ def render_2dstate(
     img = fig2data(fig)
     plt.close()
     return img
+
+
+# ****** State to MultiBody2D conversion helpers ******
+
+
+def kin_robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D:
+    """Helper for object_to_multibody2d()."""
+    assert obj.is_instance(KinRobotType)
+    bodies: list[Body2D] = []
+
+    # Base.
+    base_x = state.get(obj, "x")
+    base_y = state.get(obj, "y")
+    base_radius = state.get(obj, "base_radius")
+    circ = Circle(
+        x=base_x,
+        y=base_y,
+        radius=base_radius,
+    )
+    z_order = ZOrder.ALL
+    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
+    base = Body2D(circ, z_order, rendering_kwargs, name="base")
+    bodies.append(base)
+
+    # Gripper Base
+    theta = state.get(obj, "theta")
+    arm_joint = state.get(obj, "arm_joint")
+    gripper_base_cx = base_x + np.cos(theta) * arm_joint
+    gripper_base_cy = base_y + np.sin(theta) * arm_joint
+    gripper_base_height = state.get(obj, "gripper_base_height")
+    gripper_base_width = state.get(obj, "gripper_base_width")
+    rect = Rectangle.from_center(
+        center_x=gripper_base_cx,
+        center_y=gripper_base_cy,
+        height=gripper_base_height,
+        width=gripper_base_width,
+        rotation_about_center=theta,
+    )
+    z_order = ZOrder.ALL
+    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
+    gripper_base = Body2D(rect, z_order, rendering_kwargs, name="gripper_base")
+    gripper_base_pose = SE2Pose(
+        x=gripper_base_cx,
+        y=gripper_base_cy,
+        theta=theta,
+    )
+    bodies.append(gripper_base)
+
+    # Fingers
+    relative_dx = state.get(obj, "finger_width") / 2
+    relative_dy_r = -gripper_base_height / 2
+    relative_dy_l = state.get(obj, "finger_gap") - gripper_base_height / 2
+    finger_r_pose = gripper_base_pose * SE2Pose(
+        x=relative_dx,
+        y=relative_dy_r,
+        theta=0.0,
+    )
+    finger_l_pose = gripper_base_pose * SE2Pose(
+        x=relative_dx,
+        y=relative_dy_l,
+        theta=0.0,
+    )
+    finger_r = Rectangle.from_center(
+        center_x=finger_r_pose.x,
+        center_y=finger_r_pose.y,
+        height=state.get(obj, "finger_height"),
+        width=state.get(obj, "finger_width"),
+        rotation_about_center=finger_r_pose.theta,
+    )
+    finger_l = Rectangle.from_center(
+        center_x=finger_l_pose.x,
+        center_y=finger_l_pose.y,
+        height=state.get(obj, "finger_height"),
+        width=state.get(obj, "finger_width"),
+        rotation_about_center=finger_l_pose.theta,
+    )
+    z_order = ZOrder.ALL
+    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
+    finger_l_body = Body2D(finger_r, z_order, rendering_kwargs, name="arm")
+    bodies.append(finger_l_body)
+    finger_r_body = Body2D(finger_l, z_order, rendering_kwargs, name="arm")
+    bodies.append(finger_r_body)
+
+    multibody = MultiBody2D(obj.name, bodies)
+    return multibody
+
+
+def crv_robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D:
+    """Helper for object_to_multibody2d()."""
+    assert obj.is_instance(CRVRobotType)
+    bodies: list[Body2D] = []
+
+    # Base.
+    base_x = state.get(obj, "x")
+    base_y = state.get(obj, "y")
+    base_radius = state.get(obj, "base_radius")
+    circ = Circle(
+        x=base_x,
+        y=base_y,
+        radius=base_radius,
+    )
+    z_order = ZOrder.ALL
+    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
+    base = Body2D(circ, z_order, rendering_kwargs, name="base")
+    bodies.append(base)
+
+    # Gripper.
+    theta = state.get(obj, "theta")
+    arm_joint = state.get(obj, "arm_joint")
+    gripper_cx = base_x + np.cos(theta) * arm_joint
+    gripper_cy = base_y + np.sin(theta) * arm_joint
+    gripper_height = state.get(obj, "gripper_height")
+    gripper_width = state.get(obj, "gripper_width")
+    rect = Rectangle.from_center(
+        center_x=gripper_cx,
+        center_y=gripper_cy,
+        height=gripper_height,
+        width=gripper_width,
+        rotation_about_center=theta,
+    )
+    z_order = ZOrder.SURFACE
+    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
+    gripper = Body2D(rect, z_order, rendering_kwargs, name="gripper")
+    bodies.append(gripper)
+
+    # Arm.
+    rect = Rectangle.from_center(
+        center_x=(base_x + gripper_cx) / 2,
+        center_y=(base_y + gripper_cy) / 2,
+        height=np.sqrt((base_x - gripper_cx) ** 2 + (base_y - gripper_cy) ** 2),
+        width=(0.5 * gripper_width),
+        rotation_about_center=(theta + np.pi / 2),
+    )
+    z_order = ZOrder.SURFACE
+    silver = (128 / 255, 128 / 255, 128 / 255)
+    rendering_kwargs = {"facecolor": silver, "edgecolor": BLACK}
+    arm = Body2D(rect, z_order, rendering_kwargs, name="arm")
+    bodies.append(arm)
+
+    # If the vacuum is on, add a suction area.
+    if state.get(obj, "vacuum") > 0.5:
+        suction_height = gripper_height
+        suction_width = gripper_width
+        suction_cx = base_x + np.cos(theta) * (
+            arm_joint + gripper_width + suction_width / 2
+        )
+        suction_cy = base_y + np.sin(theta) * (
+            arm_joint + gripper_width + suction_width / 2
+        )
+        rect = Rectangle.from_center(
+            center_x=suction_cx,
+            center_y=suction_cy,
+            height=suction_height,
+            width=suction_width,
+            rotation_about_center=theta,
+        )
+        z_order = ZOrder.NONE  # NOTE: suction collides with nothing
+        rendering_kwargs = {"facecolor": PURPLE}
+        suction = Body2D(rect, z_order, rendering_kwargs, name="suction")
+        bodies.append(suction)
+
+    return MultiBody2D(obj.name, bodies)
+
+
+def geom2d_lobject_to_multibody2d(
+    obj: Object, state: ObjectCentricState
+) -> MultiBody2D:
+    """Helper to create a MultiBody2D for an LObjectType object."""
+    assert obj.is_instance(LObjectType)
+    # Get parameters
+    x = state.get(obj, "x")
+    y = state.get(obj, "y")
+    theta = state.get(obj, "theta")
+    width = state.get(obj, "width")
+    length_side1 = state.get(obj, "length_side1")
+    length_side2 = state.get(obj, "length_side2")
+    color = (
+        state.get(obj, "color_r"),
+        state.get(obj, "color_g"),
+        state.get(obj, "color_b"),
+    )
+    z_order = ZOrder(int(state.get(obj, "z_order")))
+
+    geom = Lobject(x, y, width, (length_side1, length_side2), theta)
+
+    rendering_kwargs = {
+        "facecolor": color,
+        "edgecolor": BLACK,
+    }
+    body = Body2D(geom, z_order, rendering_kwargs, name="hook")
+
+    return MultiBody2D(obj.name, [body])
+
+
+def geom2d_double_rectangle_to_multibody2d(
+    obj: Object, state: ObjectCentricState
+) -> MultiBody2D:
+    """Helper to create a MultiBody2D for a DoubleRectType object."""
+    assert obj.is_instance(DoubleRectType)
+    # Note: We need to assume the two rectangles are aligned now.
+    # This means theta is the same, relative dy == 0, 0 <= dx < width0 - width1.
+    # Such that we can create two obstacles from the base rectangle.
+    bodies: list[Body2D] = []
+
+    # First rectangle.
+    x0 = state.get(obj, "x")
+    y0 = state.get(obj, "y")
+    theta0 = state.get(obj, "theta")
+    height0 = state.get(obj, "height")
+    width0 = state.get(obj, "width")
+    pose0 = SE2Pose(x0, y0, theta0)
+    # Second rectangle.
+    x1 = state.get(obj, "x1")
+    y1 = state.get(obj, "y1")
+    theta1 = state.get(obj, "theta1")
+    width1 = state.get(obj, "width1")
+    height1 = state.get(obj, "height1")
+    pose1 = SE2Pose(x1, y1, theta1)
+    assert theta0 == theta1, f"Expected theta0 == theta1, got {theta0} != {theta1}"
+    relative_pose = pose0.inverse * pose1
+    assert relative_pose.y == 0.0, f"Expected relative y == 0, got {relative_pose.y}"
+    assert relative_pose.x >= 0.0, f"Expected relative x >= 0, got {relative_pose.x}"
+    assert relative_pose.x + width1 < width0, "Expected relative x + width1 < width0"
+    right_bookend_width = width0 - width1 - relative_pose.x
+
+    # Left bookend.
+    geom0 = Rectangle(x0, y0, relative_pose.x, height0, theta0)
+    z_order0 = ZOrder(int(state.get(obj, "z_order")))
+    rendering_kwargs0 = {
+        "facecolor": (
+            state.get(obj, "color_r"),
+            state.get(obj, "color_g"),
+            state.get(obj, "color_b"),
+        ),
+        "edgecolor": BLACK,
+    }
+    body0 = Body2D(geom0, z_order0, rendering_kwargs0, name=f"{obj.name}_base0")
+    bodies.append(body0)
+    # Right bookend.
+    right_bookend_pose = pose0 * SE2Pose(relative_pose.x + width1, 0.0, theta0)
+    geom0_ = Rectangle(
+        right_bookend_pose.x, right_bookend_pose.y, right_bookend_width, height0, theta0
+    )
+    z_order0_ = ZOrder(int(state.get(obj, "z_order")))
+    rendering_kwargs0_ = {
+        "facecolor": (
+            state.get(obj, "color_r"),
+            state.get(obj, "color_g"),
+            state.get(obj, "color_b"),
+        ),
+        "edgecolor": BLACK,
+    }
+    body0_ = Body2D(geom0_, z_order0_, rendering_kwargs0_, name=f"{obj.name}_base1")
+    bodies.append(body0_)
+
+    # Second rectangle.
+    x1 = state.get(obj, "x1")
+    y1 = state.get(obj, "y1")
+    width1 = state.get(obj, "width1")
+    height1 = state.get(obj, "height1")
+    theta1 = state.get(obj, "theta1")
+    geom1 = Rectangle(x1, y1, width1, height1, theta1)
+    z_order1 = ZOrder(int(state.get(obj, "z_order1")))
+    rendering_kwargs1 = {
+        "facecolor": (
+            state.get(obj, "color_r1"),
+            state.get(obj, "color_g1"),
+            state.get(obj, "color_b1"),
+        ),
+        "edgecolor": BLACK,
+        "alpha": 0.5,
+    }
+    body1 = Body2D(geom1, z_order1, rendering_kwargs1, name=f"{obj.name}_part")
+    bodies.append(body1)
+
+    return MultiBody2D(obj.name, bodies)
+
+
+def double_rectangle_object_to_part_geom(
+    state: ObjectCentricState,
+    double_rect_obj: Object,
+    static_object_cache: dict[Object, MultiBody2D],
+) -> Rectangle:
+    """Helper to extract the second rectangle for a DoubleRectType object."""
+    assert double_rect_obj.is_instance(DoubleRectType)
+    multibody = object_to_multibody2d(double_rect_obj, state, static_object_cache)
+    assert len(multibody.bodies) == 3
+    # The second body is the "part" rectangle.
+    assert "part" in multibody.bodies[2].name
+    geom = multibody.bodies[2].geom
+    assert isinstance(geom, Rectangle)
+    return geom
 
 
 def object_to_multibody2d(

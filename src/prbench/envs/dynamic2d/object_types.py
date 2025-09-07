@@ -55,6 +55,7 @@ Dynamic2DRobotEnvTypeFeatures[KinRobotType] = [
     "vy",
     "theta",
     "omega",
+    "static",
     "base_radius",
     "arm_joint",
     "arm_length",

@@ -8,29 +8,23 @@ import pymunk
 from gymnasium.spaces import Box
 from numpy.typing import NDArray
 from pymunk.vec2d import Vec2d
-from relational_structs import Object, ObjectCentricState
-from tomsgeoms2d.structs import Circle, Rectangle
+from relational_structs import Object
 
 from prbench.envs.dynamic2d.object_types import (
     KinRectangleType,
-    KinRobotType,
 )
 from prbench.envs.geom2d.structs import (
-    Body2D,
-    MultiBody2D,
     SE2Pose,
     ZOrder,
 )
 from prbench.envs.utils import (
     BLACK,
-    PURPLE,
 )
 
 # Collision types from the basic_pymunk.py script
 STATIC_COLLISION_TYPE = 0
 DYNAMIC_COLLISION_TYPE = 1
 ROBOT_COLLISION_TYPE = 2
-HELD_OBJECT_COLLISION_TYPE = 3
 
 
 class KinRobotActionSpace(Box):
@@ -125,7 +119,9 @@ class KinRobot:
         self._base_angle = 0.0
         self._arm_length = base_radius
         self._gripper_gap = gripper_base_height
-        self.held_objects: list[tuple[pymunk.Body, SE2Pose]] = []
+        self.held_objects: list[
+            tuple[tuple[pymunk.Body, pymunk.Shape], float, SE2Pose]
+        ] = []
         self.is_opening_finger = False
         self.is_closing_finger = False
 
@@ -361,10 +357,11 @@ class KinRobot:
             self._right_finger_body.angle = right_finger_pose.theta
 
         # Update held objects
-        for obj, relative_pose in self.held_objects:
+        for obj, _, relative_pose in self.held_objects:
+            obj_body, _ = obj
             new_obj_pose = gripper_base_pose * relative_pose
-            obj.position = (new_obj_pose.x, new_obj_pose.y)
-            obj.angle = new_obj_pose.theta
+            obj_body.position = (new_obj_pose.x, new_obj_pose.y)
+            obj_body.angle = new_obj_pose.theta
 
     def update_last_state(self) -> None:
         """Update the last state tracking variables."""
@@ -387,7 +384,7 @@ class KinRobot:
         gripper_base_vel: Vec2d,
         finger_vel_l: Vec2d,
     ) -> None:
-        """Update the body velocities using PD control."""
+        """Update the body velocities."""
         # Update robot last state
         self.update_last_state()
         # Update velocities
@@ -405,9 +402,10 @@ class KinRobot:
         self._right_finger_body.angular_velocity = base_ang_vel
 
         # Update held objects - they have the same velocity as gripper base
-        for obj, _ in self.held_objects:
-            obj.velocity = self._gripper_base_body.velocity
-            obj.angular_velocity = self._gripper_base_body.angular_velocity
+        for obj, _, _ in self.held_objects:
+            obj_body, _ = obj
+            obj_body.velocity = self._gripper_base_body.velocity
+            obj_body.angular_velocity = self._gripper_base_body.angular_velocity
 
         # Update finger opening/closing status
         rel_vel = finger_vel_l - gripper_base_vel
@@ -421,13 +419,6 @@ class KinRobot:
         else:
             self.is_closing_finger = False
             self.is_opening_finger = False
-
-    def drop_held_objects(self, space: pymunk.Space) -> None:
-        """Drop held objects if gripper is opening."""
-        if self.is_opening_finger and len(self.held_objects) > 0:
-            for obj, _ in self.held_objects:
-                self.del_from_hand_space((obj, list(obj.shapes)[0]), space)
-            self.held_objects = []
 
     def is_grasping(
         self, contact_point_set: pymunk.ContactPointSet, tgt_body: pymunk.Body
@@ -452,11 +443,10 @@ class KinRobot:
         if (abs(rel_a.y) < self.gripper_base_height / 4) and (
             abs(rel_a.x) < self.gripper_finger_width
         ):
-            print("Grasped!")
             return True
         return False
 
-    def add_to_hand(self, obj: tuple[pymunk.Body, pymunk.Shape]) -> None:
+    def add_to_hand(self, obj: tuple[pymunk.Body, pymunk.Shape], mass: float) -> None:
         """Add an object to the robot's hand."""
         obj_body, _ = obj
         obj_pose = SE2Pose(
@@ -468,27 +458,7 @@ class KinRobot:
             theta=self._gripper_base_body.angle,
         )
         relative_obj_pose = gripper_base_pose.inverse * obj_pose
-        self.held_objects.append((obj_body, relative_obj_pose))
-
-    def del_from_hand_space(
-        self, obj: tuple[pymunk.Body, pymunk.Shape], space: pymunk.Space
-    ) -> None:
-        """Remove an object from hand and make it dynamic."""
-        mass = 1.0
-        kinematic_body, kinematic_shape = obj
-        points = kinematic_shape.get_vertices()
-        moment = pymunk.moment_for_poly(mass, points, (0, 0))
-        dynamic_body = pymunk.Body(mass, moment)
-        dynamic_body.position = kinematic_body.position
-        dynamic_body.velocity = kinematic_body.velocity  # Preserve velocity
-        dynamic_body.angular_velocity = kinematic_body.angular_velocity
-        dynamic_body.angle = kinematic_body.angle
-        shape = pymunk.Poly(dynamic_body, points)
-        shape.friction = 1
-        shape.density = 1.0
-        shape.collision_type = DYNAMIC_COLLISION_TYPE
-        space.add(dynamic_body, shape)
-        space.remove(kinematic_body, kinematic_shape)
+        self.held_objects.append((obj, mass, relative_obj_pose))
 
 
 class PDController:
@@ -601,93 +571,10 @@ class PDController:
         return base_vel, base_ang_vel, v_gripper_base, finger_vel_l
 
 
-def kin_robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBody2D:
-    """Helper for object_to_multibody2d()."""
-    assert obj.is_instance(KinRobotType)
-    bodies: list[Body2D] = []
-
-    # Base.
-    base_x = state.get(obj, "x")
-    base_y = state.get(obj, "y")
-    base_radius = state.get(obj, "base_radius")
-    circ = Circle(
-        x=base_x,
-        y=base_y,
-        radius=base_radius,
-    )
-    z_order = ZOrder.ALL
-    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
-    base = Body2D(circ, z_order, rendering_kwargs, name="base")
-    bodies.append(base)
-
-    # Gripper Base
-    theta = state.get(obj, "theta")
-    arm_joint = state.get(obj, "arm_joint")
-    gripper_base_cx = base_x + np.cos(theta) * arm_joint
-    gripper_base_cy = base_y + np.sin(theta) * arm_joint
-    gripper_base_height = state.get(obj, "gripper_base_height")
-    gripper_base_width = state.get(obj, "gripper_base_width")
-    rect = Rectangle.from_center(
-        center_x=gripper_base_cx,
-        center_y=gripper_base_cy,
-        height=gripper_base_height,
-        width=gripper_base_width,
-        rotation_about_center=theta,
-    )
-    z_order = ZOrder.SURFACE
-    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
-    gripper_base = Body2D(rect, z_order, rendering_kwargs, name="gripper_base")
-    gripper_base_pose = SE2Pose(
-        x=gripper_base_cx,
-        y=gripper_base_cy,
-        theta=theta,
-    )
-    bodies.append(gripper_base)
-
-    # Fingers
-    relative_dx = state.get(obj, "finger_width") / 2
-    relative_dy_r = -gripper_base_height / 2
-    relative_dy_l = state.get(obj, "finger_gap") - gripper_base_height / 2
-    finger_r_pose = gripper_base_pose * SE2Pose(
-        x=relative_dx,
-        y=relative_dy_r,
-        theta=0.0,
-    )
-    finger_l_pose = gripper_base_pose * SE2Pose(
-        x=relative_dx,
-        y=relative_dy_l,
-        theta=0.0,
-    )
-    finger_r = Rectangle.from_center(
-        center_x=finger_r_pose.x,
-        center_y=finger_r_pose.y,
-        height=state.get(obj, "finger_height"),
-        width=state.get(obj, "finger_width"),
-        rotation_about_center=finger_r_pose.theta,
-    )
-    finger_l = Rectangle.from_center(
-        center_x=finger_l_pose.x,
-        center_y=finger_l_pose.y,
-        height=state.get(obj, "finger_height"),
-        width=state.get(obj, "finger_width"),
-        rotation_about_center=finger_l_pose.theta,
-    )
-    z_order = ZOrder.SURFACE
-    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
-    finger_l_body = Body2D(finger_r, z_order, rendering_kwargs, name="arm")
-    bodies.append(finger_l_body)
-    finger_r_body = Body2D(finger_l, z_order, rendering_kwargs, name="arm")
-    bodies.append(finger_r_body)
-
-    multibody = MultiBody2D(obj.name, bodies)
-    return multibody
-
-
 def on_gripper_grasp(
     arbiter: pymunk.Arbiter, space: pymunk.Space, robot: KinRobot
 ) -> None:
     """Collision callback for gripper grasping objects."""
-    print("Gripper Collision detected!")
     dynamic_body = arbiter.bodies[0]
     if robot.is_grasping(arbiter.contact_point_set, dynamic_body):
         # Create a new kinematic object
@@ -698,9 +585,10 @@ def on_gripper_grasp(
         shape = pymunk.Poly(kinematic_body, points)
         shape.friction = 1
         shape.density = 1.0
-        shape.collision_type = HELD_OBJECT_COLLISION_TYPE
+        # Held object becomes part of the robot.
+        shape.collision_type = ROBOT_COLLISION_TYPE
         space.add(kinematic_body, shape)
-        robot.add_to_hand((kinematic_body, shape))
+        robot.add_to_hand((kinematic_body, shape), dynamic_body.mass)
         # Remove the dynamic body from the space
         space.remove(dynamic_body, arbiter.shapes[0])
 
@@ -711,7 +599,6 @@ def on_collision_w_static(
     """Collision callback for robot colliding with static objects."""
     del arbiter
     del space
-    print("Static Collision detected!")
     robot.revert_to_last_state()
 
 

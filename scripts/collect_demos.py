@@ -256,8 +256,8 @@ class DemoCollector:
                     some_action_input = True
 
         # Execute the actions.
-        # if some_action_input:
-        self.step_env()
+        if some_action_input:
+            self.step_env()
 
         return True
 
@@ -364,7 +364,6 @@ class DemoCollector:
         running = True
         while running:
             running = self.handle_events()
-            # for _ in range(5):  # render at a lower fps than env step
             self.render()
             self.clock.tick(self.render_fps)
 

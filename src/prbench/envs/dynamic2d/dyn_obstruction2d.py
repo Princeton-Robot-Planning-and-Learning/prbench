@@ -321,6 +321,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
             "vy": 0.0,
             "theta": robot_pose.theta,
             "omega": 0.0,
+            "static": False,
             "base_radius": self._spec.robot_base_radius,
             "arm_joint": self._spec.robot_base_radius,
             "arm_length": self._spec.robot_arm_length_max,
@@ -458,28 +459,33 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         state = self._current_state.copy()
 
         # Update dynamic object positions from PyMunk simulation
-        for obj, pymunk_body in self._state_obj_to_pymunk_body.items():
+        for obj in state:
             if state.get(obj, "static"):
                 continue
-            # Update object state from body
-            state.set(obj, "x", pymunk_body.position.x)
-            state.set(obj, "y", pymunk_body.position.y)
-            state.set(obj, "theta", pymunk_body.angle)
-            state.set(obj, "vx", pymunk_body.velocity.x)
-            state.set(obj, "vy", pymunk_body.velocity.y)
-            state.set(obj, "omega", pymunk_body.angular_velocity)
-
-        # Update robot state from its body
-        assert self.robot is not None, "Robot not initialized"
-        robot_obj = state.get_objects(KinRobotType)[0]
-        state.set(robot_obj, "x", self.robot.base_pose.x)
-        state.set(robot_obj, "y", self.robot.base_pose.y)
-        state.set(robot_obj, "theta", self.robot.base_pose.theta)
-        state.set(robot_obj, "vx", self.robot.base_vel[0].x)
-        state.set(robot_obj, "vy", self.robot.base_vel[0].y)
-        state.set(robot_obj, "omega", self.robot.base_vel[1])
-        state.set(robot_obj, "arm_joint", self.robot.curr_arm_length)
-        state.set(robot_obj, "finger_gap", self.robot.curr_gripper)
+            if obj.is_instance(KinRobotType):
+                # Update robot state from its body
+                assert self.robot is not None, "Robot not initialized"
+                robot_obj = state.get_objects(KinRobotType)[0]
+                state.set(robot_obj, "x", self.robot.base_pose.x)
+                state.set(robot_obj, "y", self.robot.base_pose.y)
+                state.set(robot_obj, "theta", self.robot.base_pose.theta)
+                state.set(robot_obj, "vx", self.robot.base_vel[0].x)
+                state.set(robot_obj, "vy", self.robot.base_vel[0].y)
+                state.set(robot_obj, "omega", self.robot.base_vel[1])
+                state.set(robot_obj, "arm_joint", self.robot.curr_arm_length)
+                state.set(robot_obj, "finger_gap", self.robot.curr_gripper)
+            else:
+                assert (
+                    obj in self._state_obj_to_pymunk_body
+                ), f"Object {obj.name} not found in pymunk body cache"
+                pymunk_body = self._state_obj_to_pymunk_body[obj]
+                # Update object state from body
+                state.set(obj, "x", pymunk_body.position.x)
+                state.set(obj, "y", pymunk_body.position.y)
+                state.set(obj, "theta", pymunk_body.angle)
+                state.set(obj, "vx", pymunk_body.velocity.x)
+                state.set(obj, "vy", pymunk_body.velocity.y)
+                state.set(obj, "omega", pymunk_body.angular_velocity)
 
         # Update the current state
         self._current_state = state

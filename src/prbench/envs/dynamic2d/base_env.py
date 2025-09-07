@@ -77,7 +77,7 @@ class Dynamic2DRobotEnvSpec:
     # Physics parameters
     gravity_y: float = -9.8
     control_freq: int = 10  # Control frequency (actions per second)
-    sim_freq: int = 120  # Simulation frequency (physics steps per second)
+    sim_freq: int = 120  # Simulation frequency (rendering per second)
 
     # For rendering.
     render_dpi: int = 50
@@ -234,10 +234,10 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         # Clear existing physics space
         if self.pymunk_space:
             # Remove all bodies and shapes
-            for body in self.pymunk_space.bodies:
-                for shape in body.shapes:
+            for body in list(self.pymunk_space.bodies):
+                for shape in list(body.shapes):
                     self.pymunk_space.remove(body, shape)
-            for shape in self.pymunk_space.shapes:
+            for shape in list(self.pymunk_space.shapes):
                 # Some shapes are not attached to bodies (e.g., static lines)
                 self.pymunk_space.remove(shape)
 
@@ -306,8 +306,27 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             self.robot.update(base_vel, base_ang_vel, gripper_base_vel, finger_vel)
             # Step physics simulation
             self.pymunk_space.step(dt)
-        # Drop objects after internal steps (like basic_pymunk.py)
-        self.robot.drop_held_objects(self.pymunk_space)
+
+        # Drop objects after internal steps
+        if self.robot.is_opening_finger:
+            # Note: need to update self._state_obj_to_pymunk_body later.
+            for kin_obj, mass, _ in self.robot.held_objects:
+                kinematic_body, kinematic_shape = kin_obj
+                points = kinematic_shape.get_vertices()
+                moment = pymunk.moment_for_poly(mass, points, (0, 0))
+                dynamic_body = pymunk.Body(mass, moment)
+                dynamic_body.position = kinematic_body.position
+                dynamic_body.velocity = kinematic_body.velocity  # Preserve velocity
+                dynamic_body.angular_velocity = kinematic_body.angular_velocity
+                dynamic_body.angle = kinematic_body.angle
+                shape = pymunk.Poly(dynamic_body, points)
+                shape.friction = 1.0
+                shape.density = 1.0
+                shape.collision_type = DYNAMIC_COLLISION_TYPE
+                self.pymunk_space.add(dynamic_body, shape)
+                self.pymunk_space.remove(kinematic_body, kinematic_shape)
+            self.robot.held_objects = []
+        # Note: need to update self._state_obj_to_pymunk_body later if grasping happens.
 
         reward, terminated = self._get_reward_and_done()
         truncated = False  # no maximum horizon, by default
