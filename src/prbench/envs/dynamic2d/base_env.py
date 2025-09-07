@@ -76,6 +76,7 @@ class Dynamic2DRobotEnvSpec:
 
     # Physics parameters
     gravity_y: float = -9.8
+    collision_slop: float = 0.001  # Allow small interpenetration, depends on env scale
     control_hz: int = 10  # Control frequency (fps in rendering)
     sim_hz: int = 100  # Simulation frequency (dt in simulation)
 
@@ -138,6 +139,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         """Set up the PyMunk physics space."""
         self.pymunk_space = pymunk.Space()
         self.pymunk_space.gravity = 0, self._spec.gravity_y
+        self.pymunk_space.collision_slop = self._spec.collision_slop
 
         # Create robot
         self.robot = KinRobot(
@@ -304,8 +306,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             # Update robot with the vel (PD control updates velocities)
             self.robot.update(base_vel, base_ang_vel, gripper_base_vel, finger_vel)
             # Step physics simulation (more fine-grained than control freq)
-            for _ in range(self._spec.sim_hz // n_steps):
-                self.pymunk_space.step(sim_dt)
+            self.pymunk_space.step(sim_dt)
 
         # Drop objects after internal steps
         if self.robot.is_opening_finger:
