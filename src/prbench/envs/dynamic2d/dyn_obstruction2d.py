@@ -66,12 +66,12 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
     # Robot parameters
     init_robot_pos: tuple[float, float] = (0.5, 0.5)
-    robot_base_radius: float = 0.1
+    robot_base_radius: float = 0.15
     robot_arm_length_max: float = 2 * robot_base_radius
-    gripper_base_width: float = 0.01
-    gripper_base_height: float = 0.1
+    gripper_base_width: float = 0.03
+    gripper_base_height: float = 0.2
     gripper_finger_width: float = 0.1
-    gripper_finger_height: float = 0.01
+    gripper_finger_height: float = 0.03
 
     # Action space parameters.
     min_dx: float = -5e-2
@@ -93,7 +93,7 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
     # Table hyperparameters.
     table_rgb: tuple[float, float, float] = (0.75, 0.75, 0.75)
-    table_height: float = 0.2
+    table_height: float = 0.05
     table_width: float = world_max_x - world_min_x
     # The table pose is defined at the center
     table_pose: SE2Pose = SE2Pose(
@@ -124,12 +124,12 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
         ),
     )
     target_block_height_bounds: tuple[float, float] = (
-        0.2,
-        0.2,
+        robot_base_radius / 2,
+        2 * robot_base_radius,
     )
     target_block_width_bounds: tuple[float, float] = (
-        0.2,
-        0.2,
+        gripper_base_height / 2,
+        gripper_base_height,
     )
     target_block_mass: float = 1.0
 
@@ -148,7 +148,7 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
         2 * robot_base_radius,
     )
     obstruction_width_bounds: tuple[float, float] = (
-        robot_base_radius / 2,
+        gripper_base_height / 2,
         2 * robot_base_radius,
     )
     obstruction_block_mass: float = 1.0
