@@ -30,6 +30,7 @@ from prbench.envs.geom2d.utils import is_on
 from prbench.envs.utils import (
     PURPLE,
     state_2d_has_collision,
+    sample_se2_pose
 )
 
 # Define custom object types for the obstruction environment
@@ -41,17 +42,6 @@ Dynamic2DRobotEnvTypeFeatures[TargetBlockType] = list(
 Dynamic2DRobotEnvTypeFeatures[TargetSurfaceType] = list(
     Dynamic2DRobotEnvTypeFeatures[KinRectangleType]
 )
-
-
-def sample_se2_pose(
-    bounds: tuple[SE2Pose, SE2Pose], rng: np.random.Generator
-) -> SE2Pose:
-    """Sample a SE2Pose uniformly between the bounds."""
-    lb, ub = bounds
-    x = rng.uniform(lb.x, ub.x)
-    y = rng.uniform(lb.y, ub.y)
-    theta = rng.uniform(lb.theta, ub.theta)
-    return SE2Pose(x, y, theta)
 
 
 @dataclass(frozen=True)
