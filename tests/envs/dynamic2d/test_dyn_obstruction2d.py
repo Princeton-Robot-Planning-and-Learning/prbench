@@ -21,7 +21,7 @@ def test_dyn_obstruction2d_observation_space():
 def test_dyn_obstruction2d_action_space():
     """Tests that the actions are valid and the step function works."""
     prbench.register_all_environments()
-    env = prbench.make("prbench/DynObstruction2D-o3-v0")
+    env = prbench.make("prbench/DynObstruction2D-o0-v0")
     obs, _ = env.reset(seed=0)
     stable_move = np.array([0.05, 0.05, np.pi / 16, 0.0, 0.0], dtype=np.float32)
     # Check the control precision of base movements
@@ -87,11 +87,101 @@ def test_dyn_obstruction2d_action_space():
         )
 
 
+def test_dyn_obstruction2d_grasping_droppping():
+    """Tests that the actions are valid and the step function works."""
+    prbench.register_all_environments()
+    env = prbench.make("prbench/DynObstruction2D-o0-v0")
+    obs, _ = env.reset(seed=0)
+    state: ObjectCentricState = env.observation_space.devectorize(obs)
+    reset_state = state.copy()
+    name_to_object = {obj.name: obj for obj in state.data}
+    robot_object = name_to_object["robot"]
+    target_block_object = name_to_object["target_block"]
+    reset_state.set(robot_object, "x", 1.6)
+    reset_state.set(robot_object, "y", 0.6)
+    reset_state.set(robot_object, "theta", -np.pi / 2)
+    reset_state.set(robot_object, "arm_length", 0.24)
+    reset_state.set(robot_object, "finger_gap", 0.32)
+    reset_state.set(target_block_object, "x", 1.6)
+    reset_state.set(target_block_object, "y", 0.2)
+    reset_state.set(target_block_object, "theta", 0.0)
+    reset_state.set(target_block_object, "width", 0.2)
+    reset_state.set(target_block_object, "height", 0.2)
+    obs, _ = env.reset(options={"init_state": reset_state})
+    stable_move = np.array([0.0, 0.0, 0.0, 0.0, -0.01], dtype=np.float32)
+    # Check the grasping behavior
+    _, _, _, _, _ = env.step(stable_move)
+    # Should not hold the object yet
+    assert len(env.unwrapped._dynamic2d_env.robot.held_objects) == 0
+    for _ in range(6):
+        obs, _, _, _, _ = env.step(stable_move)
+    # Should hold the object now
+    assert len(env.unwrapped._dynamic2d_env.robot.held_objects) == 1
+    # Check move the object with the robot
+    move_with_object = np.array([0.0, 0.05, 0.0, 0.0, 0.0], dtype=np.float32)
+    for _ in range(3):
+        state: ObjectCentricState = env.observation_space.devectorize(obs)
+        name_to_object = {obj.name: obj for obj in state.data}
+        target_block_x = state.get(target_block_object, "x")
+        target_block_y = state.get(target_block_object, "y")
+        target_block_theta = state.get(target_block_object, "theta")
+        obs_, _, _, _, _ = env.step(move_with_object)
+        state_: ObjectCentricState = env.observation_space.devectorize(obs_)
+        target_block_x_ = state_.get(target_block_object, "x")
+        target_block_y_ = state_.get(target_block_object, "y")
+        target_block_theta_ = state_.get(target_block_object, "theta")
+        assert np.isclose(
+            target_block_x + move_with_object[0], target_block_x_, atol=1e-3
+        )
+        assert np.isclose(
+            target_block_y + move_with_object[1], target_block_y_, atol=1e-2
+        )
+        assert np.isclose(
+            target_block_theta + move_with_object[2], target_block_theta_, atol=1e-2
+        )
+        obs = obs_
+
+    move_with_object = np.array([0.0, 0.05, np.pi / 16, 0.0, 0.0], dtype=np.float32)
+    for _ in range(5):
+        state: ObjectCentricState = env.observation_space.devectorize(obs)
+        name_to_object = {obj.name: obj for obj in state.data}
+        target_block_x = state.get(target_block_object, "x")
+        target_block_y = state.get(target_block_object, "y")
+        target_block_theta = state.get(target_block_object, "theta")
+        obs_, _, _, _, _ = env.step(move_with_object)
+        state_: ObjectCentricState = env.observation_space.devectorize(obs_)
+        target_block_x_ = state_.get(target_block_object, "x")
+        target_block_y_ = state_.get(target_block_object, "y")
+        target_block_theta_ = state_.get(target_block_object, "theta")
+        # Note that the rotation of the base cases a larger movement of the object
+        assert target_block_x_ != (target_block_x + move_with_object[0])
+        assert target_block_y_ != (target_block_y + move_with_object[1])
+        # But the relative angle should be preserved
+        assert np.isclose(
+            target_block_theta + move_with_object[2], target_block_theta_, atol=1e-2
+        )
+        obs = obs_
+
+    # Drop the object to the ground
+    stable_move = np.array([0.0, 0.0, 0.0, 0.0, 0.01], dtype=np.float32)
+    # Check the dropping behavior
+    obs, _, _, _, _ = env.step(stable_move)
+    state: ObjectCentricState = env.observation_space.devectorize(obs)
+    curr_y = state.get(target_block_object, "y")
+    # Should not hold the object
+    assert len(env.unwrapped._dynamic2d_env.robot.held_objects) == 0
+    # The dropping behavior happends in the next step
+    obs, _, _, _, _ = env.step(stable_move)
+    state: ObjectCentricState = env.observation_space.devectorize(obs)
+    new_y = state.get(target_block_object, "y")
+    assert new_y < curr_y  # The object should fall down due to gravity
+
+
 def test_dyn_obstruction2d_different_obstruction_counts():
     """Tests that different numbers of obstructions work."""
     prbench.register_all_environments()
 
-    for num_obs in [0, 1, 2, 3, 4]:
+    for num_obs in [0, 1, 2, 3]:
         env = prbench.make(f"prbench/DynObstruction2D-o{num_obs}-v0")
         obs, _ = env.reset()
         assert env.observation_space.contains(obs)

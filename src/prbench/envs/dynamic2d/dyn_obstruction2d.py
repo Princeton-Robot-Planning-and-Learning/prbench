@@ -60,18 +60,18 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
     world_min_x: float = 0.0
-    world_max_x: float = (1 + np.sqrt(5)) / 2  # golden ratio :)
+    world_max_x: float = 1 + np.sqrt(5)  # golden ratio :)
     world_min_y: float = 0.0
-    world_max_y: float = 1.0
+    world_max_y: float = 2.0
 
     # Robot parameters
     init_robot_pos: tuple[float, float] = (0.5, 0.5)
-    robot_base_radius: float = 0.15
+    robot_base_radius: float = 0.24
     robot_arm_length_max: float = 2 * robot_base_radius
-    gripper_base_width: float = 0.03
-    gripper_base_height: float = 0.2
-    gripper_finger_width: float = 0.1
-    gripper_finger_height: float = 0.03
+    gripper_base_width: float = 0.06
+    gripper_base_height: float = 0.32
+    gripper_finger_width: float = 0.2
+    gripper_finger_height: float = 0.06
 
     # Action space parameters.
     min_dx: float = -5e-2
@@ -85,6 +85,12 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     min_dgripper: float = -0.02
     max_dgripper: float = 0.02
 
+    # Controller parameters
+    kp_pos: float = 50.0
+    kv_pos: float = 5.0
+    kp_rot: float = 50.0
+    kv_rot: float = 5.0
+
     # Robot hyperparameters.
     robot_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
         SE2Pose(0.2, 0.2, -np.pi / 2),
@@ -93,7 +99,7 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
     # Table hyperparameters.
     table_rgb: tuple[float, float, float] = (0.75, 0.75, 0.75)
-    table_height: float = 0.05
+    table_height: float = 0.1
     table_width: float = world_max_x - world_min_x
     # The table pose is defined at the center
     table_pose: SE2Pose = SE2Pose(
@@ -124,12 +130,12 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
         ),
     )
     target_block_height_bounds: tuple[float, float] = (
-        robot_base_radius / 2,
+        robot_base_radius,
         2 * robot_base_radius,
     )
     target_block_width_bounds: tuple[float, float] = (
         gripper_base_height / 2,
-        gripper_base_height,
+        2 * robot_base_radius,
     )
     target_block_mass: float = 1.0
 
@@ -144,7 +150,7 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
         ),
     )
     obstruction_height_bounds: tuple[float, float] = (
-        robot_base_radius / 2,
+        robot_base_radius,
         2 * robot_base_radius,
     )
     obstruction_width_bounds: tuple[float, float] = (
@@ -167,8 +173,11 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
 class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
     """Dynamic environment where a block must be placed on an obstructed target.
-
     Uses PyMunk physics simulation.
+
+    Key difference from Geom2DEnv is that the robot can interact with dynamic
+    objects with realistic physics (friction, collisions, etc). This means some
+    objects should be *pushed* instead of *grasped*.
     """
 
     def __init__(
