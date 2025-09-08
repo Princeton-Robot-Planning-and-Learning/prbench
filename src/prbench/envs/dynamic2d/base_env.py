@@ -315,27 +315,37 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         # Multi-step simulation like pushT env
         for _ in range(n_steps):
             # Use PD control to compute base and gripper velocities
-            base_vel, base_ang_vel, gripper_base_vel, finger_vel, held_obj_vel = (
-                self.pd_controller.compute_control(
-                    self.robot,
-                    tgt_x,
-                    tgt_y,
-                    tgt_theta,
-                    tgt_arm,
-                    tgt_gripper,
-                    control_dt,
-                )
+            (
+                base_vel,
+                base_ang_vel,
+                gripper_base_vel,
+                finger_vel_r,
+                finger_vel_l,
+                held_obj_vel,
+            ) = self.pd_controller.compute_control(
+                self.robot,
+                tgt_x,
+                tgt_y,
+                tgt_theta,
+                tgt_arm,
+                tgt_gripper,
+                control_dt,
             )
             # Update robot with the vel (PD control updates velocities)
             self.robot.update(
-                base_vel, base_ang_vel, gripper_base_vel, finger_vel, held_obj_vel
+                base_vel,
+                base_ang_vel,
+                gripper_base_vel,
+                finger_vel_r,
+                finger_vel_l,
+                held_obj_vel,
             )
             # Step physics simulation (more fine-grained than control freq)
             for _ in range(self._spec.sim_hz // self._spec.control_hz):
                 self.pymunk_space.step(sim_dt)
 
         # NOTE: We currently assume the robot can only grasp one object at a time.
-        # So we have assumed the missing object body and the new body is naturally matched.
+        # Assuming that the missing object body and the new body is naturally matched.
         # Need an update in the future if we allow multiple objects to be grasped.
         new_held_obj_pymunk_idx = {
             kin_obj[0].id: kin_obj[0] for kin_obj, _, _ in self.robot.held_objects

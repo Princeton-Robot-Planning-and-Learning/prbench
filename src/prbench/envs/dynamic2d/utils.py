@@ -393,6 +393,7 @@ class KinRobot:
         base_vel: Vec2d,
         base_ang_vel: float,
         gripper_base_vel: Vec2d,
+        finger_vel_r: Vec2d,
         finger_vel_l: Vec2d,
         helder_object_vels: list[Vec2d],
     ) -> None:
@@ -409,8 +410,8 @@ class KinRobot:
         # Fingers
         self._left_finger_body.velocity = finger_vel_l
         self._left_finger_body.angular_velocity = base_ang_vel
-        # Right finger has the same vel as gripper base always
-        self._right_finger_body.velocity = self._gripper_base_body.velocity
+        # NOTE: Right finger has different vel as gripper base
+        self._right_finger_body.velocity = finger_vel_r
         self._right_finger_body.angular_velocity = base_ang_vel
 
         # Update held objects - they have the same velocity as gripper base
@@ -538,6 +539,19 @@ class PDController:
             + Vec2d(rel_Ldot_next, 0.0).rotated(base_ang_curr)
         )
 
+        r_finger_centr = Vec2d(
+            robot.finger_poses["right"].x, robot.finger_poses["right"].y
+        )
+        relative_pos = r_finger_centr - base_pos_curr
+        r_finger_rot_omega_vec_base = relative_pos.normalized().rotated(math.pi / 2)
+        # We assume right finger does not have relative velocity in the gripper frame
+        # So we can just use rel_Ldot_next in the x-dir.
+        finger_vel_r = (
+            base_vel
+            + r_finger_rot_omega_vec_base * relative_pos.length * base_ang_vel
+            + Vec2d(rel_Ldot_next, 0.0).rotated(base_ang_curr)
+        )
+
         # Held object vel (world), calculated the same way as gripper-base vel
         helde_object_vels = []
         for kin_obj, _, _ in robot.held_objects:
@@ -585,7 +599,14 @@ class PDController:
             + Vec2d(rel_Ldot_next, rel_gdot_next).rotated(base_ang_curr)
         )
 
-        return base_vel, base_ang_vel, v_gripper_base, finger_vel_l, helde_object_vels
+        return (
+            base_vel,
+            base_ang_vel,
+            v_gripper_base,
+            finger_vel_r,
+            finger_vel_l,
+            helde_object_vels,
+        )
 
 
 def on_gripper_grasp(

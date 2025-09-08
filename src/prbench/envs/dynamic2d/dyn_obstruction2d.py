@@ -172,12 +172,12 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
 
 class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
-    """Dynamic environment where a block must be placed on an obstructed target.
-    Uses PyMunk physics simulation.
+    """Dynamic environment where a block must be placed on an obstructed target. Uses
+    PyMunk physics simulation.
 
-    Key difference from Geom2DEnv is that the robot can interact with dynamic
-    objects with realistic physics (friction, collisions, etc). This means some
-    objects should be *pushed* instead of *grasped*.
+    Key difference from Geom2DEnv is that the robot can interact with dynamic objects
+    with realistic physics (friction, collisions, etc). This means some objects should
+    be *pushed* instead of *grasped*.
     """
 
     def __init__(
@@ -457,6 +457,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                     shape.density = 1.0
                     shape.collision_type = DYNAMIC_COLLISION_TYPE
                     shape.mass = mass
+                    assert shape.body is not None
                     shape.body.moment = moment
                     shape.body.mass = mass
                     self.pymunk_space.add(body, shape)
