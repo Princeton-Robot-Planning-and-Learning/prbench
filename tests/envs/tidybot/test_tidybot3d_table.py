@@ -1,7 +1,6 @@
 """Tests for the TidyBot3D table scene: observation/action spaces, reset, and step."""
 
 import numpy as np
-
 from prbench.envs.tidybot.tidybot3d import TidyBot3DEnv
 
 
@@ -23,7 +22,8 @@ def test_tidybot3d_table_action_space():
 
 
 def test_tidybot3d_table_step():
-    """Step should return a valid obs, float reward, bool done flags, and info dict."""
+    """Step should return a valid obs, float reward, bool done flags, and info
+    dict."""
     env = TidyBot3DEnv(scene_type="table", num_objects=3, render_images=False)
     env.reset()
     action = env.action_space.sample()
@@ -57,7 +57,8 @@ def test_tidybot3d_table_reset_changes_without_seed():
 
 
 def test_tidybot3d_table_reset_format():
-    """Reset observation should match observation_space shape and be float32."""
+    """Reset observation should match observation_space shape and be
+    float32."""
     env = TidyBot3DEnv(scene_type="table", num_objects=3, render_images=False)
     obs, _ = env.reset()
     assert obs["vec"].dtype == np.float32

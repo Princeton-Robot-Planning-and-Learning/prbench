@@ -3,10 +3,6 @@
 from dataclasses import dataclass
 
 import numpy as np
-from relational_structs import Object, ObjectCentricState, Type
-from relational_structs.utils import create_state_from_dict
-from tomsgeoms2d.structs import Rectangle
-
 from prbench.envs.geom2d.base_env import (
     ConstantObjectGeom2DEnv,
     Geom2DRobotEnv,
@@ -25,6 +21,9 @@ from prbench.envs.geom2d.utils import (
     is_inside_shelf,
 )
 from prbench.envs.utils import BLACK, PURPLE, sample_se2_pose, state_2d_has_collision
+from relational_structs import Object, ObjectCentricState, Type
+from relational_structs.utils import create_state_from_dict
+from tomsgeoms2d.structs import Rectangle
 
 # NOTE: unlike some other environments, there are multiple target blocks here.
 TargetBlockType = Type("target_block", parent=RectangleType)
@@ -122,7 +121,8 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
     def get_shelf_init_pose_bounds(
         self, num_init_shelf_blocks: int
     ) -> tuple[SE2Pose, SE2Pose]:
-        """Calculate the init pose bounds for the shelf based on block number."""
+        """Calculate the init pose bounds for the shelf based on block
+        number."""
         shelf_width = self.get_shelf_width(num_init_shelf_blocks)
         return (
             SE2Pose(self.world_min_x, self.shelf_y, 0),
@@ -148,8 +148,8 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
 class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
     """Cluttered environment where blocks must be stored on a shelf.
 
-    This is an object-centric environment. The vectorized version with Box spaces is
-    defined below.
+    This is an object-centric environment. The vectorized version with
+    Box spaces is defined below.
     """
 
     def __init__(

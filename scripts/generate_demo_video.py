@@ -11,9 +11,8 @@ from pathlib import Path
 
 import dill as pkl
 import imageio.v2 as iio
-from generate_env_docs import sanitize_env_id
-
 import prbench
+from generate_env_docs import sanitize_env_id
 
 
 def load_demo(demo_path: Path) -> dict:

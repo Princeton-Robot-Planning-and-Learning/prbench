@@ -7,9 +7,6 @@ import numpy as np
 import pymunk
 from gymnasium.spaces import Box
 from numpy.typing import NDArray
-from pymunk.vec2d import Vec2d
-from relational_structs import Object
-
 from prbench.envs.dynamic2d.object_types import (
     KinRectangleType,
 )
@@ -20,6 +17,8 @@ from prbench.envs.geom2d.structs import (
 from prbench.envs.utils import (
     BLACK,
 )
+from pymunk.vec2d import Vec2d
+from relational_structs import Object
 
 # Collision types from the basic_pymunk.py script
 STATIC_COLLISION_TYPE = 0
@@ -30,8 +29,8 @@ ROBOT_COLLISION_TYPE = 2
 class KinRobotActionSpace(Box):
     """An action space for a fingered robot with gripper control.
 
-    Actions are bounded relative movements of the base, arm extension, and gripper
-    opening/closing.
+    Actions are bounded relative movements of the base, arm extension,
+    and gripper opening/closing.
     """
 
     def __init__(
@@ -79,16 +78,18 @@ class KinRobotActionSpace(Box):
 class KinRobot:
     """Robot implementation using PyMunk physics engine with four bodies.
 
-    The robot has a circular base, a rectangular gripper base, and two rectangular
-    fingers. The gripper base is attached to the robot base via a kinematic arm that can
-    extend and retract. The fingers can open and close to grasp objects.
+    The robot has a circular base, a rectangular gripper base, and two
+    rectangular fingers. The gripper base is attached to the robot base
+    via a kinematic arm that can extend and retract. The fingers can
+    open and close to grasp objects.
 
     The robot can held objects by closing the fingers around them.
 
-    The robot will be revert to the last valid state when colliding with static objects.
+    The robot will be revert to the last valid state when colliding with
+    static objects.
 
-    The robot is controlled via setting the velocities of the bodies, which can be
-    computed using a PD controller.
+    The robot is controlled via setting the velocities of the bodies,
+    which can be computed using a PD controller.
     """
 
     def __init__(
@@ -489,8 +490,8 @@ class PDController:
         tgt_gripper: float,  # target finger opening g*
         dt: float,
     ) -> tuple[Vec2d, float, Vec2d, Vec2d, Vec2d, list[Vec2d]]:
-        """Compute base vel, base ang vel, gripper-base vel (world), finger vel (world),
-        and held object vels (world) using PD control."""
+        """Compute base vel, base ang vel, gripper-base vel (world), finger vel
+        (world), and held object vels (world) using PD control."""
         # === 0) Read current state ===
         base_pos_curr = Vec2d(robot.base_pose.x, robot.base_pose.y)
         base_vel_curr = robot.base_vel[0]  # Vec2d(vx, vy) in world
@@ -655,8 +656,8 @@ def create_walls_from_world_boundaries(
 ) -> dict[Object, dict[str, float]]:
     """Create wall objects and feature dicts based on world boundaries.
 
-    Velocities are used to determine how large the walls need to be to avoid the
-    possibility that the robot will transport over the wall.
+    Velocities are used to determine how large the walls need to be to
+    avoid the possibility that the robot will transport over the wall.
     """
     state_dict: dict[Object, dict[str, float]] = {}
     # Right wall.
@@ -735,7 +736,8 @@ def create_walls_from_world_boundaries(
 def get_fingered_robot_action_from_gui_input(
     action_space: KinRobotActionSpace, gui_input: dict[str, Any]
 ) -> NDArray[np.float32]:
-    """Get the mapping from human inputs to actions, derived from action space."""
+    """Get the mapping from human inputs to actions, derived from action
+    space."""
     # This will be implemented later - placeholder for now
     keys_pressed = gui_input["keys"]
     right_x, right_y = gui_input["right_stick"]

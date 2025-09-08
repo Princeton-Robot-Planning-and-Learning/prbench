@@ -1,8 +1,8 @@
 """Unit tests for prbench.envs.tidybot.tidybot_rewards.
 
-This test suite verifies the base behavior of TidyBotRewardCalculator and the
-create_reward_calculator factory function, including reward calculation, episode step
-tracking, and default termination logic.
+This test suite verifies the base behavior of TidyBotRewardCalculator
+and the create_reward_calculator factory function, including reward
+calculation, episode step tracking, and default termination logic.
 """
 
 from prbench.envs.tidybot import tidybot_rewards

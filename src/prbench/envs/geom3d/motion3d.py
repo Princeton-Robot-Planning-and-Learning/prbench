@@ -1,4 +1,5 @@
-"""Environment where only 3D motion planning is needed to reach a goal region."""
+"""Environment where only 3D motion planning is needed to reach a goal
+region."""
 
 from __future__ import annotations
 
@@ -97,7 +98,8 @@ class Motion3DAction:
 
 
 class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
-    """Environment where only 3D motion planning is needed to reach a goal region."""
+    """Environment where only 3D motion planning is needed to reach a goal
+    region."""
 
     # Only RGB rendering is implemented.
     metadata = {"render_modes": ["rgb_array"]}

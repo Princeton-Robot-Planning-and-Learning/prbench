@@ -113,10 +113,11 @@ def register_all_environments() -> None:
 
 
 def _register(id: str, *args, **kwargs) -> None:  # pylint: disable=redefined-builtin
-    """Call register(), but only if the environment id is not already registered.
+    """Call register(), but only if the environment id is not already
+    registered.
 
-    This is to avoid noisy logging.warnings in register(). We are assuming that envs
-    with the same id are equivalent, so this is safe.
+    This is to avoid noisy logging.warnings in register(). We are
+    assuming that envs with the same id are equivalent, so this is safe.
     """
     if id not in gymnasium.registry:
         register(id, *args, **kwargs)

@@ -1,4 +1,5 @@
-"""Spec for 3D motion planning and manipulation environments (TidyBot3D, etc)."""
+"""Spec for 3D motion planning and manipulation environments (TidyBot3D,
+etc)."""
 
 from dataclasses import dataclass
 

@@ -9,10 +9,9 @@ import cv2 as cv
 import numpy as np
 from gymnasium.spaces import Space
 from numpy.typing import NDArray
-from prpl_utils.spaces import FunctionalSpace
-
 from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
 from prbench.envs.tidybot.tidybot_robot_env import MjAct, MjObs, TidyBotRobotEnv
+from prpl_utils.spaces import FunctionalSpace
 
 
 class TidyBot3DEnv(TidyBotRobotEnv):
@@ -87,7 +86,8 @@ class TidyBot3DEnv(TidyBotRobotEnv):
         )
 
     def _create_observation_space(self) -> Space[MjObs]:
-        """Create observation space based on TidyBot's observation structure."""
+        """Create observation space based on TidyBot's observation
+        structure."""
         # NOTE: this will be refactored soon after we introduce object-centric structs.
         return FunctionalSpace(contains_fn=lambda _: True)
 

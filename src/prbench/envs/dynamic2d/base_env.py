@@ -8,14 +8,6 @@ import gymnasium
 import numpy as np
 import pymunk
 from numpy.typing import NDArray
-from relational_structs import (
-    Array,
-    Object,
-    ObjectCentricState,
-    ObjectCentricStateSpace,
-)
-from relational_structs.spaces import ObjectCentricBoxSpace
-
 from prbench.envs.dynamic2d.object_types import (
     Dynamic2DRobotEnvTypeFeatures,
     DynRectangleType,
@@ -35,6 +27,13 @@ from prbench.envs.dynamic2d.utils import (
 )
 from prbench.envs.geom2d.structs import MultiBody2D
 from prbench.envs.utils import render_2dstate
+from relational_structs import (
+    Array,
+    Object,
+    ObjectCentricState,
+    ObjectCentricStateSpace,
+)
+from relational_structs.spaces import ObjectCentricBoxSpace
 
 
 @dataclass(frozen=True)
@@ -222,7 +221,8 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
     @property
     def full_state(self) -> ObjectCentricState:
-        """Get the full state, which includes both dynamic and static objects."""
+        """Get the full state, which includes both dynamic and static
+        objects."""
         if self._current_state is None:
             raise RuntimeError("Current state is not initialized")
         full_state = self._current_state.copy()
@@ -420,12 +420,14 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 class ConstantObjectDynamic2DEnv(
     gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]
 ):
-    """Defined by an object-centric Dynamic2D environment and a constant object set.
+    """Defined by an object-centric Dynamic2D environment and a constant object
+    set.
 
-    The point of this pattern is to allow implementing object-centric environments with
-    variable numbers of objects, but then also create versions of the environment with a
-    constant number of objects so it is easy to apply, e.g., RL approaches that use
-    fixed-dimensional observation and action spaces.
+    The point of this pattern is to allow implementing object-centric
+    environments with variable numbers of objects, but then also create
+    versions of the environment with a constant number of objects so it
+    is easy to apply, e.g., RL approaches that use fixed-dimensional
+    observation and action spaces.
     """
 
     # NOTE: we need to define render_modes in the class instead of the instance because
@@ -483,7 +485,8 @@ class ConstantObjectDynamic2DEnv(
     def _get_constant_object_names(
         self, exemplar_state: ObjectCentricState
     ) -> list[str]:
-        """The ordered names of the constant objects extracted from the observations."""
+        """The ordered names of the constant objects extracted from the
+        observations."""
 
     @abc.abstractmethod
     def _create_env_markdown_description(self) -> str:
@@ -495,7 +498,8 @@ class ConstantObjectDynamic2DEnv(
 
     @abc.abstractmethod
     def _create_references_markdown_description(self) -> str:
-        """Create a markdown description of the reference (e.g. papers) for this env."""
+        """Create a markdown description of the reference (e.g. papers) for
+        this env."""
 
     def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
         super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
