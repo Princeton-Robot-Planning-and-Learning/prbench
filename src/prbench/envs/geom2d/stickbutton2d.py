@@ -4,6 +4,9 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
+from relational_structs import Object, ObjectCentricState
+from relational_structs.utils import create_state_from_dict
+
 from prbench.envs.geom2d.base_env import (
     ConstantObjectGeom2DEnv,
     Geom2DRobotEnv,
@@ -21,8 +24,6 @@ from prbench.envs.geom2d.utils import (
     create_walls_from_world_boundaries,
 )
 from prbench.envs.utils import BLACK, sample_se2_pose, state_2d_has_collision
-from relational_structs import Object, ObjectCentricState
-from relational_structs.utils import create_state_from_dict
 
 
 @dataclass(frozen=True)
@@ -106,13 +107,13 @@ class StickButton2DEnvSpec(Geom2DRobotEnvSpec):
 class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
     """Environment with a stick and buttons that need to be pressed.
 
-    The robot cannot directly press buttons that are on the table but
-    can directly press buttons that are on the floor (by touching them).
+    The robot cannot directly press buttons that are on the table but can directly press
+    buttons that are on the floor (by touching them).
 
     The stick can be used to press buttons on the table (by touch).
 
-    This is an object-centric environment. The vectorized version with
-    Box spaces is defined below.
+    This is an object-centric environment. The vectorized version with Box spaces is
+    defined below.
     """
 
     def __init__(

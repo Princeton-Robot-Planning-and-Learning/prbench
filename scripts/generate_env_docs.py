@@ -7,6 +7,7 @@ from pathlib import Path
 
 import gymnasium
 import imageio.v2 as iio
+
 import prbench
 
 OUTPUT_DIR = Path(__file__).parent.parent / "docs" / "envs"

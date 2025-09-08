@@ -1,5 +1,5 @@
-"""This module defines the TidyBotRobotEnv class, which is the base class for
-the TidyBot robot in simulation."""
+"""This module defines the TidyBotRobotEnv class, which is the base class for the
+TidyBot robot in simulation."""
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 import numpy as np
 from numpy.typing import NDArray
+
 from prbench.envs.tidybot.mujoco_utils import MjAct, MjObs, MujocoEnv
 
 
@@ -52,8 +53,7 @@ class TidyBotRobotEnv(MujocoEnv):
         self.ctrl_gripper: Optional[NDArray[np.float64]] = None
 
     def _setup_robot_references(self) -> None:
-        """Setup references to robot state/actuator buffers in the simulation
-        data."""
+        """Setup references to robot state/actuator buffers in the simulation data."""
         assert self.sim is not None, "Simulation must be initialized."
 
         # Joint names for the base and arm

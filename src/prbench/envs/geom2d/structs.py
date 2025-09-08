@@ -33,8 +33,8 @@ def z_orders_may_collide(z0: ZOrder, z1: ZOrder) -> bool:
 
 @dataclass(frozen=True)
 class Body2D:
-    """A body consists a geom, a z order (for collision checks), and rendering
-    kwargs (for visualization)."""
+    """A body consists a geom, a z order (for collision checks), and rendering kwargs
+    (for visualization)."""
 
     geom: Geom2D
     z_order: ZOrder
@@ -70,8 +70,8 @@ class MultiBody2D:
 class SE2Pose:
     """Container for an SE2Pose.
 
-    In the future, may want to move this to a more general repository,
-    e.g., tomsgeoms2d.
+    In the future, may want to move this to a more general repository, e.g.,
+    tomsgeoms2d.
     """
 
     x: float

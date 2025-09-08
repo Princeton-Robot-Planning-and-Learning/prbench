@@ -58,8 +58,7 @@ MjAct: TypeAlias = NDArray[Any] | dict[str, Any]
 
 
 class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
-    """This is the base class for environments that use MuJoCo for
-    simulation."""
+    """This is the base class for environments that use MuJoCo for simulation."""
 
     def __init__(
         self,
@@ -239,8 +238,8 @@ class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
         self.done = False
 
     def _create_sim(self, xml_string: str) -> None:
-        """Initialize the MuJoCo simulation with the provided XML string. Also
-        resets the timestep counter.
+        """Initialize the MuJoCo simulation with the provided XML string. Also resets
+        the timestep counter.
 
         Args:
             xml_string: A string containing the MuJoCo XML model.

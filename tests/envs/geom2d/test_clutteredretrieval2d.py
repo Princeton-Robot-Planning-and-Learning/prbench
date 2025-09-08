@@ -1,9 +1,10 @@
 """Tests for clutteredretrieval2d.py."""
 
-import prbench
 from conftest import MAKE_VIDEOS
 from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
+
+import prbench
 from prbench.envs.geom2d.clutteredretrieval2d import (
     ObjectCentricClutteredRetrieval2DEnv,
 )

@@ -1,5 +1,5 @@
-"""Basic tests for the TidyBot3D environment observation and action space
-validity, step, and reset."""
+"""Basic tests for the TidyBot3D environment observation and action space validity,
+step, and reset."""
 
 from prbench.envs.tidybot.tidybot3d import TidyBot3DEnv
 
@@ -33,8 +33,8 @@ def test_tidybot3d_reset_returns_valid_observation():
 
 
 def test_tidybot3d_reset_returns_valid_observation_with_rendering():
-    """Test that reset() returns an observation in the observation space when
-    rendering is enabled."""
+    """Test that reset() returns an observation in the observation space when rendering
+    is enabled."""
     env = TidyBot3DEnv(num_objects=3, render_images=True)
     obs, info = env.reset()
     assert env.observation_space.contains(
@@ -45,8 +45,8 @@ def test_tidybot3d_reset_returns_valid_observation_with_rendering():
 
 
 def test_tidybot3d_step_returns_valid_outputs():
-    """Test that step() returns valid outputs: obs in space, reward is float,
-    done flags are bools."""
+    """Test that step() returns valid outputs: obs in space, reward is float, done flags
+    are bools."""
     env = TidyBot3DEnv(num_objects=3, render_images=False)
     env.reset()
     action = env.action_space.sample()
@@ -62,8 +62,7 @@ def test_tidybot3d_step_returns_valid_outputs():
 
 
 def test_tidybot3d_get_object_pos_quat():
-    """Test that get_object_pos_quat() returns valid position and
-    orientation."""
+    """Test that get_object_pos_quat() returns valid position and orientation."""
     env = TidyBot3DEnv(num_objects=3, render_images=False)
     env.reset()
     for name in env._object_names:  # pylint: disable=protected-access
@@ -74,8 +73,8 @@ def test_tidybot3d_get_object_pos_quat():
 
 
 def test_tidybot3d_set_get_object_pos_quat_consistency():
-    """Test that setting and then getting an object's position and orientation
-    is consistent."""
+    """Test that setting and then getting an object's position and orientation is
+    consistent."""
     env = TidyBot3DEnv(num_objects=3, render_images=False)
     env.reset()
     for name in env._object_names:  # pylint: disable=protected-access

@@ -3,6 +3,9 @@
 from dataclasses import dataclass
 
 import numpy as np
+from relational_structs import Object, ObjectCentricState, Type
+from relational_structs.utils import create_state_from_dict
+
 from prbench.envs.geom2d.base_env import (
     ConstantObjectGeom2DEnv,
     Geom2DRobotEnv,
@@ -21,8 +24,6 @@ from prbench.envs.geom2d.utils import (
     get_suctioned_objects,
 )
 from prbench.envs.utils import PURPLE, sample_se2_pose, state_2d_has_collision
-from relational_structs import Object, ObjectCentricState, Type
-from relational_structs.utils import create_state_from_dict
 
 TargetBlockType = Type("target_block", parent=RectangleType)
 Geom2DRobotEnvTypeFeatures[TargetBlockType] = list(
@@ -115,8 +116,8 @@ class ClutteredRetrieval2DEnvSpec(Geom2DRobotEnvSpec):
 class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
     """Environment where a block must be retrieved amidst clutter.
 
-    This is an object-centric environment. The vectorized version with
-    Box spaces is defined below.
+    This is an object-centric environment. The vectorized version with Box spaces is
+    defined below.
     """
 
     def __init__(

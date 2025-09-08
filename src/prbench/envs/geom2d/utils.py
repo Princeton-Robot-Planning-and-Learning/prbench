@@ -5,6 +5,16 @@ from typing import Any, Iterable
 import numpy as np
 from gymnasium.spaces import Box
 from numpy.typing import NDArray
+from prpl_utils.motion_planning import BiRRT
+from prpl_utils.utils import get_signed_angle_distance, wrap_angle
+from relational_structs import (
+    Array,
+    Object,
+    ObjectCentricState,
+)
+from tomsgeoms2d.structs import Rectangle
+from tomsgeoms2d.utils import find_closest_points, geom2ds_intersect
+
 from prbench.envs.geom2d.object_types import (
     DoubleRectType,
     RectangleType,
@@ -23,22 +33,13 @@ from prbench.envs.utils import (
     rectangle_object_to_geom,
     state_2d_has_collision,
 )
-from prpl_utils.motion_planning import BiRRT
-from prpl_utils.utils import get_signed_angle_distance, wrap_angle
-from relational_structs import (
-    Array,
-    Object,
-    ObjectCentricState,
-)
-from tomsgeoms2d.structs import Rectangle
-from tomsgeoms2d.utils import find_closest_points, geom2ds_intersect
 
 
 class CRVRobotActionSpace(Box):
     """An action space for a CRV robot.
 
-    Actions are bounded relative movements of the base and the arm, as
-    well as an absolute setting for the vacuum.
+    Actions are bounded relative movements of the base and the arm, as well as an
+    absolute setting for the vacuum.
     """
 
     def __init__(
@@ -93,8 +94,8 @@ def create_walls_from_world_boundaries(
 ) -> dict[Object, dict[str, float]]:
     """Create wall objects and feature dicts based on world boundaries.
 
-    Velocities are used to determine how large the walls need to be to
-    avoid the possibility that the robot will transport over the wall.
+    Velocities are used to determine how large the walls need to be to avoid the
+    possibility that the robot will transport over the wall.
     """
     state_dict: dict[Object, dict[str, float]] = {}
     # Right wall.
@@ -161,8 +162,8 @@ def create_walls_from_world_boundaries(
 def get_tool_tip_position(
     state: ObjectCentricState, robot: Object
 ) -> tuple[float, float]:
-    """Get the tip of the tool for the robot, which is defined as the center of
-    the bottom edge of the gripper."""
+    """Get the tip of the tool for the robot, which is defined as the center of the
+    bottom edge of the gripper."""
     multibody = crv_robot_to_multibody2d(robot, state)
     gripper_geom = multibody.get_body("gripper").geom
     assert isinstance(gripper_geom, Rectangle)
@@ -184,8 +185,8 @@ def get_tool_tip_position(
 def get_suctioned_objects(
     state: ObjectCentricState, robot: Object
 ) -> list[tuple[Object, SE2Pose]]:
-    """Find objects that are in the suction zone of a CRVRobot and return the
-    associated transform from gripper tool tip to suctioned object."""
+    """Find objects that are in the suction zone of a CRVRobot and return the associated
+    transform from gripper tool tip to suctioned object."""
     # If the robot's vacuum is not on, there are no suctioned objects.
     if state.get(robot, "vacuum") <= 0.5:
         return []
@@ -490,8 +491,7 @@ def is_movable_rectangle(state: ObjectCentricState, obj: Object) -> bool:
 def get_geom2d_crv_robot_action_from_gui_input(
     action_space: CRVRobotActionSpace, gui_input: dict[str, Any]
 ) -> NDArray[np.float32]:
-    """Get the mapping from human inputs to actions, derived from action
-    space."""
+    """Get the mapping from human inputs to actions, derived from action space."""
     # Unpack the input.
     keys_pressed = gui_input["keys"]
     right_x, right_y = gui_input["right_stick"]

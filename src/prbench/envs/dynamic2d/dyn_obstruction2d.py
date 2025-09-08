@@ -5,6 +5,9 @@ from dataclasses import dataclass
 
 import numpy as np
 import pymunk
+from relational_structs import Object, ObjectCentricState, Type
+from relational_structs.utils import create_state_from_dict
+
 from prbench.envs.dynamic2d.base_env import (
     ConstantObjectDynamic2DEnv,
     Dynamic2DRobotEnv,
@@ -25,8 +28,6 @@ from prbench.envs.dynamic2d.utils import (
 from prbench.envs.geom2d.structs import MultiBody2D, SE2Pose, ZOrder
 from prbench.envs.geom2d.utils import is_on
 from prbench.envs.utils import PURPLE, sample_se2_pose, state_2d_has_collision
-from relational_structs import Object, ObjectCentricState, Type
-from relational_structs.utils import create_state_from_dict
 
 # Define custom object types for the obstruction environment
 TargetBlockType = Type("target_block", parent=DynRectangleType)
@@ -157,12 +158,12 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
 
 class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
-    """Dynamic environment where a block must be placed on an obstructed
-    target. Uses PyMunk physics simulation.
+    """Dynamic environment where a block must be placed on an obstructed target. Uses
+    PyMunk physics simulation.
 
-    Key difference from Geom2DEnv is that the robot can interact with
-    dynamic objects with realistic physics (friction, collisions, etc).
-    This means some objects should be *pushed* instead of *grasped*.
+    Key difference from Geom2DEnv is that the robot can interact with dynamic objects
+    with realistic physics (friction, collisions, etc). This means some objects should
+    be *pushed* instead of *grasped*.
     """
 
     def __init__(

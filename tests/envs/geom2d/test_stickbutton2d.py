@@ -1,9 +1,10 @@
 """Tests for stickbutton2d.py."""
 
-import prbench
 from conftest import MAKE_VIDEOS
 from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
+
+import prbench
 from prbench.envs.geom2d.object_types import CircleType
 from prbench.envs.geom2d.stickbutton2d import ObjectCentricStickButton2DEnv
 

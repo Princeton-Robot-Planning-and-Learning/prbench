@@ -1,7 +1,8 @@
 """Tests for obstruction2d.py."""
 
-import prbench
 from gymnasium.spaces import Box
+
+import prbench
 
 
 def test_obstruction2d_observation_space():

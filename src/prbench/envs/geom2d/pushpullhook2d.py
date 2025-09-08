@@ -4,6 +4,9 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
+from relational_structs import Object, ObjectCentricState
+from relational_structs.utils import create_state_from_dict
+
 from prbench.envs.geom2d.base_env import (
     ConstantObjectGeom2DEnv,
     Geom2DRobotEnv,
@@ -23,8 +26,6 @@ from prbench.envs.geom2d.utils import (
     move_objects_in_contact,
 )
 from prbench.envs.utils import BLACK, sample_se2_pose, state_2d_has_collision
-from relational_structs import Object, ObjectCentricState
-from relational_structs.utils import create_state_from_dict
 
 
 @dataclass(frozen=True)
@@ -137,9 +138,9 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
 
     The robot or hook cannot directly press the target button.
 
-    The robot can grab the hook and then use it to move the movable
-    button towards the target button. The target button is pressed only
-    when the movable button is in contact with it.
+    The robot can grab the hook and then use it to move the movable button towards the
+    target button. The target button is pressed only when the movable button is in
+    contact with it.
     """
 
     def __init__(self, spec: PushPullHook2DEnvSpec = PushPullHook2DEnvSpec(), **kwargs):
@@ -381,11 +382,10 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         return self._current_state
 
     def push_movable_button(self):
-        """Utility function to push the movable button in the direction of
-        travel of robot if the hook and button are in contact.
+        """Utility function to push the movable button in the direction of travel of
+        robot if the hook and button are in contact.
 
-        If robot travels in opposite direction, button disconnects and
-        does not move.
+        If robot travels in opposite direction, button disconnects and does not move.
         """
         assert self._current_state is not None
         assert self._initial_constant_state is not None
@@ -430,8 +430,8 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         state: ObjectCentricState,
         suctioned_objs: list[tuple[Object, SE2Pose]],
     ) -> tuple[ObjectCentricState, set[tuple[Object, SE2Pose]]]:
-        """Get the set of objects that should be moved based on the current
-        state and robot actions."""
+        """Get the set of objects that should be moved based on the current state and
+        robot actions."""
         robots = [o for o in state if o.is_instance(CRVRobotType)]
         assert len(robots) == 1, "Multi-robot not yet supported"
         robot = robots[0]

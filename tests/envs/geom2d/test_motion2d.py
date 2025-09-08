@@ -1,10 +1,11 @@
 """Tests for motion2d.py."""
 
 import numpy as np
-import prbench
 from conftest import MAKE_VIDEOS
 from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
+
+import prbench
 from prbench.envs.geom2d.motion2d import Motion2DEnvSpec, ObjectCentricMotion2DEnv
 
 prbench.register_all_environments()
@@ -68,8 +69,7 @@ def test_motion2d_observation_space():
 
 
 def test_motion2d_vacuum_and_arm_actions():
-    """Tests that vacuum and arm actions don't affect movement or
-    termination."""
+    """Tests that vacuum and arm actions don't affect movement or termination."""
     env = prbench.make("prbench/Motion2D-p1-v0")
 
     # Reset environment and get initial state

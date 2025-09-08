@@ -123,8 +123,7 @@ _EGL_ATTRIBUTES = (
 
 
 class EGLGLContext:
-    """An EGL context for headless accelerated OpenGL rendering on GPU
-    devices."""
+    """An EGL context for headless accelerated OpenGL rendering on GPU devices."""
 
     def __init__(self, max_width, max_height, device_id=0):
         del max_width, max_height  # unused

@@ -3,6 +3,14 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
+from prpl_utils.utils import fig2data
+from relational_structs import (
+    Object,
+    ObjectCentricState,
+)
+from tomsgeoms2d.structs import Circle, Geom2D, Lobject, Rectangle
+from tomsgeoms2d.utils import geom2ds_intersect
+
 from prbench.envs.dynamic2d.object_types import (
     DynRectangleType,
     KinRectangleType,
@@ -22,13 +30,6 @@ from prbench.envs.geom2d.structs import (
     ZOrder,
     z_orders_may_collide,
 )
-from prpl_utils.utils import fig2data
-from relational_structs import (
-    Object,
-    ObjectCentricState,
-)
-from tomsgeoms2d.structs import Circle, Geom2D, Lobject, Rectangle
-from tomsgeoms2d.utils import geom2ds_intersect
 
 PURPLE: tuple[float, float, float] = (128 / 255, 0 / 255, 128 / 255)
 BLACK: tuple[float, float, float] = (0.1, 0.1, 0.1)

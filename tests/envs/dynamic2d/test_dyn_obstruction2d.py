@@ -2,9 +2,10 @@
 
 # import imageio.v2 as iio
 import numpy as np
-import prbench
 from gymnasium.spaces import Box
 from relational_structs import ObjectCentricState
+
+import prbench
 
 
 def test_dyn_obstruction2d_observation_space():
