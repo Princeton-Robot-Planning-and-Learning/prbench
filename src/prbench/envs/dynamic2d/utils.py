@@ -437,13 +437,15 @@ class KinRobot:
         theta_ok = abs(dtheta - np.pi / 2) < self.grasping_theta_thresh
         if not theta_ok:
             return False
-        # Checker 2: If the body is within the grasping area
-        p_a = SE2Pose(x=tgt_body.position.x, y=tgt_body.position.y, theta=0.0)
-        rel_a = self.gripper_base_pose.inverse * p_a
-        if (abs(rel_a.y) < self.gripper_base_height / 4) and (
-            abs(rel_a.x) < self.gripper_finger_width
-        ):
-            return True
+        # Checker 2: If exist contact points in hand
+        for pt in contact_point_set.points:
+            pt_a = pt.point_a
+            p_a = SE2Pose(x=pt_a.x, y=pt_a.y, theta=0.0)
+            rel_a = self.gripper_base_pose.inverse * p_a
+            if (abs(rel_a.y) < self.gripper_base_height / 2) and (
+                abs(rel_a.x) < self.gripper_finger_width
+            ):
+                return True
         return False
 
     def add_to_hand(self, obj: tuple[pymunk.Body, pymunk.Shape], mass: float) -> None:
@@ -756,14 +758,16 @@ def get_fingered_robot_action_from_gui_input(
     action[2] = _rescale(left_x, low[2], high[2])
 
     # The w/s mouse keys are used to adjust the robot arm.
-    if "w" in keys_pressed:
+    if "a" in keys_pressed:
         action[3] = low[3]
     if "s" in keys_pressed:
         action[3] = high[3]
 
     # The space bar is used to close the gripper.
     # Open the gripper by default.
-    if "space" in keys_pressed:
+    if "d" in keys_pressed:
         action[4] = low[4]
+    if "f" in keys_pressed:
+        action[4] = high[4]
 
     return action
