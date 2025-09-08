@@ -424,6 +424,7 @@ class KinRobot:
         self, contact_point_set: pymunk.ContactPointSet, tgt_body: pymunk.Body
     ) -> bool:
         """Check if robot is grasping a target body."""
+        del tgt_body  # Unused for now
         # Checker 0: If robot is closing gripper
         if not self.is_closing_finger:
             return False
