@@ -27,10 +27,7 @@ from prbench.envs.dynamic2d.utils import (
 )
 from prbench.envs.geom2d.structs import MultiBody2D, SE2Pose, ZOrder
 from prbench.envs.geom2d.utils import is_on
-from prbench.envs.utils import (
-    PURPLE,
-    state_2d_has_collision,
-)
+from prbench.envs.utils import PURPLE, sample_se2_pose, state_2d_has_collision
 
 # Define custom object types for the obstruction environment
 TargetBlockType = Type("target_block", parent=DynRectangleType)
@@ -43,35 +40,24 @@ Dynamic2DRobotEnvTypeFeatures[TargetSurfaceType] = list(
 )
 
 
-def sample_se2_pose(
-    bounds: tuple[SE2Pose, SE2Pose], rng: np.random.Generator
-) -> SE2Pose:
-    """Sample a SE2Pose uniformly between the bounds."""
-    lb, ub = bounds
-    x = rng.uniform(lb.x, ub.x)
-    y = rng.uniform(lb.y, ub.y)
-    theta = rng.uniform(lb.theta, ub.theta)
-    return SE2Pose(x, y, theta)
-
-
 @dataclass(frozen=True)
 class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     """Scene specification for DynObstruction2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
     world_min_x: float = 0.0
-    world_max_x: float = (1 + np.sqrt(5)) / 2  # golden ratio :)
+    world_max_x: float = 1 + np.sqrt(5)  # golden ratio :)
     world_min_y: float = 0.0
-    world_max_y: float = 1.0
+    world_max_y: float = 2.0
 
     # Robot parameters
     init_robot_pos: tuple[float, float] = (0.5, 0.5)
-    robot_base_radius: float = 0.1
+    robot_base_radius: float = 0.24
     robot_arm_length_max: float = 2 * robot_base_radius
-    gripper_base_width: float = 0.01
-    gripper_base_height: float = 0.1
-    gripper_finger_width: float = 0.1
-    gripper_finger_height: float = 0.01
+    gripper_base_width: float = 0.06
+    gripper_base_height: float = 0.32
+    gripper_finger_width: float = 0.2
+    gripper_finger_height: float = 0.06
 
     # Action space parameters.
     min_dx: float = -5e-2
@@ -84,6 +70,12 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     max_darm: float = 1e-1
     min_dgripper: float = -0.02
     max_dgripper: float = 0.02
+
+    # Controller parameters
+    kp_pos: float = 50.0
+    kv_pos: float = 5.0
+    kp_rot: float = 50.0
+    kv_rot: float = 5.0
 
     # Robot hyperparameters.
     robot_init_pose_bounds: tuple[SE2Pose, SE2Pose] = (
@@ -124,11 +116,11 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
         ),
     )
     target_block_height_bounds: tuple[float, float] = (
-        robot_base_radius / 2,
+        robot_base_radius,
         2 * robot_base_radius,
     )
     target_block_width_bounds: tuple[float, float] = (
-        robot_base_radius / 2,
+        gripper_base_height / 2,
         2 * robot_base_radius,
     )
     target_block_mass: float = 1.0
@@ -144,11 +136,11 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
         ),
     )
     obstruction_height_bounds: tuple[float, float] = (
-        robot_base_radius / 2,
+        robot_base_radius,
         2 * robot_base_radius,
     )
     obstruction_width_bounds: tuple[float, float] = (
-        robot_base_radius / 2,
+        gripper_base_height / 2,
         2 * robot_base_radius,
     )
     obstruction_block_mass: float = 1.0
@@ -166,9 +158,12 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
 
 
 class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
-    """Dynamic environment where a block must be placed on an obstructed target.
+    """Dynamic environment where a block must be placed on an obstructed target. Uses
+    PyMunk physics simulation.
 
-    Uses PyMunk physics simulation.
+    Key difference from Geom2DEnv is that the robot can interact with dynamic objects
+    with realistic physics (friction, collisions, etc). This means some objects should
+    be *pushed* instead of *grasped*.
     """
 
     def __init__(
@@ -353,7 +348,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         # Create the target block.
         target_block = Object("target_block", TargetBlockType)
         init_state_dict[target_block] = {
-            "x": target_block_pose.x + target_block_shape[0] / 2,
+            "x": target_block_pose.x,
             "vx": 0.0,
             "y": target_block_pose.y + target_block_shape[1] / 2,
             "vy": 0.0,
@@ -373,7 +368,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         for i, (obstruction_pose, obstruction_shape) in enumerate(obstructions):
             obstruction = Object(f"obstruction{i}", DynRectangleType)
             init_state_dict[obstruction] = {
-                "x": obstruction_pose.x + obstruction_shape[0] / 2,
+                "x": obstruction_pose.x,
                 "vx": 0.0,
                 "y": obstruction_pose.y + obstruction_shape[1] / 2,
                 "vy": 0.0,
@@ -425,6 +420,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                     shape = pymunk.Poly(b2, vs)
                     shape.friction = 1.0
                     shape.density = 1.0
+                    shape.mass = 1.0
                     shape.elasticity = 0.99
                     shape.collision_type = STATIC_COLLISION_TYPE
                     self.pymunk_space.add(b2, shape)
@@ -435,7 +431,7 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                     # Dynamic objects
                     mass = state.get(obj, "mass")
                     moment = pymunk.moment_for_box(mass, (width, height))
-                    body = pymunk.Body(mass, moment)
+                    body = pymunk.Body()
                     vs = [
                         (-width / 2, -height / 2),
                         (-width / 2, height / 2),
@@ -446,6 +442,10 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                     shape.friction = 1.0
                     shape.density = 1.0
                     shape.collision_type = DYNAMIC_COLLISION_TYPE
+                    shape.mass = mass
+                    assert shape.body is not None
+                    shape.body.moment = moment
+                    shape.body.mass = mass
                     self.pymunk_space.add(body, shape)
                     body.position = x, y
                     body.angle = theta

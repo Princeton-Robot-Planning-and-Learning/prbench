@@ -238,7 +238,6 @@ class TidyBot3DEnv(TidyBotRobotEnv):
         seed: int | None = None,
         options: dict[str, Any] | None = None,
     ) -> tuple[MjObs, dict[str, Any]]:
-
         # Create scene XML
         self._object_names = []
         xml_string = self._create_scene_xml()

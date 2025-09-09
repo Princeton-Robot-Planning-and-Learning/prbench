@@ -213,7 +213,6 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         target_region_pose: SE2Pose | None = None,
         obstacles: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
     ) -> ObjectCentricState:
-
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
         assert self._initial_constant_state is not None

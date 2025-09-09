@@ -69,6 +69,9 @@ class Dynamic2DRobotEnvSpec:
     gripper_finger_height: float = 0.01
 
     # Controller parameters
+    # NOTE: Do not modify these parameters and the control_hz, sim_hz unless you
+    # understand the implications. These parameters have been tuned to work well
+    # with the simulation parameters.
     kp_pos: float = 50.0
     kv_pos: float = 5.0
     kp_rot: float = 50.0
@@ -76,8 +79,9 @@ class Dynamic2DRobotEnvSpec:
 
     # Physics parameters
     gravity_y: float = -9.8
-    control_freq: int = 10  # Control frequency (actions per second)
-    sim_freq: int = 120  # Simulation frequency (rendering per second)
+    collision_slop: float = 0.001  # Allow small interpenetration, depends on env scale
+    control_hz: int = 10  # Control frequency (fps in rendering)
+    sim_hz: int = 100  # Simulation frequency (dt in simulation)
 
     # For rendering.
     render_dpi: int = 50
@@ -138,6 +142,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         """Set up the PyMunk physics space."""
         self.pymunk_space = pymunk.Space()
         self.pymunk_space.gravity = 0, self._spec.gravity_y
+        self.pymunk_space.collision_slop = self._spec.collision_slop
 
         # Create robot
         self.robot = KinRobot(
@@ -257,12 +262,10 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         self._add_state_to_space(self.full_state)
 
         # Calculate simulation parameters
-        dt = 1.0 / self._spec.control_freq
-        n_steps = self._spec.sim_freq // self._spec.control_freq
-
+        dt = 1.0 / self._spec.sim_hz
         # Stepping physics to let things settle
         assert self.pymunk_space is not None, "Space not initialized"
-        for _ in range(n_steps):
+        for _ in range(self._spec.sim_hz):
             self.pymunk_space.step(dt)
 
         observation = self._get_obs()
@@ -278,8 +281,9 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         assert self.robot is not None, "Robot not initialized"
 
         # Calculate simulation parameters
-        n_steps = self._spec.sim_freq // self._spec.control_freq
-        dt = 1.0 / self._spec.control_freq
+        sim_dt = 1.0 / self._spec.sim_hz
+        control_dt = 1.0 / self._spec.control_hz
+        n_steps = self._spec.sim_hz // self._spec.control_hz
 
         # Calculate target positions
         tgt_x = self.robot.base_pose.x + dx
@@ -294,18 +298,68 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             self.robot.gripper_finger_height * 2,
         )
 
+        # Set robot finger state (for grasping and dropping behavior)
+        curr_held_obj_pymunk_idx = [
+            kin_obj[0].id for kin_obj, _, _ in self.robot.held_objects
+        ]
+        if tgt_gripper > self.robot.curr_gripper:
+            self.robot.is_opening_finger = True
+            self.robot.is_closing_finger = False
+        elif tgt_gripper < self.robot.curr_gripper:
+            self.robot.is_opening_finger = False
+            self.robot.is_closing_finger = True
+        else:
+            self.robot.is_opening_finger = False
+            self.robot.is_closing_finger = False
+
         # Multi-step simulation like pushT env
         for _ in range(n_steps):
             # Use PD control to compute base and gripper velocities
-            base_vel, base_ang_vel, gripper_base_vel, finger_vel = (
-                self.pd_controller.compute_control(
-                    self.robot, tgt_x, tgt_y, tgt_theta, tgt_arm, tgt_gripper, dt
-                )
+            (
+                base_vel,
+                base_ang_vel,
+                gripper_base_vel,
+                finger_vel_r,
+                finger_vel_l,
+                held_obj_vel,
+            ) = self.pd_controller.compute_control(
+                self.robot,
+                tgt_x,
+                tgt_y,
+                tgt_theta,
+                tgt_arm,
+                tgt_gripper,
+                control_dt,
             )
             # Update robot with the vel (PD control updates velocities)
-            self.robot.update(base_vel, base_ang_vel, gripper_base_vel, finger_vel)
-            # Step physics simulation
-            self.pymunk_space.step(dt)
+            self.robot.update(
+                base_vel,
+                base_ang_vel,
+                gripper_base_vel,
+                finger_vel_r,
+                finger_vel_l,
+                held_obj_vel,
+            )
+            # Step physics simulation (more fine-grained than control freq)
+            for _ in range(self._spec.sim_hz // self._spec.control_hz):
+                self.pymunk_space.step(sim_dt)
+
+        # NOTE: We currently assume the robot can only grasp one object at a time.
+        # Assuming that the missing object body and the new body is naturally matched.
+        # Need an update in the future if we allow multiple objects to be grasped.
+        new_held_obj_pymunk_idx = {
+            kin_obj[0].id: kin_obj[0] for kin_obj, _, _ in self.robot.held_objects
+        }
+        if list(new_held_obj_pymunk_idx.keys()) != curr_held_obj_pymunk_idx:
+            # Grasping happened
+            assert self.robot.is_closing_finger
+            assert len(curr_held_obj_pymunk_idx) == 0
+            assert len(list(new_held_obj_pymunk_idx.keys())) == 1
+            new_body = list(new_held_obj_pymunk_idx.values())[0]
+            for state_obj, body in self._state_obj_to_pymunk_body.items():
+                if body not in self.pymunk_space.bodies:
+                    # This is the object that got grasped
+                    self._state_obj_to_pymunk_body[state_obj] = new_body
 
         # Drop objects after internal steps
         if self.robot.is_opening_finger:
@@ -325,8 +379,14 @@ class Dynamic2DRobotEnv(gymnasium.Env):
                 shape.collision_type = DYNAMIC_COLLISION_TYPE
                 self.pymunk_space.add(dynamic_body, shape)
                 self.pymunk_space.remove(kinematic_body, kinematic_shape)
+                # Update the mapping
+                for state_obj, body in self._state_obj_to_pymunk_body.items():
+                    if body.id == kinematic_body.id:
+                        self._state_obj_to_pymunk_body[state_obj] = dynamic_body
             self.robot.held_objects = []
-        # Note: need to update self._state_obj_to_pymunk_body later if grasping happens.
+
+        self.robot.is_closing_finger = False  # reset
+        self.robot.is_opening_finger = False
 
         reward, terminated = self._get_reward_and_done()
         truncated = False  # no maximum horizon, by default

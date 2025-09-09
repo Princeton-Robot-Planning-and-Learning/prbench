@@ -258,7 +258,6 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         shelf_target_block_rotations: list[float],
         target_block_outside_poses: list[SE2Pose] | None = None,
     ) -> ObjectCentricState:
-
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
         assert self._initial_constant_state is not None

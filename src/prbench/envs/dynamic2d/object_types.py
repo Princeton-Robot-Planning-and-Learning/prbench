@@ -26,7 +26,7 @@ Dynamic2DRobotEnvTypeFeatures[Dynamic2DType] = [
 ]
 # Specific types.
 # For kinematic and static blocks, they don't have mass and moment.
-KinRectangleType = Type("rectangle", parent=Dynamic2DType)
+KinRectangleType = Type("kin_rectangle", parent=Dynamic2DType)
 Dynamic2DRobotEnvTypeFeatures[KinRectangleType] = Dynamic2DRobotEnvTypeFeatures[
     Dynamic2DType
 ] + [

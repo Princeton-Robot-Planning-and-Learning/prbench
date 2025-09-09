@@ -262,7 +262,6 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         target_button_pose: tuple[float, float],
         target_button_z_order: ZOrder = ZOrder.NONE,
     ) -> ObjectCentricState:
-
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
         assert self._initial_constant_state is not None
