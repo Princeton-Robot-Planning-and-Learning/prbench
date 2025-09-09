@@ -34,10 +34,12 @@ Dynamic2DRobotEnvTypeFeatures[KinRectangleType] = Dynamic2DRobotEnvTypeFeatures[
     "height",
 ]
 # For dynamic blocks, they have mass and moment of inertia.
-DynRectangleType = Type("dyn_rectangle", parent=KinRectangleType)
+DynRectangleType = Type("dyn_rectangle", parent=Dynamic2DType)
 Dynamic2DRobotEnvTypeFeatures[DynRectangleType] = Dynamic2DRobotEnvTypeFeatures[
-    KinRectangleType
+    Dynamic2DType
 ] + [
+    "width",
+    "height",
     "mass",
 ]
 
