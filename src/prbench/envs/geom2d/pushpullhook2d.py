@@ -19,16 +19,13 @@ from prbench.envs.geom2d.object_types import (
     LObjectType,
     RectangleType,
 )
-from prbench.envs.geom2d.structs import ZOrder
+from prbench.envs.geom2d.structs import SE2Pose, ZOrder
 from prbench.envs.geom2d.utils import (
-    BLACK,
     CRVRobotActionSpace,
-    SE2Pose,
     create_walls_from_world_boundaries,
     move_objects_in_contact,
-    sample_se2_pose,
-    state_has_collision,
 )
+from prbench.envs.utils import BLACK, sample_se2_pose, state_2d_has_collision
 
 
 @dataclass(frozen=True)
@@ -197,7 +194,7 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
             full_state = state.copy()
             full_state.data.update(self._initial_constant_state.data)
             if (
-                not state_has_collision(
+                not state_2d_has_collision(
                     full_state,
                     {hook, movable_button, target_button},
                     set(full_state),
@@ -265,7 +262,6 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         target_button_pose: tuple[float, float],
         target_button_z_order: ZOrder = ZOrder.NONE,
     ) -> ObjectCentricState:
-
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
         assert self._initial_constant_state is not None

@@ -332,92 +332,112 @@ class MjModel:
         self.body_names: tuple[str | None, ...]
         self._body_name2id: dict[str | None, int]
         self._body_id2name: dict[int, str | None]
-        self.body_names, self._body_name2id, self._body_id2name = (
-            self._extract_mj_names(
-                self._model.nbody,
-                mujoco.mjtObj.mjOBJ_BODY,
-            )
+        (
+            self.body_names,
+            self._body_name2id,
+            self._body_id2name,
+        ) = self._extract_mj_names(
+            self._model.nbody,
+            mujoco.mjtObj.mjOBJ_BODY,
         )
         self.joint_names: tuple[str | None, ...]
         self._joint_name2id: dict[str | None, int]
         self._joint_id2name: dict[int, str | None]
-        self.joint_names, self._joint_name2id, self._joint_id2name = (
-            self._extract_mj_names(
-                self._model.njnt,
-                mujoco.mjtObj.mjOBJ_JOINT,
-            )
+        (
+            self.joint_names,
+            self._joint_name2id,
+            self._joint_id2name,
+        ) = self._extract_mj_names(
+            self._model.njnt,
+            mujoco.mjtObj.mjOBJ_JOINT,
         )
         self.geom_names: tuple[str | None, ...]
         self._geom_name2id: dict[str | None, int]
         self._geom_id2name: dict[int, str | None]
-        self.geom_names, self._geom_name2id, self._geom_id2name = (
-            self._extract_mj_names(
-                self._model.ngeom,
-                mujoco.mjtObj.mjOBJ_GEOM,
-            )
+        (
+            self.geom_names,
+            self._geom_name2id,
+            self._geom_id2name,
+        ) = self._extract_mj_names(
+            self._model.ngeom,
+            mujoco.mjtObj.mjOBJ_GEOM,
         )
         self.site_names: tuple[str | None, ...]
         self._site_name2id: dict[str | None, int]
         self._site_id2name: dict[int, str | None]
-        self.site_names, self._site_name2id, self._site_id2name = (
-            self._extract_mj_names(
-                self._model.nsite,
-                mujoco.mjtObj.mjOBJ_SITE,
-            )
+        (
+            self.site_names,
+            self._site_name2id,
+            self._site_id2name,
+        ) = self._extract_mj_names(
+            self._model.nsite,
+            mujoco.mjtObj.mjOBJ_SITE,
         )
         self.light_names: tuple[str | None, ...]
         self._light_name2id: dict[str | None, int]
         self._light_id2name: dict[int, str | None]
-        self.light_names, self._light_name2id, self._light_id2name = (
-            self._extract_mj_names(
-                self._model.nlight,
-                mujoco.mjtObj.mjOBJ_LIGHT,
-            )
+        (
+            self.light_names,
+            self._light_name2id,
+            self._light_id2name,
+        ) = self._extract_mj_names(
+            self._model.nlight,
+            mujoco.mjtObj.mjOBJ_LIGHT,
         )
         self.camera_names: tuple[str | None, ...]
         self._camera_name2id: dict[str | None, int]
         self._camera_id2name: dict[int, str | None]
-        self.camera_names, self._camera_name2id, self._camera_id2name = (
-            self._extract_mj_names(
-                self._model.ncam,
-                mujoco.mjtObj.mjOBJ_CAMERA,
-            )
+        (
+            self.camera_names,
+            self._camera_name2id,
+            self._camera_id2name,
+        ) = self._extract_mj_names(
+            self._model.ncam,
+            mujoco.mjtObj.mjOBJ_CAMERA,
         )
         self.actuator_names: tuple[str | None, ...]
         self._actuator_name2id: dict[str | None, int]
         self._actuator_id2name: dict[int, str | None]
-        self.actuator_names, self._actuator_name2id, self._actuator_id2name = (
-            self._extract_mj_names(
-                self._model.nu,
-                mujoco.mjtObj.mjOBJ_ACTUATOR,
-            )
+        (
+            self.actuator_names,
+            self._actuator_name2id,
+            self._actuator_id2name,
+        ) = self._extract_mj_names(
+            self._model.nu,
+            mujoco.mjtObj.mjOBJ_ACTUATOR,
         )
         self.sensor_names: tuple[str | None, ...]
         self._sensor_name2id: dict[str | None, int]
         self._sensor_id2name: dict[int, str | None]
-        self.sensor_names, self._sensor_name2id, self._sensor_id2name = (
-            self._extract_mj_names(
-                self._model.nsensor,
-                mujoco.mjtObj.mjOBJ_SENSOR,
-            )
+        (
+            self.sensor_names,
+            self._sensor_name2id,
+            self._sensor_id2name,
+        ) = self._extract_mj_names(
+            self._model.nsensor,
+            mujoco.mjtObj.mjOBJ_SENSOR,
         )
         self.tendon_names: tuple[str | None, ...]
         self._tendon_name2id: dict[str | None, int]
         self._tendon_id2name: dict[int, str | None]
-        self.tendon_names, self._tendon_name2id, self._tendon_id2name = (
-            self._extract_mj_names(
-                self._model.ntendon,
-                mujoco.mjtObj.mjOBJ_TENDON,
-            )
+        (
+            self.tendon_names,
+            self._tendon_name2id,
+            self._tendon_id2name,
+        ) = self._extract_mj_names(
+            self._model.ntendon,
+            mujoco.mjtObj.mjOBJ_TENDON,
         )
         self.mesh_names: tuple[str | None, ...]
         self._mesh_name2id: dict[str | None, int]
         self._mesh_id2name: dict[int, str | None]
-        self.mesh_names, self._mesh_name2id, self._mesh_id2name = (
-            self._extract_mj_names(
-                self._model.nmesh,
-                mujoco.mjtObj.mjOBJ_MESH,
-            )
+        (
+            self.mesh_names,
+            self._mesh_name2id,
+            self._mesh_id2name,
+        ) = self._extract_mj_names(
+            self._model.nmesh,
+            mujoco.mjtObj.mjOBJ_MESH,
         )
 
     def camera_name2id(self, name: str) -> int:
@@ -595,7 +615,6 @@ class MjRenderContext:
         max_width: int = 640,
         max_height: int = 480,
     ) -> None:
-
         if _MUJOCO_GL not in ("disable", "disabled", "off", "false", "0"):
             _VALID_MUJOCO_GL = ("enable", "enabled", "on", "true", "1", "glfw", "")
             if _SYSTEM == "Linux":

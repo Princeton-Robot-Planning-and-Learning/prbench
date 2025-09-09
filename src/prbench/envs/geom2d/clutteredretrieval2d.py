@@ -18,14 +18,12 @@ from prbench.envs.geom2d.object_types import (
 )
 from prbench.envs.geom2d.structs import ZOrder
 from prbench.envs.geom2d.utils import (
-    PURPLE,
     CRVRobotActionSpace,
     SE2Pose,
     create_walls_from_world_boundaries,
     get_suctioned_objects,
-    sample_se2_pose,
-    state_has_collision,
 )
+from prbench.envs.utils import PURPLE, sample_se2_pose, state_2d_has_collision
 
 TargetBlockType = Type("target_block", parent=RectangleType)
 Geom2DRobotEnvTypeFeatures[TargetBlockType] = list(
@@ -149,7 +147,7 @@ class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
         # Check for collisions with the robot and static objects.
         full_state = state.copy()
         full_state.data.update(self._initial_constant_state.data)
-        assert not state_has_collision(full_state, {robot}, static_objects, {})
+        assert not state_2d_has_collision(full_state, {robot}, static_objects, {})
         # Sample target pose and check for collisions with robot and static objects.
         for _ in range(self._spec.max_init_sampling_attempts):
             target_pose = sample_se2_pose(
@@ -162,7 +160,7 @@ class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
             target_block = state.get_objects(TargetBlockType)[0]
             full_state = state.copy()
             full_state.data.update(self._initial_constant_state.data)
-            if not state_has_collision(
+            if not state_2d_has_collision(
                 full_state, {target_block}, {robot} | static_objects, {}
             ):
                 break
@@ -207,7 +205,7 @@ class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
                 full_state.data.update(self._initial_constant_state.data)
                 new_obstruction = obj_name_to_obj[f"obstruction{len(obstructions)}"]
                 assert new_obstruction.name.startswith("obstruction")
-                if not state_has_collision(
+                if not state_2d_has_collision(
                     full_state, {new_obstruction}, set(full_state), {}
                 ):
                     break
@@ -245,7 +243,6 @@ class ObjectCentricClutteredRetrieval2DEnv(Geom2DRobotEnv):
         target_pose: SE2Pose | None = None,
         obstructions: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
     ) -> ObjectCentricState:
-
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
         assert self._initial_constant_state is not None

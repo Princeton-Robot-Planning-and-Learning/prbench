@@ -126,7 +126,6 @@ class EGLGLContext:
     """An EGL context for headless accelerated OpenGL rendering on GPU devices."""
 
     def __init__(self, max_width, max_height, device_id=0):
-
         del max_width, max_height  # unused
         num_configs = ctypes.c_long()  # pylint: disable=no-value-for-parameter
         config_size = 1
