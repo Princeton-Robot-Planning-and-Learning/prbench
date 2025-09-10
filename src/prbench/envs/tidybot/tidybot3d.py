@@ -11,8 +11,9 @@ from gymnasium.spaces import Space
 from numpy.typing import NDArray
 from prpl_utils.spaces import FunctionalSpace
 
+from prbench.envs.tidybot.mujoco_utils import MjAct, MjObs
 from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
-from prbench.envs.tidybot.tidybot_robot_env import MjAct, MjObs, TidyBotRobotEnv
+from prbench.envs.tidybot.tidybot_robot_env import TidyBotRobotEnv
 
 
 class TidyBot3DEnv(TidyBotRobotEnv):
@@ -94,18 +95,17 @@ class TidyBot3DEnv(TidyBotRobotEnv):
     def _create_action_space(self) -> Space[MjAct]:
         """Create action space for TidyBot's control interface."""
         # TidyBot actions: base_pose (3), arm_pos (3), arm_quat (4), gripper_pos (1)
-        # NOTE: this will be refactored soon after we introduce object-centric structs.
         low = np.array(
             [-1.0, -1.0, -np.pi, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 0.0]
         )
         high = np.array([1.0, 1.0, np.pi, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
         def _contains_fn(x: Any) -> bool:
-            # Weak check, will change soon.
-            return isinstance(x, (dict, np.ndarray))
+            return isinstance(x, MjAct)
 
         def _sample_fn(rng: np.random.Generator) -> MjAct:
-            return rng.uniform(low, high)
+            ctrl = rng.uniform(low, high)
+            return MjAct(ctrl=ctrl)
 
         return FunctionalSpace(contains_fn=_contains_fn, sample_fn=_sample_fn)
 
@@ -116,15 +116,6 @@ class TidyBot3DEnv(TidyBotRobotEnv):
             value = obs[key]
             obs_vector.extend(value.flatten())
         return np.array(obs_vector, dtype=np.float32)
-
-    def _action_to_dict(self, action_vector: NDArray[np.float32]) -> dict[str, Any]:
-        """Convert action vector to TidyBot action dict."""
-        return {
-            "base_pose": action_vector[:3],
-            "arm_pos": action_vector[3:6],
-            "arm_quat": action_vector[6:10],
-            "gripper_pos": action_vector[10:11],
-        }
 
     def _create_scene_xml(self) -> str:
         """Create the MuJoCo XML string for the current scene configuration."""
@@ -273,9 +264,8 @@ class TidyBot3DEnv(TidyBotRobotEnv):
             cv.waitKey(1)  # pylint: disable=no-member
 
     def step(self, action: MjAct) -> tuple[MjObs, float, bool, bool, dict[str, Any]]:
-        assert isinstance(action, np.ndarray)
-        action_dict = self._action_to_dict(action)
-        super().step(action_dict)
+        # Run the action.
+        super().step(action)
 
         # Get observation
         obs = self.get_obs()
@@ -290,7 +280,7 @@ class TidyBot3DEnv(TidyBotRobotEnv):
                 )
 
         # Calculate reward and termination
-        reward = self._calculate_reward(obs)
+        reward = self.reward(obs)
         terminated = self._is_terminated(obs)
         truncated = False
 
@@ -299,11 +289,11 @@ class TidyBot3DEnv(TidyBotRobotEnv):
 
         return final_obs, reward, terminated, truncated, {}
 
-    def _calculate_reward(self, obs: dict[str, Any]) -> float:
+    def reward(self, obs: MjObs) -> float:
         """Calculate reward based on task completion."""
         return self._reward_calculator.calculate_reward(obs)
 
-    def _is_terminated(self, obs: dict[str, Any]) -> bool:
+    def _is_terminated(self, obs: MjObs) -> bool:
         """Check if episode should terminate."""
         return self._reward_calculator.is_terminated(obs)
 

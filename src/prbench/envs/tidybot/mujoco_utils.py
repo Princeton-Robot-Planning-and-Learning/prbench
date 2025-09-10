@@ -12,6 +12,7 @@ import gc
 import os
 import platform
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from threading import Lock
 from typing import Any, TypeAlias
 
@@ -54,7 +55,18 @@ _MjSim_render_lock = Lock()
 
 
 MjObs: TypeAlias = dict[str, NDArray[Any]]
-MjAct: TypeAlias = NDArray[Any] | dict[str, Any]
+
+
+@dataclass(frozen=True)
+class MjAct:
+    """An action in a MuJoCo environment.
+
+    The ctrl field is used to set sim.data.ctrl in the MuJoCo environment. Depending on
+    how the environment is defined, these control inputs may refer to positions,
+    velocities, or torques.
+    """
+
+    ctrl: NDArray[np.float64]
 
 
 class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
@@ -83,7 +95,6 @@ class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
         # Simulation-related attributes, change with creating/closing env
         self.sim: MjSim | None = None
         self.timestep: int | None = None
-        self.done: bool = False
 
         self.show_viewer: bool = show_viewer
         self.control_frequency: float = control_frequency
@@ -124,48 +135,11 @@ class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
         # Subclasses should override.
         pass
 
-    def _pre_action(self, action: MjAct) -> None:
-        """Do any preprocessing before taking an action.
-
-        Args:
-            action (np.array): Action to execute within the environment.
-        """
-        if self.sim is not None:
-            if isinstance(action, dict):
-                raise NotImplementedError(
-                    "Dict actions not implemented in base MujocoEnv _pre_action"
-                )
-            self.sim.data.ctrl[:] = action
-
-    def _post_action(self, action: MjAct) -> tuple[float, bool, dict[str, Any]]:
-        """Do any housekeeping after taking an action.
-
-        Args:
-            action (np.array): Action to execute within the environment.
-
-        Returns:
-            reward (float): Reward from the environment.
-            done (bool): Whether the episode is completed.
-            info (dict): Additional information.
-        """
-        reward = self.reward(action=action)
-        done = False  # Default to not done unless overridden
-        info: dict[str, object] = {}
-        return reward, done, info
-
     @abc.abstractmethod
-    def reward(self, **kwargs: Any) -> float:
-        """Compute the reward for the current state and action.
-
-        Returns:
-            reward (float): Computed reward.
-        """
-        raise NotImplementedError
+    def reward(self, obs: MjObs) -> float:
+        """Compute the reward from an observation."""
 
     def step(self, action: MjAct) -> tuple[MjObs, float, bool, bool, dict[str, Any]]:
-        if self.done:
-            raise ValueError("Executing action in a terminated episode.")
-
         assert self.sim is not None, "Simulation must be initialized before stepping."
 
         assert self.timestep is not None, "Timestep must be initialized."
@@ -175,18 +149,18 @@ class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
         # is reached
         control_timestep = 1.0 / self.control_frequency
         for _ in range(int(control_timestep / SIMULATION_TIMESTEP)):
-            self._pre_action(action)
+            self.sim.data.ctrl[:] = action.ctrl
             self.sim.forward()
             self.sim.step()
 
         # Post-action processing
-        reward, self.done, info = self._post_action(action)
-
-        # Check if the episode is done due to horizon
-        self.done = self.done or (self.timestep >= self.horizon)
+        obs = self.get_obs()
+        reward = self.reward(obs)
+        terminated = self.timestep >= self.horizon
         truncated = False
+        info: dict[str, object] = {}
 
-        return self.get_obs(), reward, self.done, truncated, info
+        return obs, reward, terminated, truncated, info
 
     def get_obs(self) -> MjObs:
         """Get the current observation."""
@@ -235,7 +209,6 @@ class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
             self.sim.free()
         self.sim = None
         self.timestep = None
-        self.done = False
 
     def _create_sim(self, xml_string: str) -> None:
         """Initialize the MuJoCo simulation with the provided XML string. Also resets
@@ -250,7 +223,6 @@ class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
             self.camera_height,
         )
         self.timestep: int = 0  # type: ignore[no-redef]
-        self.done: bool = False  # type: ignore[no-redef]
 
         if self.show_viewer:
             mujoco.viewer.launch(

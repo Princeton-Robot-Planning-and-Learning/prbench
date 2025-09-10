@@ -1,6 +1,7 @@
 """This module defines the TidyBotRobotEnv class, which is the base class for the
 TidyBot robot in simulation."""
 
+import abc
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Optional
@@ -8,12 +9,14 @@ from typing import Any, Optional
 import numpy as np
 from numpy.typing import NDArray
 
-from prbench.envs.tidybot.mujoco_utils import MjAct, MjObs, MujocoEnv
+from prbench.envs.tidybot.mujoco_utils import MjObs, MujocoEnv
 
 
-class TidyBotRobotEnv(MujocoEnv):
-    """This is the base class for TidyBot environments that use MuJoCo for
-    simulation."""
+class TidyBotRobotEnv(MujocoEnv, abc.ABC):
+    """This is the base class for TidyBot environments that use MuJoCo for sim.
+
+    It is still abstract: subclasses define rewards and add objects to the env.
+    """
 
     def __init__(
         self,
@@ -255,18 +258,3 @@ class TidyBotRobotEnv(MujocoEnv):
 
         # Return the merged XML as string
         return ET.tostring(input_root, encoding="unicode")
-
-    def _pre_action(self, action: MjAct) -> None:
-        """Do any preprocessing before taking an action.
-
-        Args:
-            action: Action to execute within the environment.
-        """
-
-    def step(self, action: MjAct) -> tuple[MjObs, float, bool, bool, dict[str, Any]]:
-        assert isinstance(action, dict), "Action must be a dictionary."
-        return super().step(action)
-
-    def reward(self, **kwargs: Any) -> float:
-        """Compute the reward for the current state and action."""
-        return 0.0  # Placeholder reward
