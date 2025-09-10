@@ -4,13 +4,14 @@ from relational_structs import Type
 
 Dynamic2DRobotEnvTypeFeatures: dict[Type, list[str]] = {}
 
+ObjectType = Type("object")
 # All bodies have an origin (x, y), a rotation (in radians),
 # a velocity (vx, vy), an angular velocity (omega),
 # a bit indicating whether the geom is static,
 # a bit indicating whether the geom is kinematic,
 # a bit indicating whether the geom is dynamic.
 # They also have RGB.
-Dynamic2DType = Type("dynamic2d")
+Dynamic2DType = Type("dynamic2d", parent=ObjectType)
 Dynamic2DRobotEnvTypeFeatures[Dynamic2DType] = [
     "x",
     "y",
@@ -49,13 +50,13 @@ Dynamic2DRobotEnvTypeFeatures[DynRectangleType] = Dynamic2DRobotEnvTypeFeatures[
 # gripper_base. The arm_length is the max value of arm_joint. The gripper_gap is
 # the distance between the two grippers. The gripper_height and gripper_width are
 # for the grippers.
-KinRobotType = Type("kin_robot")
+KinRobotType = Type("kin_robot", parent=Dynamic2DType)
 Dynamic2DRobotEnvTypeFeatures[KinRobotType] = [
     "x",
-    "vx",
     "y",
-    "vy",
     "theta",
+    "vx",
+    "vy",
     "omega",
     "static",
     "base_radius",
