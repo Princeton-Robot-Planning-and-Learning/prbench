@@ -105,7 +105,7 @@ class TidyBot3DEnv(TidyBotRobotEnv):
 
         def _sample_fn(rng: np.random.Generator) -> MjAct:
             ctrl = rng.uniform(low, high)
-            return MjAct(ctrl=ctrl)
+            return MjAct(position_ctrl=ctrl)
 
         return FunctionalSpace(contains_fn=_contains_fn, sample_fn=_sample_fn)
 

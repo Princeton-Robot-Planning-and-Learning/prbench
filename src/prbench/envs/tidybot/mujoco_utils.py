@@ -61,12 +61,12 @@ MjObs: TypeAlias = dict[str, NDArray[Any]]
 class MjAct:
     """An action in a MuJoCo environment.
 
-    The ctrl field is used to set sim.data.ctrl in the MuJoCo environment. Depending on
-    how the environment is defined, these control inputs may refer to positions,
-    velocities, or torques.
+    The position_ctrl field is used to set sim.data.ctrl in the MuJoCo environment. For
+    now, we assume that all actuators (as defined in the MuJoCo xml) use position
+    control, hence the variable name.
     """
 
-    ctrl: NDArray[np.float64]
+    position_ctrl: NDArray[np.float64]
 
 
 class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
@@ -149,7 +149,7 @@ class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
         # is reached
         control_timestep = 1.0 / self.control_frequency
         for _ in range(int(control_timestep / SIMULATION_TIMESTEP)):
-            self.sim.data.ctrl[:] = action.ctrl
+            self.sim.data.ctrl[:] = action.position_ctrl
             self.sim.forward()
             self.sim.step()
 
