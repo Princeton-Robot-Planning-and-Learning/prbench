@@ -1,6 +1,9 @@
 """Basic tests for the TidyBot3D environment observation and action space validity,
 step, and reset."""
 
+import numpy as np
+
+from prbench.envs.tidybot.mujoco_utils import MjAct
 from prbench.envs.tidybot.tidybot3d import TidyBot3DEnv
 
 
@@ -18,6 +21,17 @@ def test_tidybot3d_action_space():
     env = TidyBot3DEnv(num_objects=3, render_images=False)
     action = env.action_space.sample()
     assert env.action_space.contains(action), "Action not in action space"
+    assert isinstance(action, MjAct)
+    env.close()
+
+
+def test_tidybot3d_step():
+    """Test that stepping the environment leads to some nontrivial change."""
+    env = TidyBot3DEnv(num_objects=3, render_images=False)
+    obs, _ = env.reset()
+    action = env.action_space.sample()
+    next_obs, _, _, _, _ = env.step(action)
+    assert not np.allclose(obs["vec"], next_obs["vec"])
     env.close()
 
 
