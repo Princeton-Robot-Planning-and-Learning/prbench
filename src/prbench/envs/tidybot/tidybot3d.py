@@ -12,6 +12,7 @@ from numpy.typing import NDArray
 from prpl_utils.spaces import FunctionalSpace
 
 from prbench.envs.tidybot.mujoco_utils import MjAct, MjObs
+from prbench.envs.tidybot.objects import Cube
 from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
 from prbench.envs.tidybot.tidybot_robot_env import TidyBotRobotEnv
 
@@ -61,7 +62,7 @@ class TidyBot3DEnv(TidyBotRobotEnv):
                 raise ValueError("Cannot show images if render_images is False")
 
         # Initialize empty object list
-        self._object_names: list[str] = []
+        self._objects: list[str] = []
 
         self._reward_calculator = create_reward_calculator(
             self.scene_type, self.num_objects
@@ -147,18 +148,15 @@ class TidyBot3DEnv(TidyBotRobotEnv):
                 # Insert new cubes
                 for i in range(self.num_objects):
                     name = f"cube{i+1}"
-                    body = ET.Element("body")
-                    ET.SubElement(body, "freejoint", name=f"{name}_joint")
-                    ET.SubElement(
-                        body,
-                        "geom",
-                        type="box",
-                        size="0.02 0.02 0.02",
-                        rgba=".5 .7 .5 1",
-                        mass="0.1",
+                    # Create cube using the Cube class
+                    obj = Cube(
+                        name=name, size=0.02, rgba=".5 .7 .5 1", mass=0.1, env=self
                     )
+                    # Get the XML element from the cube
+                    body = obj.xml_element
+
                     worldbody.append(body)
-                    self._object_names.append(name)
+                    self._objects.append(obj)
 
                 # Get XML string from tree
                 xml_string = ET.tostring(root, encoding="unicode")
@@ -171,32 +169,12 @@ class TidyBot3DEnv(TidyBotRobotEnv):
 
         return xml_string
 
-    def _set_object_pos_quat(
-        self, name: str, pos: NDArray[np.float32], quat: NDArray[np.float32]
-    ) -> None:
-        """Set object position and orientation in the environment."""
-
-        assert self.sim is not None, "Simulation not initialized"
-        joint_id = self.sim.model.get_joint_qpos_addr(f"{name}_joint")
-        self.sim.data.qpos[joint_id : joint_id + 7] = np.array(
-            [float(x) for x in pos] + [float(q) for q in quat]
-        )
-
-    def get_object_pos_quat(self, name: str) -> tuple[float, float]:
-        """Set object position and orientation in the environment."""
-
-        assert self.sim is not None, "Simulation not initialized"
-        joint_id = self.sim.model.get_joint_qpos_addr(f"{name}_joint")
-        pos = self.sim.data.qpos[joint_id : joint_id + 3]
-        quat = self.sim.data.qpos[joint_id + 3 : joint_id + 7]
-        return pos, quat
-
     def _initialize_object_poses(self) -> None:
         """Initialize object poses in the environment."""
 
         assert self.sim is not None, "Simulation not initialized"
 
-        for name in self._object_names:
+        for obj in self._objects:
             pos = np.array([0.0, 0.0, 0.0])
             if self.scene_type == "cupboard":
                 pass  # no position randomization for cupboard scene
@@ -219,7 +197,7 @@ class TidyBot3DEnv(TidyBotRobotEnv):
             quat = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
 
             # Set object pose in the environment
-            self._set_object_pos_quat(name, pos, quat)
+            obj.set_pose(pos, quat)
 
         self.sim.forward()
 
@@ -230,7 +208,7 @@ class TidyBot3DEnv(TidyBotRobotEnv):
         options: dict[str, Any] | None = None,
     ) -> tuple[MjObs, dict[str, Any]]:
         # Create scene XML
-        self._object_names = []
+        self._objects = []
         xml_string = self._create_scene_xml()
 
         # Reset the underlying TidyBot robot environment
