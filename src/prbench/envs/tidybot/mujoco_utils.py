@@ -173,7 +173,9 @@ class MujocoEnv(gymnasium.Env[MjObs, MjAct]):
             [float(x) for x in pos] + [float(q) for q in quat]
         )
 
-    def get_joint_pos_quat(self, name: str) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
+    def get_joint_pos_quat(
+        self, name: str
+    ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """Get joint position and orientation in the environment."""
 
         assert self.sim is not None, "Simulation not initialized"
