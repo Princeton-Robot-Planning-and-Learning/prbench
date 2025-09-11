@@ -79,8 +79,9 @@ class KinRobotActionSpace(Box):
 class KinRobot:
     """Robot implementation using PyMunk physics engine with four bodies.
 
-    The robot has a circular base, a rectangular gripper base, and two rectangular
-    fingers. The gripper base is attached to the robot base via a kinematic arm that can
+    The robot has a circular base, a rectangular gripper base (attached one arm and 
+    one right finger), and a left fingers. 
+    The gripper base is attached to the robot base via a kinematic arm that can
     extend and retract. The fingers can open and close to grasp objects.
 
     The robot can held objects by closing the fingers around them.
