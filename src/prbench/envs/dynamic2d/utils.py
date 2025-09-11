@@ -629,6 +629,10 @@ def create_walls_from_world_boundaries(
 
     Velocities are used to determine how large the walls need to be to avoid the
     possibility that the robot will transport over the wall.
+
+    Left and right walls are considered "surfaces" (z_order=1) while top and bottom
+    walls are considered "floors" (z_order=0). Otherwise there might be weird collision
+    betweent left/right walls and top/bottom walls.
     """
     state_dict: dict[Object, dict[str, float]] = {}
     # Right wall.
@@ -647,7 +651,7 @@ def create_walls_from_world_boundaries(
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
-        "z_order": ZOrder.ALL.value,
+        "z_order": ZOrder.SURFACE.value,
     }
     # Left wall.
     left_wall = Object("left_wall", KinRectangleType)
@@ -664,7 +668,7 @@ def create_walls_from_world_boundaries(
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
-        "z_order": ZOrder.ALL.value,
+        "z_order": ZOrder.SURFACE.value,
     }
     # Top wall.
     top_wall = Object("top_wall", KinRectangleType)
@@ -682,7 +686,7 @@ def create_walls_from_world_boundaries(
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
-        "z_order": ZOrder.ALL.value,
+        "z_order": ZOrder.FLOOR.value,
     }
     # Bottom wall.
     bottom_wall = Object("bottom_wall", KinRectangleType)
@@ -699,7 +703,7 @@ def create_walls_from_world_boundaries(
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
-        "z_order": ZOrder.ALL.value,
+        "z_order": ZOrder.FLOOR.value,
     }
     return state_dict
 
