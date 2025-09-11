@@ -4,14 +4,13 @@ from relational_structs import Type
 
 Dynamic2DRobotEnvTypeFeatures: dict[Type, list[str]] = {}
 
-ObjectType = Type("object")
 # All bodies have an origin (x, y), a rotation (in radians),
 # a velocity (vx, vy), an angular velocity (omega),
 # a bit indicating whether the geom is static,
 # a bit indicating whether the geom is kinematic,
 # a bit indicating whether the geom is dynamic.
 # They also have RGB.
-Dynamic2DType = Type("dynamic2d", parent=ObjectType)
+Dynamic2DType = Type("dynamic2d")
 Dynamic2DRobotEnvTypeFeatures[Dynamic2DType] = [
     "x",
     "y",
