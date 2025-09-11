@@ -6,14 +6,16 @@ from typing import Optional, Union
 import numpy as np
 from numpy.typing import NDArray
 
+from prbench.envs.tidybot.mujoco_utils import MujocoEnv
+
 
 class MujocoObjectState:
     """Class to represent the state of a MujocoObject."""
 
     def __init__(
         self,
-        position: NDArray[np.float64],
-        orientation: NDArray[np.float64],
+        position: NDArray[np.float32],
+        orientation: NDArray[np.float32],
     ) -> None:
         """Initialize a MujocoObjectState.
 
@@ -38,7 +40,7 @@ class MujocoObject:
     def __init__(
         self,
         name: str,
-        env: Optional[object] = None,
+        env: Optional[MujocoEnv] = None,
     ) -> None:
         """Initialize a MujocoObject.
 
@@ -50,7 +52,7 @@ class MujocoObject:
         self.joint_name = f"{name}_joint"
         self.env = env
 
-    def get_position(self) -> NDArray[np.float64]:
+    def get_position(self) -> NDArray[np.float32]:
         """Get the object's current position.
 
         Returns:
@@ -65,7 +67,7 @@ class MujocoObject:
         pos, _ = self.env.get_joint_pos_quat(self.joint_name)
         return pos
 
-    def get_orientation(self) -> NDArray[np.float64]:
+    def get_orientation(self) -> NDArray[np.float32]:
         """Get the object's current orientation.
 
         Returns:
@@ -80,7 +82,7 @@ class MujocoObject:
         _, quat = self.env.get_joint_pos_quat(self.joint_name)
         return quat
 
-    def get_pose(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    def get_pose(self) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """Get the object's current position and orientation.
 
         Returns:
@@ -94,7 +96,7 @@ class MujocoObject:
 
         return self.env.get_joint_pos_quat(self.joint_name)
 
-    def set_position(self, position: Union[list[float], NDArray[np.float64]]) -> None:
+    def set_position(self, position: Union[list[float], NDArray[np.float32]]) -> None:
         """Set the object's position.
 
         Args:
@@ -113,7 +115,7 @@ class MujocoObject:
         self.env.set_joint_pos_quat(self.joint_name, np.array(position), current_quat)
 
     def set_orientation(
-        self, quaternion: Union[list[float], NDArray[np.float64]]
+        self, quaternion: Union[list[float], NDArray[np.float32]]
     ) -> None:
         """Set the object's orientation.
 
@@ -134,8 +136,8 @@ class MujocoObject:
 
     def set_pose(
         self,
-        position: Union[list[float], NDArray[np.float64]],
-        quaternion: Union[list[float], NDArray[np.float64]],
+        position: Union[list[float], NDArray[np.float32]],
+        quaternion: Union[list[float], NDArray[np.float32]],
     ) -> None:
         """Set the object's position and orientation.
 
@@ -178,7 +180,7 @@ class Cube(MujocoObject):
         size: Union[float, list[float]] = 0.02,
         rgba: Union[str, list[float]] = ".5 .7 .5 1",
         mass: float = 0.1,
-        env: Optional[object] = None,
+        env: Optional[MujocoEnv] = None,
     ) -> None:
         """Initialize a Cube object.
 
