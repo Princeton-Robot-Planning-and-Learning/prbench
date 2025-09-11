@@ -242,7 +242,8 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             # Remove all bodies and shapes
             for body in list(self.pymunk_space.bodies):
                 for shape in list(body.shapes):
-                    self.pymunk_space.remove(body, shape)
+                    if body in self.pymunk_space.bodies:
+                        self.pymunk_space.remove(body, shape)
             for shape in list(self.pymunk_space.shapes):
                 # Some shapes are not attached to bodies (e.g., static lines)
                 self.pymunk_space.remove(shape)
@@ -321,7 +322,6 @@ class Dynamic2DRobotEnv(gymnasium.Env):
                 base_vel,
                 base_ang_vel,
                 gripper_base_vel,
-                finger_vel_r,
                 finger_vel_l,
                 held_obj_vel,
             ) = self.pd_controller.compute_control(
@@ -338,7 +338,6 @@ class Dynamic2DRobotEnv(gymnasium.Env):
                 base_vel,
                 base_ang_vel,
                 gripper_base_vel,
-                finger_vel_r,
                 finger_vel_l,
                 held_obj_vel,
             )

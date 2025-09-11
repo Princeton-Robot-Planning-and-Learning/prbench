@@ -53,7 +53,7 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
     # Robot parameters
     init_robot_pos: tuple[float, float] = (0.5, 0.5)
     robot_base_radius: float = 0.24
-    robot_arm_length_max: float = 2 * robot_base_radius
+    robot_arm_length_max: float = 3 * robot_base_radius
     gripper_base_width: float = 0.06
     gripper_base_height: float = 0.32
     gripper_finger_width: float = 0.2
