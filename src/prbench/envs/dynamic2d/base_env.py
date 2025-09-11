@@ -1,6 +1,7 @@
 """Base class for Dynamic2D (PyMunk) robot environments."""
 
 import abc
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -241,7 +242,8 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             # Remove all bodies and shapes
             for body in list(self.pymunk_space.bodies):
                 for shape in list(body.shapes):
-                    self.pymunk_space.remove(body, shape)
+                    if body in self.pymunk_space.bodies:
+                        self.pymunk_space.remove(body, shape)
             for shape in list(self.pymunk_space.shapes):
                 # Some shapes are not attached to bodies (e.g., static lines)
                 self.pymunk_space.remove(shape)
@@ -313,13 +315,13 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             self.robot.is_closing_finger = False
 
         # Multi-step simulation like pushT env
+        s = time.time()
         for _ in range(n_steps):
             # Use PD control to compute base and gripper velocities
             (
                 base_vel,
                 base_ang_vel,
                 gripper_base_vel,
-                finger_vel_r,
                 finger_vel_l,
                 held_obj_vel,
             ) = self.pd_controller.compute_control(
@@ -336,7 +338,6 @@ class Dynamic2DRobotEnv(gymnasium.Env):
                 base_vel,
                 base_ang_vel,
                 gripper_base_vel,
-                finger_vel_r,
                 finger_vel_l,
                 held_obj_vel,
             )
@@ -344,6 +345,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             for _ in range(self._spec.sim_hz // self._spec.control_hz):
                 self.pymunk_space.step(sim_dt)
 
+        print(f"Stepping time: {(time.time()-s) * 1000} ms")
         # NOTE: We currently assume the robot can only grasp one object at a time.
         # Assuming that the missing object body and the new body is naturally matched.
         # Need an update in the future if we allow multiple objects to be grasped.
