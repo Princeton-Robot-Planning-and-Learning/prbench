@@ -236,7 +236,10 @@ class Cube(MujocoObject):
 
     def __str__(self) -> str:
         """String representation of the cube."""
-        return f"Cube(name='{self.name}', size={self.size}, rgba='{self.rgba}', mass={self.mass})"
+        return (
+            f"Cube(name='{self.name}', size={self.size}, "
+            f"rgba='{self.rgba}', mass={self.mass})"
+        )
 
     def __repr__(self) -> str:
         """Detailed string representation of the cube."""
