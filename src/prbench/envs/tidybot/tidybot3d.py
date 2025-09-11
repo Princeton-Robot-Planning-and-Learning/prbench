@@ -12,7 +12,7 @@ from numpy.typing import NDArray
 from prpl_utils.spaces import FunctionalSpace
 
 from prbench.envs.tidybot.mujoco_utils import MjAct, MjObs
-from prbench.envs.tidybot.objects import Cube
+from prbench.envs.tidybot.objects import Cube, MujocoObject
 from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
 from prbench.envs.tidybot.tidybot_robot_env import TidyBotRobotEnv
 
@@ -62,7 +62,7 @@ class TidyBot3DEnv(TidyBotRobotEnv):
                 raise ValueError("Cannot show images if render_images is False")
 
         # Initialize empty object list
-        self._objects: list[str] = []
+        self._objects: list[MujocoObject] = []
 
         self._reward_calculator = create_reward_calculator(
             self.scene_type, self.num_objects
