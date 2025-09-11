@@ -67,6 +67,7 @@ class Dynamic2DRobotEnvSpec:
     gripper_base_height: float = 0.1
     gripper_finger_width: float = 0.1
     gripper_finger_height: float = 0.01
+    finger_moving_threshold: float = 1e-3  # threshold to consider finger moving
 
     # Controller parameters
     # NOTE: Do not modify these parameters and the control_hz, sim_hz unless you
@@ -302,10 +303,11 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         curr_held_obj_pymunk_idx = [
             kin_obj[0].id for kin_obj, _, _ in self.robot.held_objects
         ]
-        if tgt_gripper > self.robot.curr_gripper:
+        # Allow small change in finger gap without changing state
+        if tgt_gripper - self.robot.curr_gripper > self._spec.finger_moving_threshold:
             self.robot.is_opening_finger = True
             self.robot.is_closing_finger = False
-        elif tgt_gripper < self.robot.curr_gripper:
+        elif self.robot.curr_gripper - tgt_gripper > self._spec.finger_moving_threshold:
             self.robot.is_opening_finger = False
             self.robot.is_closing_finger = True
         else:
