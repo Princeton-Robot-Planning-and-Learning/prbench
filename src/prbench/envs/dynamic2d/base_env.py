@@ -67,6 +67,7 @@ class Dynamic2DRobotEnvSpec:
     gripper_base_height: float = 0.1
     gripper_finger_width: float = 0.1
     gripper_finger_height: float = 0.01
+    finger_moving_threshold: float = 1e-3  # threshold to consider finger moving
 
     # Controller parameters
     # NOTE: Do not modify these parameters and the control_hz, sim_hz unless you
@@ -241,7 +242,8 @@ class Dynamic2DRobotEnv(gymnasium.Env):
             # Remove all bodies and shapes
             for body in list(self.pymunk_space.bodies):
                 for shape in list(body.shapes):
-                    self.pymunk_space.remove(body, shape)
+                    if body in self.pymunk_space.bodies:
+                        self.pymunk_space.remove(body, shape)
             for shape in list(self.pymunk_space.shapes):
                 # Some shapes are not attached to bodies (e.g., static lines)
                 self.pymunk_space.remove(shape)
@@ -302,10 +304,11 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         curr_held_obj_pymunk_idx = [
             kin_obj[0].id for kin_obj, _, _ in self.robot.held_objects
         ]
-        if tgt_gripper > self.robot.curr_gripper:
+        # Allow small change in finger gap without changing state
+        if tgt_gripper - self.robot.curr_gripper > self._spec.finger_moving_threshold:
             self.robot.is_opening_finger = True
             self.robot.is_closing_finger = False
-        elif tgt_gripper < self.robot.curr_gripper:
+        elif self.robot.curr_gripper - tgt_gripper > self._spec.finger_moving_threshold:
             self.robot.is_opening_finger = False
             self.robot.is_closing_finger = True
         else:
@@ -319,7 +322,6 @@ class Dynamic2DRobotEnv(gymnasium.Env):
                 base_vel,
                 base_ang_vel,
                 gripper_base_vel,
-                finger_vel_r,
                 finger_vel_l,
                 held_obj_vel,
             ) = self.pd_controller.compute_control(
@@ -336,7 +338,6 @@ class Dynamic2DRobotEnv(gymnasium.Env):
                 base_vel,
                 base_ang_vel,
                 gripper_base_vel,
-                finger_vel_r,
                 finger_vel_l,
                 held_obj_vel,
             )
@@ -363,7 +364,6 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Drop objects after internal steps
         if self.robot.is_opening_finger:
-            # Note: need to update self._state_obj_to_pymunk_body later.
             for kin_obj, mass, _ in self.robot.held_objects:
                 kinematic_body, kinematic_shape = kin_obj
                 points = kinematic_shape.get_vertices()

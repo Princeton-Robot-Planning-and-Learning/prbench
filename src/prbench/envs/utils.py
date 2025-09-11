@@ -196,6 +196,25 @@ def kin_robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBod
     )
     bodies.append(gripper_base)
 
+    # Arm
+    gripper_base_arm_rel_se2 = SE2Pose(
+        x=(-state.get(obj, "arm_length") / 2 - gripper_base_width / 2),
+        y=0.0,
+        theta=0.0,
+    )
+    arm_se2 = gripper_base_pose * gripper_base_arm_rel_se2
+    rect = Rectangle.from_center(
+        center_x=arm_se2.x,
+        center_y=arm_se2.y,
+        height=gripper_base_width,
+        width=state.get(obj, "arm_length"),
+        rotation_about_center=theta,
+    )
+    z_order = ZOrder.ALL
+    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
+    arm = Body2D(rect, z_order, rendering_kwargs, name="arm")
+    bodies.append(arm)
+
     # Fingers
     relative_dx = state.get(obj, "finger_width") / 2
     relative_dy_r = -gripper_base_height / 2
