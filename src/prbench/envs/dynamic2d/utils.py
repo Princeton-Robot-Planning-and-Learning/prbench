@@ -135,12 +135,12 @@ class KinRobot:
     def add_to_space(self, space: pymunk.Space) -> None:
         """Add robot components to the PyMunk space."""
         space.add(self._base_body, self._base_shape)
-        all_gripper_base_shapes = [
+        space.add(
+            self._gripper_base_body,
             self._gripper_base_shape,
             self._arm_shape,
-            self._right_finger_shape
-        ]
-        space.add(self._gripper_base_body, *all_gripper_base_shapes)
+            self._right_finger_shape,
+        )
         space.add(self._left_finger_body, self._left_finger_shape)
 
     def create_base(self) -> None:
@@ -185,23 +185,29 @@ class KinRobot:
         self._gripper_base_shape.density = 1.0
 
         vs_arm = [
-            (-self.arm_length_max / 2 - half_w, half_w),
-            (-self.arm_length_max / 2 - half_w, -half_w),
-            (-half_w, -half_w),
-            (-half_w, half_w),
+            (-self.arm_length_max / 2, half_w),
+            (-self.arm_length_max / 2, -half_w),
+            (self.arm_length_max / 2, -half_w),
+            (self.arm_length_max / 2, half_w),
         ]
-        self._arm_shape = pymunk.Poly(self._gripper_base_body, vs_arm)
+        ts_arm = pymunk.Transform(tx=-self.arm_length_max / 2 - half_w, ty=0)
+        self._arm_shape = pymunk.Poly(self._gripper_base_body, vs_arm, transform=ts_arm)
         self._arm_shape.friction = 1
         self._arm_shape.collision_type = ROBOT_COLLISION_TYPE
         self._arm_shape.density = 1.0
 
         vs_right_finger = [
-            (0, self.gripper_finger_width / 2),
-            (0, -self.gripper_finger_width / 2),
-            (self.gripper_finger_height, -self.gripper_finger_width / 2),
-            (self.gripper_finger_height, self.gripper_finger_width / 2),
+            (-self.gripper_finger_width / 2, -self.gripper_finger_height / 2),
+            (-self.gripper_finger_width / 2, self.gripper_finger_height / 2),
+            (self.gripper_finger_width / 2, -self.gripper_finger_height / 2),
+            (self.gripper_finger_width / 2, self.gripper_finger_height / 2),
         ]
-        self._right_finger_shape = pymunk.Poly(self._gripper_base_body, vs_right_finger)
+        ts_finger = pymunk.Transform(
+            tx=self.gripper_finger_width / 2, ty=-self.gripper_base_height / 2
+        )
+        self._right_finger_shape = pymunk.Poly(
+            self._gripper_base_body, vs_right_finger, transform=ts_finger
+        )
         self._right_finger_shape.friction = 1
         self._right_finger_shape.collision_type = ROBOT_COLLISION_TYPE
         self._right_finger_shape.density = 1.0
@@ -228,7 +234,7 @@ class KinRobot:
             self._gripper_base_body.angular_velocity,
         )
 
-    def create_finger(self, left: bool = True) -> tuple[pymunk.Body, pymunk.Shape]:
+    def create_finger(self) -> tuple[pymunk.Body, pymunk.Shape]:
         """Create a gripper finger."""
         half_w = self.gripper_finger_width / 2
         half_h = self.gripper_finger_height / 2
@@ -256,18 +262,18 @@ class KinRobot:
     def finger_poses(self) -> SE2Pose:
         """Get the left finger pose as SE2Pose."""
         return SE2Pose(
-                x=self._left_finger_body.position.x,
-                y=self._left_finger_body.position.y,
-                theta=self._left_finger_body.angle,
-            )
+            x=self._left_finger_body.position.x,
+            y=self._left_finger_body.position.y,
+            theta=self._left_finger_body.angle,
+        )
 
     @property
     def finger_vels(self) -> tuple[Vec2d, float]:
         """Get the left finger linear and angular velocity."""
         return (
-                self._left_finger_body.velocity,
-                self._left_finger_body.angular_velocity,
-            )
+            self._left_finger_body.velocity,
+            self._left_finger_body.angular_velocity,
+        )
 
     @property
     def held_object_vels(self) -> list[tuple[Vec2d, float]]:
@@ -281,9 +287,7 @@ class KinRobot:
     @property
     def curr_gripper(self) -> float:
         """Get the current gripper opening."""
-        relative_finger_pose = (
-            self.gripper_base_pose.inverse * self.finger_poses
-        )
+        relative_finger_pose = self.gripper_base_pose.inverse * self.finger_poses
         return relative_finger_pose.y + self.gripper_base_height / 2
 
     @property
@@ -367,9 +371,7 @@ class KinRobot:
 
         relative_pose = self.base_pose.inverse * self.gripper_base_pose
         self._arm_length = relative_pose.x
-        relative_finger_pose = (
-            self.gripper_base_pose.inverse * self.finger_poses
-        )
+        relative_finger_pose = self.gripper_base_pose.inverse * self.finger_poses
         self._gripper_gap = relative_finger_pose.y + self.gripper_base_height / 2
 
     def update(
@@ -419,8 +421,9 @@ class KinRobot:
             return False
         # Checker 2: If exist contact points in hand and target body is within
         # the gripper height
-        rel_body = self.gripper_base_pose.inverse * SE2Pose(x=tgt_body.position.x, 
-                                                y=tgt_body.position.y, theta=0.0)
+        rel_body = self.gripper_base_pose.inverse * SE2Pose(
+            x=tgt_body.position.x, y=tgt_body.position.y, theta=0.0
+        )
         if abs(rel_body.y) > self.gripper_base_height / 2:
             return False
         for pt in contact_point_set.points:
@@ -428,8 +431,7 @@ class KinRobot:
             p_a = SE2Pose(x=pt_a.x, y=pt_a.y, theta=0.0)
             rel_a = self.gripper_base_pose.inverse * p_a
             if (abs(rel_a.y) < self.gripper_base_height / 2) and (
-                (rel_a.x < self.gripper_finger_width / 2) and 
-                rel_a.x > 0
+                (rel_a.x < self.gripper_finger_width / 2) and rel_a.x > 0
             ):
                 return True
         return False
@@ -473,7 +475,7 @@ class PDController:
         tgt_arm: float,  # target arm length L*
         tgt_gripper: float,  # target finger opening g*
         dt: float,
-    ) -> tuple[Vec2d, float, Vec2d, Vec2d, Vec2d, list[Vec2d]]:
+    ) -> tuple[Vec2d, float, Vec2d, Vec2d, list[Vec2d]]:
         """Compute base vel, base ang vel, gripper-base vel (world), finger vel (world),
         and held object vels (world) using PD control."""
         # === 0) Read current state ===
@@ -549,9 +551,7 @@ class PDController:
         # Use *updated* base_vel & base_ang_vel for consistency in this control step
         kp_finger = getattr(self, "kp_finger", self.kp_pos)
         kv_finger = getattr(self, "kv_finger", self.kv_pos)
-        gripper_centr = Vec2d(
-            robot.finger_poses.x, robot.finger_poses.y
-        )
+        gripper_centr = Vec2d(robot.finger_poses.x, robot.finger_poses.y)
         # Extract the rotate omega x r contribution
         relative_pos = gripper_centr - base_pos_curr
         finger_rot_omega_vec_base = relative_pos.normalized().rotated(math.pi / 2)

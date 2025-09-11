@@ -364,7 +364,6 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Drop objects after internal steps
         if self.robot.is_opening_finger:
-            # Note: need to update self._state_obj_to_pymunk_body later.
             for kin_obj, mass, _ in self.robot.held_objects:
                 kinematic_body, kinematic_shape = kin_obj
                 points = kinematic_shape.get_vertices()

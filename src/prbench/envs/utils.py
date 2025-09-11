@@ -198,9 +198,9 @@ def kin_robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBod
 
     # Arm
     gripper_base_arm_rel_se2 = SE2Pose(
-        x = (-state.get(obj, "arm_length") / 2 - gripper_base_width / 2),
-        y = 0.0,
-        theta = 0.0,
+        x=(-state.get(obj, "arm_length") / 2 - gripper_base_width / 2),
+        y=0.0,
+        theta=0.0,
     )
     arm_se2 = gripper_base_pose * gripper_base_arm_rel_se2
     rect = Rectangle.from_center(
