@@ -499,6 +499,14 @@ class ConstantObjectDynamic2DEnv(
 
     def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
         super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
+        if (kwargs["options"] is not None) and ("init_state" in kwargs["options"]):
+            # NOTE: From user perspective, they might just pass in a state
+            # that is similar to the observation array for resetting, 
+            # not an ObjectCentricState.
+            if not isinstance(kwargs["options"]["init_state"], ObjectCentricState):
+                assert isinstance(kwargs["options"]["init_state"], np.ndarray)
+                obj_centric_state = self.observation_space.devectorize(kwargs["options"]["init_state"])
+                kwargs["options"]["init_state"] = obj_centric_state
         obs, info = self._dynamic2d_env.reset(*args, **kwargs)
         assert isinstance(self.observation_space, ObjectCentricBoxSpace)
         vec_obs = self.observation_space.vectorize(obs)
