@@ -351,11 +351,14 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         new_held_obj_pymunk_idx = {
             kin_obj[0].id: kin_obj[0] for kin_obj, _, _ in self.robot.held_objects
         }
-        if list(new_held_obj_pymunk_idx.keys()) != curr_held_obj_pymunk_idx:
+        if (len(list(new_held_obj_pymunk_idx.keys())) > 1):
+            self.robot.is_closing_finger = False
+            self.robot.is_opening_finger = True # Grasping failed, open fingers
+
+        if (list(new_held_obj_pymunk_idx.keys()) != curr_held_obj_pymunk_idx) \
+            and self.robot.is_closing_finger:
             # Grasping happened
-            assert self.robot.is_closing_finger
             assert len(curr_held_obj_pymunk_idx) == 0
-            assert len(list(new_held_obj_pymunk_idx.keys())) == 1
             new_body = list(new_held_obj_pymunk_idx.values())[0]
             for state_obj, body in self._state_obj_to_pymunk_body.items():
                 if body not in self.pymunk_space.bodies:
@@ -364,7 +367,11 @@ class Dynamic2DRobotEnv(gymnasium.Env):
 
         # Drop objects after internal steps
         if self.robot.is_opening_finger:
-            for kin_obj, mass, _ in self.robot.held_objects:
+            for i, (kin_obj, mass, _) in enumerate(self.robot.held_objects):
+                if i >= 1:
+                    # Remove any extra objects in hand
+                    self.pymunk_space.remove(kin_obj[0], kin_obj[1])
+                    continue
                 kinematic_body, kinematic_shape = kin_obj
                 points = kinematic_shape.get_vertices()
                 moment = pymunk.moment_for_poly(mass, points, (0, 0))
