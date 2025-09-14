@@ -8,7 +8,7 @@ The robot is a Kinova Gen-3 with 7 degrees of freedom that can grasp and manipul
 - A **table** with dimensions 0.400m × 0.800m × 0.500m
 - A **target region** (purple block) with random dimensions between (0.02, 0.02, 0.005) and (0.05, 0.05, 0.005) half-extents
 - A **target block** that must be placed on the target region, sized at 0.8× the target region's x,y dimensions
-- **1 obstruction(s)** (red blocks) that may be placed on or near the target region, blocking access
+- **Obstruction(s)** (red blocks) that may be placed on or near the target region, blocking access
 
 Obstructions have random dimensions between (0.01, 0.01, 0.01) and (0.02, 0.02, 0.03) half-extents. During initialization, there's a 0.9 probability that each obstruction will be placed on the target region, requiring clearance.
 
@@ -21,30 +21,66 @@ The task requires planning to grasp and move obstructions out of the way, then p
 ![demo GIF](assets/demo_gifs/Obstruction3D-o1.gif)
 
 ### Observation Space
-Observations consist of:
-- **joint_positions**: Current joint positions of the 13-DOF robot arm (list of floats)
-- **grasped_object**: Name of currently grasped object, or None if not grasping anything (string or None)
-- **grasped_object_transform**: Relative transform of grasped object to gripper, or None if not grasping (transform or None)
-- **target_region**: State of the target region including:
-  - pose: 3D position and orientation (Pose object)
-  - geometry: Half-extents (width/2, height/2, depth/2) of the region (tuple of 3 floats)
-- **target_block**: State of the target block including:
-  - pose: 3D position and orientation (Pose object)
-  - geometry: Half-extents of the block (tuple of 3 floats)
-- **obstructions**: Dictionary of obstruction states, keyed by obstruction name (e.g., "obstruction0"), each containing:
-  - pose: 3D position and orientation (Pose object)
-  - geometry: Half-extents of the obstruction (tuple of 3 floats)
-
-The observation is returned as an Obstruction3DState dataclass with these fields.
+The entries of an array in this Box space correspond to the following object features:
+| **Index** | **Object** | **Feature** |
+| --- | --- | --- |
+| 0 | robot | joint_1 |
+| 1 | robot | joint_2 |
+| 2 | robot | joint_3 |
+| 3 | robot | joint_4 |
+| 4 | robot | joint_5 |
+| 5 | robot | joint_6 |
+| 6 | robot | joint_7 |
+| 7 | robot | finger_state |
+| 8 | robot | grasp_active |
+| 9 | robot | grasp_tf_x |
+| 10 | robot | grasp_tf_y |
+| 11 | robot | grasp_tf_z |
+| 12 | robot | grasp_tf_qx |
+| 13 | robot | grasp_tf_qy |
+| 14 | robot | grasp_tf_qz |
+| 15 | robot | grasp_tf_qw |
+| 16 | target_region | pose_x |
+| 17 | target_region | pose_y |
+| 18 | target_region | pose_z |
+| 19 | target_region | pose_qx |
+| 20 | target_region | pose_qy |
+| 21 | target_region | pose_qz |
+| 22 | target_region | pose_qw |
+| 23 | target_region | grasp_active |
+| 24 | target_region | half_extent_x |
+| 25 | target_region | half_extent_y |
+| 26 | target_region | half_extent_z |
+| 27 | target_block | pose_x |
+| 28 | target_block | pose_y |
+| 29 | target_block | pose_z |
+| 30 | target_block | pose_qx |
+| 31 | target_block | pose_qy |
+| 32 | target_block | pose_qz |
+| 33 | target_block | pose_qw |
+| 34 | target_block | grasp_active |
+| 35 | target_block | half_extent_x |
+| 36 | target_block | half_extent_y |
+| 37 | target_block | half_extent_z |
+| 38 | obstruction0 | pose_x |
+| 39 | obstruction0 | pose_y |
+| 40 | obstruction0 | pose_z |
+| 41 | obstruction0 | pose_qx |
+| 42 | obstruction0 | pose_qy |
+| 43 | obstruction0 | pose_qz |
+| 44 | obstruction0 | pose_qw |
+| 45 | obstruction0 | grasp_active |
+| 46 | obstruction0 | half_extent_x |
+| 47 | obstruction0 | half_extent_y |
+| 48 | obstruction0 | half_extent_z |
 
 
 ### Action Space
-Actions control the change in joint positions:
-- **delta_arm_joints**: Change in joint positions for all 13 joints (list of floats)
+An action space for a 7 DOF robot that can open and close its gripper.
 
-The action is an Obstruction3DAction dataclass with delta_arm_joints field. Each delta is clipped to the range [-0.050, 0.050].
+    Actions are bounded relative joint positions and open / close.
 
-The resulting joint positions are clipped to the robot's joint limits before being applied. The robot can automatically grasp objects when the gripper is close enough and release them with appropriate actions.
+    The open / close logic is: <-0.5 is close, >0.5 is open, and otherwise no change.
 
 
 ### Rewards
@@ -55,6 +91,8 @@ The reward structure is simple:
 The goal is considered reached when:
 1. The robot is not currently grasping the target block
 2. The target block is resting on (supported by) the target region
+
+Support is determined based on contact between the target block and target region, within a small distance threshold (1e-4).
 
 This encourages the robot to efficiently clear obstructions and place the target block while avoiding infinite episodes.
 

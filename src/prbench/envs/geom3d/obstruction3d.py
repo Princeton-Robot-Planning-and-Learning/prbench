@@ -574,7 +574,7 @@ The goal is considered reached when:
 1. The robot is not currently grasping the target block
 2. The target block is resting on (supported by) the target region
 
-Support is determined based on contact between the target block and target region, within a small threshold.
+Support is determined based on contact between the target block and target region, within a small distance threshold (1e-4).
 
 This encourages the robot to efficiently clear obstructions and place the target block while avoiding infinite episodes.
 """
