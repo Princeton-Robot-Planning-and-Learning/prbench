@@ -18,8 +18,8 @@ from prbench.envs.utils import RobotActionSpace
 
 
 @dataclass(frozen=True)
-class PRBenchEnvSpec:
-    """Scene specification for a PRBench environment."""
+class PRBenchEnvConfig:
+    """Scene configuration for a PRBench environment."""
 
 
 # All object-centric PRBench environments have object-centric states.
@@ -27,7 +27,7 @@ _ObsType = TypeVar("_ObsType", bound=ObjectCentricState)
 # All PRBench environments have array actions.
 _ActType = TypeVar("_ActType", bound=NDArray[Any])
 # All PRBench environments have an environment config.
-_ConfigType = TypeVar("_ConfigType")
+_ConfigType = TypeVar("_ConfigType", bound=PRBenchEnvConfig)
 
 
 class ObjectCentricPRBenchEnv(
