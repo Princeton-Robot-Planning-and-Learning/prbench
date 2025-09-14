@@ -2,7 +2,7 @@
 
 import abc
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import gymnasium
 import numpy as np
@@ -35,11 +35,13 @@ from prbench.envs.dynamic2d.utils import (
 )
 from prbench.envs.geom2d.structs import MultiBody2D
 from prbench.envs.utils import render_2dstate
+from prbench.core import PRBenchEnvConfig, ObjectCentricPRBenchEnv
+
 
 
 @dataclass(frozen=True)
-class Dynamic2DRobotEnvSpec:
-    """Scene specification for a Dynamic2DRobotEnv."""
+class Dynamic2DRobotEnvConfig(PRBenchEnvConfig):
+    """Scene config for a Dynamic2DRobotEnv."""
 
     # The world is oriented like a standard X/Y coordinate frame.
     world_min_x: float = 0.0
@@ -88,7 +90,13 @@ class Dynamic2DRobotEnvSpec:
     render_dpi: int = 50
 
 
-class Dynamic2DRobotEnv(gymnasium.Env):
+_ConfigType = TypeVar("_ConfigType", bound=Dynamic2DRobotEnvConfig)
+
+
+class ObjectCentricDynamic2DRobotEnv(
+    ObjectCentricPRBenchEnv[ObjectCentricState, Array, _ConfigType],
+    Generic[_ConfigType],
+):
     """Base class for Dynamic2D robot environments using PyMunk physics.
 
     This environment uses PyMunk for physics simulation with a KinRobot.
@@ -98,7 +106,7 @@ class Dynamic2DRobotEnv(gymnasium.Env):
     metadata = {"render_modes": ["rgb_array"]}
 
     def __init__(
-        self, spec: Dynamic2DRobotEnvSpec, render_mode: str | None = "rgb_array"
+        self, spec: Dynamic2DRobotEnvConfig, render_mode: str | None = "rgb_array"
     ) -> None:
         self._spec = spec
         self._types = {KinRobotType, KinRectangleType, DynRectangleType}

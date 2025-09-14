@@ -11,7 +11,7 @@ from relational_structs.utils import create_state_from_dict
 from prbench.envs.dynamic2d.base_env import (
     ConstantObjectDynamic2DEnv,
     Dynamic2DRobotEnv,
-    Dynamic2DRobotEnvSpec,
+    Dynamic2DRobotEnvConfig,
 )
 from prbench.envs.dynamic2d.object_types import (
     Dynamic2DRobotEnvTypeFeatures,
@@ -41,7 +41,7 @@ Dynamic2DRobotEnvTypeFeatures[TargetSurfaceType] = list(
 
 
 @dataclass(frozen=True)
-class DynObstruction2DEnvSpec(Dynamic2DRobotEnvSpec):
+class DynObstruction2DEnvSpec(Dynamic2DRobotEnvConfig):
     """Scene specification for DynObstruction2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
