@@ -33,6 +33,11 @@ class Geom3DObjectCentricState(ObjectCentricState):
         return [self.get(self.robot, n) for n in joint_names]
 
     @property
+    def finger_state(self) -> float:
+        """The robot finger state."""
+        return self.get(self.robot, "finger_state")
+
+    @property
     def grasped_object(self) -> str | None:
         """The name of the currently grasped object, or None if there is none."""
         grasped_objs: list[Object] = []

@@ -63,6 +63,7 @@ class Geom3DEnvSpec:
             np.pi / 2,  # "joint_7"
         ]
     )
+    initial_finger_state: float = 0.0
     end_effector_viz_radius: float = 0.01
     end_effector_viz_color: tuple[float, float, float, float] = (1.0, 0.2, 0.2, 0.5)
     max_action_mag: float = 0.05
@@ -211,7 +212,9 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
 
         # Reset the robot. In the future, we may want to allow randomizing the initial
         # robot joint positions.
-        self._set_robot_and_held_object(self._spec.initial_joints)
+        self._set_robot_and_held_object(
+            self._spec.initial_joints, self._spec.initial_finger_state
+        )
 
         # Reset objects.
         self._reset_objects()
@@ -223,7 +226,7 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
 
         This is useful when treating the environment as a simulator.
         """
-        self._set_robot_and_held_object(obs.joint_positions)
+        self._set_robot_and_held_object(obs.joint_positions, obs.finger_state)
         self._grasped_object = obs.grasped_object
         self._grasped_object_transform = obs.grasped_object_transform
         self._set_object_states(obs)
@@ -235,6 +238,7 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
         current_joints = remove_fingers_from_extended_joints(
             self.robot.get_joint_positions()
         )
+        current_finger_state = self.robot.get_finger_state()
 
         # Tentatively apply robot action.
         delta_arm_joints = action[:7]
@@ -249,12 +253,12 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             self.robot.joint_lower_limits[:7],
             self.robot.joint_upper_limits[:7],
         ).tolist()
-        self._set_robot_and_held_object(next_joints)
+        self._set_robot_and_held_object(next_joints, current_finger_state)
 
         # Check for collisions.
         if self._robot_or_held_object_collision_exists():
             # Revert!
-            self._set_robot_and_held_object(current_joints)
+            self._set_robot_and_held_object(current_joints, current_finger_state)
 
         # Check for grasping.
         if action[7] < -0.5:
@@ -330,7 +334,10 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             **self._spec.get_camera_kwargs(),
         )
 
-    def _set_robot_and_held_object(self, joints: JointPositions) -> None:
+    def _set_robot_and_held_object(
+        self, joints: JointPositions, finger_state: float
+    ) -> None:
+        # First handle the robot arm joints.
         set_robot_joints_with_held_object(
             self.robot,
             self.physics_client_id,
@@ -338,6 +345,8 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             self._grasped_object_transform,
             extend_joints_to_include_fingers(joints),
         )
+        # Now handle the fingers.
+        self.robot.set_finger_state(finger_state)
         # Update the end effector visualization.
         end_effector_pose = self.robot.get_end_effector_pose()
         set_pose(self.end_effector_viz_id, end_effector_pose, self.physics_client_id)
@@ -381,6 +390,8 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
                 )
                 for i, v in enumerate(joints):
                     feats[f"joint_{i+1}"] = v
+                # Add finger state.
+                feats["finger_state"] = self.robot.get_finger_state()
                 # Add grasp.
                 grasp_tf_feat_names = [
                     "grasp_tf_x",

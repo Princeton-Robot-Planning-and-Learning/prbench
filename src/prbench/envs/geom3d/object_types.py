@@ -5,6 +5,8 @@ from relational_structs import Type
 Geom3DEnvTypeFeatures: dict[Type, list[str]] = {}
 
 # The robot, which is a 7DOF arm, has joint positions and grasp features.
+# Note that we must store the finger state if we want to have different grasps for
+# different sized objects.
 Geom3DRobotType = Type("Geom3DRobot")
 Geom3DEnvTypeFeatures[Geom3DRobotType] = [
     "joint_1",
@@ -14,6 +16,7 @@ Geom3DEnvTypeFeatures[Geom3DRobotType] = [
     "joint_5",
     "joint_6",
     "joint_7",
+    "finger_state",
     "grasp_active",
     "grasp_tf_x",
     "grasp_tf_y",
