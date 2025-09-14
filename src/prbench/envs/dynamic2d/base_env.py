@@ -351,12 +351,13 @@ class Dynamic2DRobotEnv(gymnasium.Env):
         new_held_obj_pymunk_idx = {
             kin_obj[0].id: kin_obj[0] for kin_obj, _, _ in self.robot.held_objects
         }
-        if (len(list(new_held_obj_pymunk_idx.keys())) > 1):
+        if len(list(new_held_obj_pymunk_idx.keys())) > 1:
             self.robot.is_closing_finger = False
-            self.robot.is_opening_finger = True # Grasping failed, open fingers
+            self.robot.is_opening_finger = True  # Grasping failed, open fingers
 
-        if (list(new_held_obj_pymunk_idx.keys()) != curr_held_obj_pymunk_idx) \
-            and self.robot.is_closing_finger:
+        if (
+            list(new_held_obj_pymunk_idx.keys()) != curr_held_obj_pymunk_idx
+        ) and self.robot.is_closing_finger:
             # Grasping happened
             assert len(curr_held_obj_pymunk_idx) == 0
             new_body = list(new_held_obj_pymunk_idx.values())[0]
@@ -506,16 +507,18 @@ class ConstantObjectDynamic2DEnv(
 
     def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
         super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
+        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
         if (kwargs["options"] is not None) and ("init_state" in kwargs["options"]):
             # NOTE: From user perspective, they might just pass in a state
-            # that is similar to the observation array for resetting, 
+            # that is similar to the observation array for resetting,
             # not an ObjectCentricState.
             if not isinstance(kwargs["options"]["init_state"], ObjectCentricState):
                 assert isinstance(kwargs["options"]["init_state"], np.ndarray)
-                obj_centric_state = self.observation_space.devectorize(kwargs["options"]["init_state"])
+                obj_centric_state = self.observation_space.devectorize(
+                    kwargs["options"]["init_state"]
+                )
                 kwargs["options"]["init_state"] = obj_centric_state
         obs, info = self._dynamic2d_env.reset(*args, **kwargs)
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
         vec_obs = self.observation_space.vectorize(obs)
         return vec_obs, info
 
