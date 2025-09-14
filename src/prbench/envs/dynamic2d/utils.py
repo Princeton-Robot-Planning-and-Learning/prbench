@@ -651,7 +651,7 @@ def create_walls_from_world_boundaries(
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
-        "z_order": ZOrder.SURFACE.value,
+        "z_order": ZOrder.ALL.value,
     }
     # Left wall.
     left_wall = Object("left_wall", KinRectangleType)
@@ -668,7 +668,7 @@ def create_walls_from_world_boundaries(
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
-        "z_order": ZOrder.SURFACE.value,
+        "z_order": ZOrder.ALL.value,
     }
     # Top wall.
     top_wall = Object("top_wall", KinRectangleType)
@@ -686,7 +686,7 @@ def create_walls_from_world_boundaries(
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
-        "z_order": ZOrder.FLOOR.value,
+        "z_order": ZOrder.ALL.value,
     }
     # Bottom wall.
     bottom_wall = Object("bottom_wall", KinRectangleType)
@@ -703,7 +703,7 @@ def create_walls_from_world_boundaries(
         "color_r": BLACK[0],
         "color_g": BLACK[1],
         "color_b": BLACK[2],
-        "z_order": ZOrder.FLOOR.value,
+        "z_order": ZOrder.ALL.value,
     }
     return state_dict
 
