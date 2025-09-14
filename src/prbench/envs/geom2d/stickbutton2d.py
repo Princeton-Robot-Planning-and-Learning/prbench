@@ -7,10 +7,10 @@ from numpy.typing import NDArray
 from relational_structs import Object, ObjectCentricState
 from relational_structs.utils import create_state_from_dict
 
+from prbench.core import ConstantObjectPRBenchEnv
 from prbench.envs.geom2d.base_env import (
-    ConstantObjectGeom2DEnv,
-    Geom2DRobotEnv,
-    Geom2DRobotEnvSpec,
+    Geom2DRobotEnvConfig,
+    ObjectCentricGeom2DRobotEnv,
 )
 from prbench.envs.geom2d.object_types import (
     CircleType,
@@ -27,8 +27,8 @@ from prbench.envs.utils import BLACK, sample_se2_pose, state_2d_has_collision
 
 
 @dataclass(frozen=True)
-class StickButton2DEnvSpec(Geom2DRobotEnvSpec):
-    """Spec for StickButton2DEnv()."""
+class StickButton2DEnvConfig(Geom2DRobotEnvConfig):
+    """Config for StickButton2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
     world_min_x: float = 0.0
@@ -104,7 +104,9 @@ class StickButton2DEnvSpec(Geom2DRobotEnvSpec):
     render_fps: int = 20
 
 
-class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
+class ObjectCentricStickButton2DEnv(
+    ObjectCentricGeom2DRobotEnv[StickButton2DEnvConfig]
+):
     """Environment with a stick and buttons that need to be pressed.
 
     The robot cannot directly press buttons that are on the table but can directly press
@@ -119,29 +121,20 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
     def __init__(
         self,
         num_buttons: int = 2,
-        spec: StickButton2DEnvSpec = StickButton2DEnvSpec(),
+        config: StickButton2DEnvConfig = StickButton2DEnvConfig(),
         **kwargs,
     ) -> None:
-        super().__init__(spec, **kwargs)
+        super().__init__(config, **kwargs)
         self._num_buttons = num_buttons
-        self._spec: StickButton2DEnvSpec = spec  # for type checking
-        self.metadata = {
-            "render_modes": ["rgb_array"],
-            "render_fps": self._spec.render_fps,
-        }
-        initial_state_dict = self._create_constant_initial_state_dict()
-        self._initial_constant_state = create_state_from_dict(
-            initial_state_dict, Geom2DRobotEnvTypeFeatures
-        )
 
     def _sample_initial_state(self) -> ObjectCentricState:
         # Sample initial robot pose.
         assert self._initial_constant_state is not None
-        robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
+        robot_pose = sample_se2_pose(self.config.robot_init_pose_bounds, self.np_random)
         # Sample stick pose.
-        for _ in range(self._spec.max_init_sampling_attempts):
+        for _ in range(self.config.max_init_sampling_attempts):
             stick_pose = sample_se2_pose(
-                self._spec.stick_init_pose_bounds, self.np_random
+                self.config.stick_init_pose_bounds, self.np_random
             )
             state = self._create_initial_state(
                 robot_pose,
@@ -163,7 +156,7 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         for _ in range(self._num_buttons):
             while True:
                 button_position = tuple(
-                    self.np_random.uniform(*self._spec.button_init_position_bounds)
+                    self.np_random.uniform(*self.config.button_init_position_bounds)
                 )
                 new_button_positions = button_positions + [button_position]
                 state = self._create_initial_state(
@@ -199,10 +192,10 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         min_dx, min_dy = self.action_space.low[:2]
         max_dx, max_dy = self.action_space.high[:2]
         wall_state_dict = create_walls_from_world_boundaries(
-            self._spec.world_min_x,
-            self._spec.world_max_x,
-            self._spec.world_min_y,
-            self._spec.world_max_y,
+            self.config.world_min_x,
+            self.config.world_max_x,
+            self.config.world_min_y,
+            self.config.world_max_y,
             min_dx,
             max_dx,
             min_dy,
@@ -213,15 +206,15 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
         # Create the table.
         table = Object("table", RectangleType)
         init_state_dict[table] = {
-            "x": self._spec.table_pose.x,
-            "y": self._spec.table_pose.y,
-            "theta": self._spec.table_pose.theta,
-            "width": self._spec.table_shape[0],
-            "height": self._spec.table_shape[1],
+            "x": self.config.table_pose.x,
+            "y": self.config.table_pose.y,
+            "theta": self.config.table_pose.theta,
+            "width": self.config.table_shape[0],
+            "height": self.config.table_shape[1],
             "static": True,
-            "color_r": self._spec.table_rgb[0],
-            "color_g": self._spec.table_rgb[1],
-            "color_b": self._spec.table_rgb[2],
+            "color_r": self.config.table_rgb[0],
+            "color_g": self.config.table_rgb[1],
+            "color_b": self.config.table_rgb[2],
             "z_order": ZOrder.FLOOR.value,
         }
 
@@ -245,12 +238,12 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
             "x": robot_pose.x,
             "y": robot_pose.y,
             "theta": robot_pose.theta,
-            "base_radius": self._spec.robot_base_radius,
-            "arm_joint": self._spec.robot_base_radius,  # arm is fully retracted
-            "arm_length": self._spec.robot_arm_length,
+            "base_radius": self.config.robot_base_radius,
+            "arm_joint": self.config.robot_base_radius,  # arm is fully retracted
+            "arm_length": self.config.robot_arm_length,
             "vacuum": 0.0,  # vacuum is off
-            "gripper_height": self._spec.robot_gripper_height,
-            "gripper_width": self._spec.robot_gripper_width,
+            "gripper_height": self.config.robot_gripper_height,
+            "gripper_width": self.config.robot_gripper_width,
         }
 
         # Create the stick.
@@ -259,12 +252,12 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
             "x": stick_pose.x,
             "y": stick_pose.y,
             "theta": stick_pose.theta,
-            "width": self._spec.stick_shape[0],
-            "height": self._spec.stick_shape[1],
+            "width": self.config.stick_shape[0],
+            "height": self.config.stick_shape[1],
             "static": False,
-            "color_r": self._spec.stick_rgb[0],
-            "color_g": self._spec.stick_rgb[1],
-            "color_b": self._spec.stick_rgb[2],
+            "color_r": self.config.stick_rgb[0],
+            "color_g": self.config.stick_rgb[1],
+            "color_b": self.config.stick_rgb[2],
             "z_order": ZOrder.SURFACE.value,
         }
 
@@ -275,11 +268,11 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
                 "x": button_position[0],
                 "y": button_position[1],
                 "theta": 0,
-                "radius": self._spec.button_radius,
+                "radius": self.config.button_radius,
                 "static": True,
-                "color_r": self._spec.button_unpressed_rgb[0],
-                "color_g": self._spec.button_unpressed_rgb[1],
-                "color_b": self._spec.button_unpressed_rgb[2],
+                "color_r": self.config.button_unpressed_rgb[0],
+                "color_g": self.config.button_unpressed_rgb[1],
+                "color_b": self.config.button_unpressed_rgb[2],
                 "z_order": button_z_order.value,
             }
 
@@ -289,9 +282,9 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
     def press_button(self, button: Object) -> ObjectCentricState:
         """Press a button by changing its color."""
         assert self._current_state is not None
-        self._current_state.set(button, "color_r", self._spec.button_pressed_rgb[0])
-        self._current_state.set(button, "color_g", self._spec.button_pressed_rgb[1])
-        self._current_state.set(button, "color_b", self._spec.button_pressed_rgb[2])
+        self._current_state.set(button, "color_r", self.config.button_pressed_rgb[0])
+        self._current_state.set(button, "color_g", self.config.button_pressed_rgb[1])
+        self._current_state.set(button, "color_b", self.config.button_pressed_rgb[2])
         return self._current_state
 
     def step(
@@ -338,16 +331,18 @@ class ObjectCentricStickButton2DEnv(Geom2DRobotEnv):
                 self._current_state.get(button, "color_g"),
                 self._current_state.get(button, "color_b"),
             )
-            if not np.allclose(color, self._spec.button_pressed_rgb):
+            if not np.allclose(color, self.config.button_pressed_rgb):
                 terminated = False
                 break
         return -1.0, terminated
 
 
-class StickButton2DEnv(ConstantObjectGeom2DEnv):
+class StickButton2DEnv(ConstantObjectPRBenchEnv):
     """Stick button 2D env with a constant number of objects."""
 
-    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom2DRobotEnv:
+    def _create_object_centric_env(
+        self, *args, **kwargs
+    ) -> ObjectCentricGeom2DRobotEnv:
         return ObjectCentricStickButton2DEnv(*args, **kwargs)
 
     def _get_constant_object_names(

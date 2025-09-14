@@ -21,6 +21,8 @@ from prbench.envs.utils import RobotActionSpace
 class PRBenchEnvConfig:
     """Scene configuration for a PRBench environment."""
 
+    render_fps: int = 20
+
 
 # All object-centric PRBench environments have object-centric states.
 _ObsType = TypeVar("_ObsType", bound=ObjectCentricState)
@@ -96,6 +98,11 @@ class ObjectCentricPRBenchEnv(
             # Merge the initial constant state with the current state.
             full_state.data.update(self._initial_constant_state.data)
         return full_state
+
+    def get_action_from_gui_input(self, gui_input: dict[str, Any]) -> _ActType:
+        """Optionally implement a GUI interface, e.g., for demo collection."""
+        del gui_input
+        return np.array([])  # type: ignore
 
 
 class ConstantObjectPRBenchEnv(gymnasium.Env[NDArray[Any], NDArray[Any]]):
@@ -211,6 +218,4 @@ class ConstantObjectPRBenchEnv(gymnasium.Env[NDArray[Any], NDArray[Any]]):
         self, gui_input: dict[str, Any]
     ) -> NDArray[np.float32]:
         """Get the mapping from human inputs to actions."""
-        # Subclasses should implement this.
-        del gui_input
-        return np.array([], dtype=np.float32)
+        return self._object_centric_env.get_action_from_gui_input(gui_input)

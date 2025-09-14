@@ -6,10 +6,10 @@ import numpy as np
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
+from prbench.core import ConstantObjectPRBenchEnv
 from prbench.envs.geom2d.base_env import (
-    ConstantObjectGeom2DEnv,
-    Geom2DRobotEnv,
-    Geom2DRobotEnvSpec,
+    Geom2DRobotEnvConfig,
+    ObjectCentricGeom2DRobotEnv,
 )
 from prbench.envs.geom2d.object_types import (
     CRVRobotType,
@@ -31,8 +31,8 @@ Geom2DRobotEnvTypeFeatures[TargetRegionType] = list(
 
 
 @dataclass(frozen=True)
-class Motion2DEnvSpec(Geom2DRobotEnvSpec):
-    """Spec for Motion2DEnv()."""
+class Motion2DEnvConfig(Geom2DRobotEnvConfig):
+    """Config for Motion2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
     world_min_x: float = 0.0
@@ -114,7 +114,7 @@ class Motion2DEnvSpec(Geom2DRobotEnvSpec):
     render_fps: int = 20
 
 
-class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
+class ObjectCentricMotion2DEnv(ObjectCentricGeom2DRobotEnv[Motion2DEnvConfig]):
     """Only 2D motion planning is needed to reach a goal region.
 
     This is an object-centric environment. The vectorized version with Box spaces is
@@ -124,57 +124,48 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
     def __init__(
         self,
         num_passages: int = 2,
-        spec: Motion2DEnvSpec = Motion2DEnvSpec(),
+        config: Motion2DEnvConfig = Motion2DEnvConfig(),
         **kwargs,
     ) -> None:
-        super().__init__(spec, **kwargs)
+        super().__init__(config, **kwargs)
         self._num_passages = num_passages
-        self._spec: Motion2DEnvSpec = spec  # for type checking
-        self.metadata = {
-            "render_modes": ["rgb_array"],
-            "render_fps": self._spec.render_fps,
-        }
-        initial_state_dict = self._create_constant_initial_state_dict()
-        self._initial_constant_state = create_state_from_dict(
-            initial_state_dict, Geom2DRobotEnvTypeFeatures
-        )
 
     def _sample_initial_state(self) -> ObjectCentricState:
         # Sample initial robot pose.
-        robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
+        robot_pose = sample_se2_pose(self.config.robot_init_pose_bounds, self.np_random)
         # Sample initial target region pose.
         target_region_pose = sample_se2_pose(
-            self._spec.target_region_init_bounds, self.np_random
+            self.config.target_region_init_bounds, self.np_random
         )
         # Sample obstacles to form vertical narrow passages.
         obstacles: list[tuple[SE2Pose, tuple[float, float]]] = []
-        min_x = self._spec.obstacle_min_x
-        max_x = self._spec.obstacle_max_x
+        min_x = self.config.obstacle_min_x
+        max_x = self.config.obstacle_max_x
         if self._num_passages > 1:
             x_dist_between_passages = (
-                max_x - min_x - self._num_passages * self._spec.obstacle_width
+                max_x - min_x - self._num_passages * self.config.obstacle_width
             ) / (self._num_passages - 1)
-            assert x_dist_between_passages > 2 * self._spec.robot_base_radius
+            assert x_dist_between_passages > 2 * self.config.robot_base_radius
         else:
             x_dist_between_passages = 0.0  # not used
         for i in range(self._num_passages):
             # Sample the passage parameters.
-            passage_y = self.np_random.uniform(*self._spec.obstacle_passage_y_bounds)
+            passage_y = self.np_random.uniform(*self.config.obstacle_passage_y_bounds)
             passage_height = self.np_random.uniform(
-                *self._spec.obstacle_passage_height_bounds
+                *self.config.obstacle_passage_height_bounds
             )
-            x = min_x + i * (self._spec.obstacle_width + x_dist_between_passages)
+            x = min_x + i * (self.config.obstacle_width + x_dist_between_passages)
             # Create the bottom obstacle.
-            y = self._spec.world_min_y
+            y = self.config.world_min_y
             height = passage_y - y
             pose = SE2Pose(x, y, 0.0)
-            shape = (self._spec.obstacle_width, height)
+            shape = (self.config.obstacle_width, height)
             obstacles.append((pose, shape))
             # Create the top obstacle.
             y = y + height + passage_height
             pose = SE2Pose(x, y, 0.0)
-            height = self._spec.world_max_y - y
-            shape = (self._spec.obstacle_width, height)
+            height = self.config.world_max_y - y
+            shape = (self.config.obstacle_width, height)
             obstacles.append((pose, shape))
 
         state = self._create_initial_state(robot_pose, target_region_pose, obstacles)
@@ -194,10 +185,10 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         min_dx, min_dy = self.action_space.low[:2]
         max_dx, max_dy = self.action_space.high[:2]
         wall_state_dict = create_walls_from_world_boundaries(
-            self._spec.world_min_x,
-            self._spec.world_max_x,
-            self._spec.world_min_y,
-            self._spec.world_max_y,
+            self.config.world_min_x,
+            self.config.world_max_x,
+            self.config.world_min_y,
+            self.config.world_max_y,
             min_dx,
             max_dx,
             min_dy,
@@ -224,12 +215,12 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
             "x": robot_pose.x,
             "y": robot_pose.y,
             "theta": robot_pose.theta,
-            "base_radius": self._spec.robot_base_radius,
-            "arm_joint": self._spec.robot_base_radius,  # arm is fully retracted
-            "arm_length": self._spec.robot_arm_length,
+            "base_radius": self.config.robot_base_radius,
+            "arm_joint": self.config.robot_base_radius,  # arm is fully retracted
+            "arm_length": self.config.robot_arm_length,
             "vacuum": 0.0,  # vacuum is off
-            "gripper_height": self._spec.robot_gripper_height,
-            "gripper_width": self._spec.robot_gripper_width,
+            "gripper_height": self.config.robot_gripper_height,
+            "gripper_width": self.config.robot_gripper_width,
         }
 
         # Create the target region.
@@ -239,12 +230,12 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
                 "x": target_region_pose.x,
                 "y": target_region_pose.y,
                 "theta": target_region_pose.theta,
-                "width": self._spec.target_region_shape[0],
-                "height": self._spec.target_region_shape[1],
+                "width": self.config.target_region_shape[0],
+                "height": self.config.target_region_shape[1],
                 "static": True,  # NOTE
-                "color_r": self._spec.target_region_rgb[0],
-                "color_g": self._spec.target_region_rgb[1],
-                "color_b": self._spec.target_region_rgb[2],
+                "color_r": self.config.target_region_rgb[0],
+                "color_g": self.config.target_region_rgb[1],
+                "color_b": self.config.target_region_rgb[2],
                 "z_order": ZOrder.NONE.value,
             }
 
@@ -259,9 +250,9 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
                     "width": obstacle_shape[0],
                     "height": obstacle_shape[1],
                     "static": True,  # NOTE
-                    "color_r": self._spec.obstacle_rgb[0],
-                    "color_g": self._spec.obstacle_rgb[1],
-                    "color_b": self._spec.obstacle_rgb[2],
+                    "color_r": self.config.obstacle_rgb[0],
+                    "color_g": self.config.obstacle_rgb[1],
+                    "color_b": self.config.obstacle_rgb[2],
                     "z_order": ZOrder.ALL.value,
                 }
 
@@ -285,10 +276,12 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         return -1.0, terminated
 
 
-class Motion2DEnv(ConstantObjectGeom2DEnv):
+class Motion2DEnv(ConstantObjectPRBenchEnv):
     """Motion 2D env with a constant number of objects."""
 
-    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom2DRobotEnv:
+    def _create_object_centric_env(
+        self, *args, **kwargs
+    ) -> ObjectCentricGeom2DRobotEnv:
         return ObjectCentricMotion2DEnv(*args, **kwargs)
 
     def _get_constant_object_names(
