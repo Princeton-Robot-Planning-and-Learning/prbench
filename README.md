@@ -120,7 +120,15 @@ PRBench does not provide any models for TAMP. Users are welcome to engineer thei
 
 ### :wrench: Installation
 1. Recommended: create and source a virtualenv (perhaps with [uv](https://github.com/astral-sh/uv))
-2. `pip install -e ".[develop]"`
+2. Choose one of the following based on you need:
+    - `pip install -e .` - Installs only core dependencies (matplotlib, numpy, relational_structs, prpl_utils)
+    - `pip install -e .[all]` - Installs everything (excluding develop)
+    - `pip install -e .[geom2d]` - Installs only core + geom2d dependencies (no pybullet)
+    - `pip install -e .[dynamic2d]` - Installs only core + dynamic2d dependencies
+    - `pip install -e .[tidybot]` - Installs only core + tidybot dependencies
+    - `pip install -e .[geom3d]` - Installs only core + geom3d dependencies
+    - `pip install -e .[develop]` - Installs only core + development tools
+    - Compositionally install the dependencies like `[geom2d,develop]`
 3. `pre-commit install`
 
 ### :microscope: Check Installation
@@ -144,12 +152,12 @@ Here is an example of demo collection.
 ### :oncoming_automobile: Roadmap
 For specific environments, we will use issue tracking. Here are higher level TODOs:
 
-- [ ] Decide which simulator(s) to use for 3D environments
+- [x] Decide which simulator(s) to use for 3D environments
 - [ ] Determine what metrics we want to record, and how
 - [ ] Run reinforcement learning baselines
 - [ ] Run VLM/VLA baselines
 - [ ] Create interface to PDDLStream
-- [ ] Create interface to "task then motion planning"
+- [x] Create interface to "task then motion planning"
 - [ ] Run "code as policies" type baselines
 - [ ] Collect at least 100 demonstrations per environment
 - [ ] Run imitation learning baselines
