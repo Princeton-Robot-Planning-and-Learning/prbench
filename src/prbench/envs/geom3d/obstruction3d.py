@@ -6,9 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pybullet as p
-from gymnasium.spaces import Space
-from prpl_utils.spaces import FunctionalSpace
-from pybullet_helpers.geometry import Pose, get_pose, set_pose
+from pybullet_helpers.geometry import Pose, set_pose
 from pybullet_helpers.inverse_kinematics import check_body_collisions
 from pybullet_helpers.utils import create_pybullet_block
 
@@ -472,33 +470,15 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
     def _get_surface_object_names(self) -> set[str]:
         return {"target_region", "table"}
 
-    def _get_obs(self) -> Obstruction3DState:
-        joint_positions = self.robot.get_joint_positions()
-        assert self._target_region_id is not None
-        assert self._target_block_id is not None
-        target_region_pose = get_pose(self._target_region_id, self.physics_client_id)
-        target_region_state = Geom3DObjectState(
-            target_region_pose, self._target_region_half_extents
+    def _get_obs(self) -> Obstruction3DObjectCentricState:
+        state_dict = self._create_state_dict([
+            ("robot", Geom3DRobotType),
+            ("target_region", Geom3DCuboidType),
+            ("target_block", Geom3DCuboidType),
+        ] + [(f"obstruction{i}", Geom3DCuboidType) for i in range(self._num_obstructions)]
         )
-        target_block_pose = get_pose(self._target_block_id, self.physics_client_id)
-        target_block_state = Geom3DObjectState(
-            target_block_pose, self._target_block_half_extents
-        )
-        obstruction_states = {
-            name: Geom3DObjectState(
-                get_pose(oid, self.physics_client_id),
-                self._obstruction_id_to_half_extents[oid],
-            )
-            for name, oid in self._obstruction_ids.items()
-        }
-        return Obstruction3DState(
-            joint_positions,
-            grasped_object=self._grasped_object,
-            grasped_object_transform=self._grasped_object_transform,
-            target_region=target_region_state,
-            target_block=target_block_state,
-            obstructions=obstruction_states,
-        )
+        s = create_state_from_dict(state_dict, Geom3DEnvTypeFeatures)
+        return Obstruction3DObjectCentricState(s.data, Geom3DEnvTypeFeatures)
 
     def _goal_reached(self) -> bool:
         if self._grasped_object is not None:
@@ -507,23 +487,38 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
         target_supports = self._get_surfaces_supporting_object(self._target_block_id)
         return self._target_region_id in target_supports
 
-    def _sample_action(self, rng: np.random.Generator) -> Obstruction3DAction:
-        num_dof = 7
-        arr = rng.uniform(
-            -self._spec.max_action_mag, self._spec.max_action_mag, size=(num_dof,)
-        )
-        return Obstruction3DAction(arr.tolist())
+
+class Obstruction3DEnv(ConstantObjectGeom3DEnv):
+    """Obstruction 3D env with a constant number of objects."""
+
+    def __init__(self, *args, render_mode = None, **kwargs):
+        super().__init__(*args, render_mode=render_mode, **kwargs)
+        # Allow the markdown references to use the spec.
+        self._spec: Obstruction3DEnvSpec = self._geom3d_env._spec  # pylint: disable=protected-access
+
+    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom3DEnv:
+        return ObjectCentricObstruction3DEnv(*args, **kwargs)
+
+    def _get_constant_object_names(
+        self, exemplar_state: Obstruction3DObjectCentricState
+    ) -> list[str]:
+        constant_objects = ["robot", "target_region", "target_block"]
+        for obj in sorted(exemplar_state):
+            if obj.name.startswith("obstruct"):
+                constant_objects.append(obj.name)
+        return constant_objects
 
     def _create_env_markdown_description(self) -> str:
         """Create environment description."""
         # pylint: disable=line-too-long
+        num_obstructions = len(self._get_constant_object_names()) - 3
         return f"""A 3D obstruction clearance environment where the goal is to place a target block on a designated target region by first clearing obstructions.
 
 The robot is a Kinova Gen-3 with 7 degrees of freedom that can grasp and manipulate objects. The environment consists of:
 - A **table** with dimensions {self._spec.table_half_extents[0]*2:.3f}m × {self._spec.table_half_extents[1]*2:.3f}m × {self._spec.table_half_extents[2]*2:.3f}m
 - A **target region** (purple block) with random dimensions between {self._spec.target_region_half_extents_lb} and {self._spec.target_region_half_extents_ub} half-extents
 - A **target block** that must be placed on the target region, sized at {self._spec.target_block_size_scale}× the target region's x,y dimensions
-- **{self._num_obstructions} obstruction(s)** (red blocks) that may be placed on or near the target region, blocking access
+- **{num_obstructions} obstruction(s)** (red blocks) that may be placed on or near the target region, blocking access
 
 Obstructions have random dimensions between {self._spec.obstruction_half_extents_lb} and {self._spec.obstruction_half_extents_ub} half-extents. During initialization, there's a {self._spec.obstruction_init_on_target_prob} probability that each obstruction will be placed on the target region, requiring clearance.
 
