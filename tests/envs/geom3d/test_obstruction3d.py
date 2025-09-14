@@ -11,6 +11,7 @@ from pybullet_helpers.motion_planning import (
     run_smooth_motion_planning_to_pose,
     smoothly_follow_end_effector_path,
 )
+from relational_structs.spaces import ObjectCentricBoxSpace
 
 from prbench.envs.geom3d.obstruction3d import (
     ObjectCentricObstruction3DEnv,
@@ -24,10 +25,11 @@ def test_obstruction3d_env():
 
     env = Obstruction3DEnv(use_gui=False)  # set use_gui=True to debug
     obs, _ = env.reset(seed=123)
-    assert isinstance(obs, Obstruction3DObjectCentricState)
+    assert isinstance(obs, np.ndarray)
 
     for _ in range(10):
         act = env.action_space.sample()
+        assert isinstance(obs, np.ndarray)
         obs, _, _, _, _ = env.step(act)
 
     # Uncomment to debug.
@@ -40,11 +42,15 @@ def test_pick_place_no_obstructions():
     """Test that picking and placing succeeds when there are no obstructions."""
     # Create the real environment.
     env = Obstruction3DEnv(num_obstructions=0, use_gui=False, render_mode="rgb_array")
+    assert isinstance(env.observation_space, ObjectCentricBoxSpace)
     spec = env._spec  # pylint: disable=protected-access
     if MAKE_VIDEOS:
         env = RecordVideo(env, "unit_test_videos")
 
-    obs, _ = env.reset(seed=123)
+    vec_obs, _ = env.reset(seed=123)
+    # NOTE: we should soon make this smoother.
+    oc_obs = env.observation_space.devectorize(vec_obs)
+    obs = Obstruction3DObjectCentricState(oc_obs.data, oc_obs.type_features)
 
     # Create a simulator for planning.
     sim = ObjectCentricObstruction3DEnv(num_obstructions=0, spec=spec)
@@ -57,7 +63,7 @@ def test_pick_place_no_obstructions():
         max_candidate_plans = 1
 
     # First, move to pre-grasp pose (top-down).
-    x, y, z = obs.target_block.pose.position
+    x, y, z = obs.target_block_pose.position
     dz = 0.025
     pre_grasp_pose = Pose.from_rpy((x, y, z + dz), (np.pi, 0, np.pi / 2))
     joint_plan = run_smooth_motion_planning_to_pose(
@@ -76,19 +82,23 @@ def test_pick_place_no_obstructions():
     )
 
     for target_joints in joint_plan[1:]:
-        delta = np.subtract(target_joints, obs.joint_positions)[:7]
+        delta = np.subtract(target_joints[:7], obs.joint_positions)
         delta_lst = [wrap_angle(a) for a in delta]
         action_lst = delta_lst + [0.0]
         action = np.array(action_lst, dtype=np.float32)
-        obs, _, _, _, _ = env.step(action)
+        vec_obs, _, _, _, _ = env.step(action)
+        # NOTE: we should soon make this smoother.
+        oc_obs = env.observation_space.devectorize(vec_obs)
+        obs = Obstruction3DObjectCentricState(oc_obs.data, oc_obs.type_features)
 
     # Close the gripper to grasp.
     action = np.array([0.0] * 7 + [-1.0], dtype=np.float32)
-    obs, _, _, _, _ = env.step(action)
+    vec_obs, _, _, _, _ = env.step(action)
+    # NOTE: we should soon make this smoother.
+    oc_obs = env.observation_space.devectorize(vec_obs)
+    obs = Obstruction3DObjectCentricState(oc_obs.data, oc_obs.type_features)
 
     # The target block should now be grasped.
-    # TODO: fix things so this is no longer needed.
-    assert isinstance(obs, Obstruction3DObjectCentricState)
     assert obs.grasped_object == "target_block"
 
     # Move up slightly to break contact with the table.
@@ -117,17 +127,18 @@ def test_pick_place_no_obstructions():
     )
 
     for target_joints in joint_plan[1:]:
-        delta = np.subtract(target_joints, obs.joint_positions)[:7]
+        delta = np.subtract(target_joints[:7], obs.joint_positions)
         delta_lst = [wrap_angle(a) for a in delta]
         action_lst = delta_lst + [0.0]
         action = np.array(action_lst, dtype=np.float32)
-        obs, _, _, _, _ = env.step(action)
+        vec_obs, _, _, _, _ = env.step(action)
+        # NOTE: we should soon make this smoother.
+        oc_obs = env.observation_space.devectorize(vec_obs)
+        obs = Obstruction3DObjectCentricState(oc_obs.data, oc_obs.type_features)
 
     # Determine placement pose and pre-placement pose. Place directly in the center of
     # the target region for this test.
     placement_padding = 1e-4  # leave some room to prevent collisions with surface
-    # TODO: fix things so this is no longer needed.
-    assert isinstance(obs, Obstruction3DObjectCentricState)
     block_placement_pose = Pose(
         (
             obs.target_region_pose.position[0],
@@ -173,15 +184,21 @@ def test_pick_place_no_obstructions():
     )
 
     for target_joints in joint_plan[1:]:
-        delta = np.subtract(target_joints, obs.joint_positions)[:7]
+        delta = np.subtract(target_joints[:7], obs.joint_positions)
         delta_lst = [wrap_angle(a) for a in delta]
         action_lst = delta_lst + [0.0]
         action = np.array(action_lst, dtype=np.float32)
-        obs, _, _, _, _ = env.step(action)
+        vec_obs, _, _, _, _ = env.step(action)
+        # NOTE: we should soon make this smoother.
+        oc_obs = env.observation_space.devectorize(vec_obs)
+        obs = Obstruction3DObjectCentricState(oc_obs.data, oc_obs.type_features)
 
     # Open the gripper to finish the placement. Should trigger "done" (goal reached).
     action = np.array([0.0] * 7 + [1.0], dtype=np.float32)
-    obs, _, done, _, _ = env.step(action)
+    vec_obs, _, done, _, _ = env.step(action)
+    # NOTE: we should soon make this smoother.
+    oc_obs = env.observation_space.devectorize(vec_obs)
+    obs = Obstruction3DObjectCentricState(oc_obs.data, oc_obs.type_features)
     assert obs.grasped_object is None, "Object not released"
     assert done, "Goal not reached"
 

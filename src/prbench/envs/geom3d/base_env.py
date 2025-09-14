@@ -36,7 +36,12 @@ from prbench.envs.geom3d.object_types import (
     Geom3DPointType,
     Geom3DRobotType,
 )
-from prbench.envs.geom3d.utils import Geom3DObjectCentricState, Geom3DRobotActionSpace
+from prbench.envs.geom3d.utils import (
+    Geom3DObjectCentricState,
+    Geom3DRobotActionSpace,
+    extend_joints_to_include_fingers,
+    remove_fingers_from_extended_joints,
+)
 
 
 @dataclass(frozen=True)
@@ -46,8 +51,6 @@ class Geom3DEnvSpec:
     # Robot.
     robot_name: str = "kinova-gen3"
     robot_base_pose: Pose = Pose.identity()
-    # NOTE: the robot joints include 7 DOF for the arm and 6 DOF for the fingers. We
-    # don't need to change the fingers this in the environment.
     initial_joints: JointPositions = field(
         # This is a retract position.
         default_factory=lambda: [
@@ -58,13 +61,6 @@ class Geom3DEnvSpec:
             0.0,  # "joint_5"
             -0.87,  # "joint_6"
             np.pi / 2,  # "joint_7"
-            # Finger joints (not used in this environment).
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
         ]
     )
     end_effector_viz_radius: float = 0.01
@@ -124,7 +120,9 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             self.physics_client_id,
             base_pose=self._spec.robot_base_pose,
             control_mode="reset",
-            home_joint_positions=self._spec.initial_joints,
+            home_joint_positions=extend_joints_to_include_fingers(
+                self._spec.initial_joints
+            ),
         )
         assert isinstance(robot, FingeredSingleArmPyBulletRobot)
         self.robot = robot
@@ -234,7 +232,9 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
         self, action: Array
     ) -> tuple[Geom3DObjectCentricState, float, bool, bool, dict]:
         # Store the current robot joints because we may need to revert in collision.
-        current_joints = self.robot.get_joint_positions()
+        current_joints = remove_fingers_from_extended_joints(
+            self.robot.get_joint_positions()
+        )
 
         # Tentatively apply robot action.
         delta_arm_joints = action[:7]
@@ -244,14 +244,11 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             -self._spec.max_action_mag,
             self._spec.max_action_mag,
         )
-        current_joints_fingers = current_joints[7:]
-        current_joints_no_fingers = current_joints[:7]
-        next_joints_no_fingers = np.clip(
-            current_joints_no_fingers + delta_joints,
+        next_joints = np.clip(
+            current_joints + delta_joints,
             self.robot.joint_lower_limits[:7],
             self.robot.joint_upper_limits[:7],
         ).tolist()
-        next_joints = next_joints_no_fingers + current_joints_fingers
         self._set_robot_and_held_object(next_joints)
 
         # Check for collisions.
@@ -339,7 +336,7 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             self.physics_client_id,
             self._grasped_object_id,
             self._grasped_object_transform,
-            joints,
+            extend_joints_to_include_fingers(joints),
         )
         # Update the end effector visualization.
         end_effector_pose = self.robot.get_end_effector_pose()
@@ -379,7 +376,9 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             # Handle robots.
             if object_type == Geom3DRobotType:
                 # Add joints.
-                joints = self.robot.get_joint_positions()
+                joints = remove_fingers_from_extended_joints(
+                    self.robot.get_joint_positions()
+                )
                 for i, v in enumerate(joints):
                     feats[f"joint_{i+1}"] = v
                 # Add grasp.

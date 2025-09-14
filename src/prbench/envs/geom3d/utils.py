@@ -50,14 +50,14 @@ class Geom3DObjectCentricState(ObjectCentricState):
         """The grasped object transform, or None if there is no grasped object."""
         if self.grasped_object is None:
             return None
-        grasped_object = self.get_object_from_name(self.grasped_object)
-        x = self.get(grasped_object, "grasp_tf_x")
-        y = self.get(grasped_object, "grasp_tf_y")
-        z = self.get(grasped_object, "grasp_tf_z")
-        qx = self.get(grasped_object, "grasp_tf_qx")
-        qy = self.get(grasped_object, "grasp_tf_qy")
-        qz = self.get(grasped_object, "grasp_tf_qz")
-        qw = self.get(grasped_object, "grasp_tf_qw")
+        robot = self.robot
+        x = self.get(robot, "grasp_tf_x")
+        y = self.get(robot, "grasp_tf_y")
+        z = self.get(robot, "grasp_tf_z")
+        qx = self.get(robot, "grasp_tf_qx")
+        qy = self.get(robot, "grasp_tf_qy")
+        qz = self.get(robot, "grasp_tf_qz")
+        qw = self.get(robot, "grasp_tf_qw")
         grasp_tf = Pose((x, y, z), (qx, qy, qz, qw))
         return grasp_tf
 
@@ -86,3 +86,18 @@ class Geom3DRobotActionSpace(Box):
 
     The open / close logic is: <-0.5 is close, >0.5 is open, and otherwise no change.
 """
+
+
+def extend_joints_to_include_fingers(joint_positions: JointPositions) -> JointPositions:
+    """Add 6 DOF for fingers."""
+    assert len(joint_positions) == 7
+    finger_joints = [0.0] * 6
+    return list(joint_positions) + finger_joints
+
+
+def remove_fingers_from_extended_joints(
+    joint_positions: JointPositions,
+) -> JointPositions:
+    """Inverse of _extend_joints_to_include_fingers()."""
+    assert len(joint_positions) == 13
+    return joint_positions[:7]

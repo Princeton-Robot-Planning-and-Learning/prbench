@@ -9,13 +9,13 @@ from pybullet_helpers.motion_planning import (
     remap_joint_position_plan_to_constant_distance,
     run_smooth_motion_planning_to_pose,
 )
+from relational_structs.spaces import ObjectCentricBoxSpace
 
 from prbench.envs.geom3d.motion3d import (
     Motion3DEnv,
     Motion3DObjectCentricState,
     ObjectCentricMotion3DEnv,
 )
-from relational_structs.spaces import ObjectCentricBoxSpace
 
 
 def test_motion3d_env():

@@ -405,7 +405,6 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
         set_pose(self._target_block_id, obs.target_block_pose, self.physics_client_id)
 
         # Handle obstructions.
-        # TODO handle obstructions...
         for obstruction_idx in range(self._num_obstructions):
             obstruction_name = f"obstruction{obstruction_idx}"
             obstruction_half_extents = obs.get_cuboid_half_extents(obstruction_name)
