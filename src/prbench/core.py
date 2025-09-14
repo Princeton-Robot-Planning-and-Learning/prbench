@@ -6,10 +6,8 @@ from typing import Any, Generic, TypeVar
 
 import gymnasium
 import numpy as np
-from gymnasium.spaces import Space
 from numpy.typing import NDArray
 from relational_structs import (
-    Array,
     ObjectCentricState,
     ObjectCentricStateSpace,
     Type,
@@ -27,7 +25,7 @@ class PRBenchEnvSpec:
 # All object-centric PRBench environments have object-centric states.
 _ObsType = TypeVar("_ObsType", bound=ObjectCentricState)
 # All PRBench environments have array actions.
-_ActType = TypeVar("_ActType", bound=Array)
+_ActType = TypeVar("_ActType", bound=NDArray[Any])
 # All PRBench environments have an environment config.
 _ConfigType = TypeVar("_ConfigType")
 
@@ -46,7 +44,9 @@ class ObjectCentricPRBenchEnv(
         self.config = config
         self.render_mode = render_mode
         self.observation_space = self._create_observation_space(config)
-        self.action_space = self._create_action_space(config)
+        # I'm not completely sure why this type: ignore is necessary. I tried to fix it
+        # for a while and gave up.
+        self.action_space = self._create_action_space(config)  # type: ignore
 
         # Maintain an independent initial_constant_state, including static objects
         # that never change throughout the lifetime of the environment.
@@ -55,11 +55,11 @@ class ObjectCentricPRBenchEnv(
         super().__init__()
 
     @abc.abstractmethod
-    def _create_observation_space(self, config: _ConfigType) -> Space[_ObsType]:
+    def _create_observation_space(self, config: _ConfigType) -> ObjectCentricStateSpace:
         """Create the observation space given the config."""
 
     @abc.abstractmethod
-    def _create_action_space(self, config: _ConfigType) -> Space[_ActType]:
+    def _create_action_space(self, config: _ConfigType) -> RobotActionSpace:
         """Create the action space given the config."""
 
     @abc.abstractmethod
@@ -98,7 +98,7 @@ class ObjectCentricPRBenchEnv(
         return full_state
 
 
-class ConstantObjectPRBenchEnv(gymnasium.Env[Array, Array]):
+class ConstantObjectPRBenchEnv(gymnasium.Env[NDArray[Any], NDArray[Any]]):
     """Defined by an object-centric PRBench environment and a constant object set.
 
     The point of this pattern is to allow implementing object-centric environments with
@@ -116,14 +116,14 @@ class ConstantObjectPRBenchEnv(gymnasium.Env[Array, Array]):
         self._object_centric_env = self._create_object_centric_env(*args, **kwargs)
         # Create a Box version of the observation space by extracting the constant
         # objects from an exemplar state.
-        assert isinstance(
-            self._object_centric_env.observation_space, ObjectCentricStateSpace
-        )
         exemplar_object_centric_state, _ = self._object_centric_env.reset()
         obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
         obj_names = self._get_constant_object_names(exemplar_object_centric_state)
         self._constant_objects = [obj_name_to_obj[o] for o in obj_names]
         # This is a Box space with some extra functionality to allow easy vectorizing.
+        assert isinstance(
+            self._object_centric_env.observation_space, ObjectCentricStateSpace
+        )
         self.observation_space = self._object_centric_env.observation_space.to_box(
             self._constant_objects, self._object_centric_env.type_features
         )
