@@ -77,23 +77,11 @@ class ObjectCentricGeom2DRobotEnv(
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        # Set up metadata for rendering.
-        self.metadata = {
-            "render_modes": ["rgb_array"],
-            "render_fps": self.config.render_fps,
-        }
-
         # Initialized by reset().
         self._current_state: ObjectCentricState | None = None
 
         # Used for collision checking.
         self._static_object_body_cache: dict[Object, MultiBody2D] = {}
-
-        # Create initial state dict.
-        initial_state_dict = self._create_constant_initial_state_dict()
-        self._initial_constant_state = create_state_from_dict(
-            initial_state_dict, Geom2DRobotEnvTypeFeatures
-        )
 
     @abc.abstractmethod
     def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
@@ -124,6 +112,10 @@ class ObjectCentricGeom2DRobotEnv(
             min_vac=config.min_vac,
             max_vac=config.max_vac,
         )
+
+    def _create_constant_initial_state(self) -> ObjectCentricState:
+        initial_state_dict = self._create_constant_initial_state_dict()
+        return create_state_from_dict(initial_state_dict, Geom2DRobotEnvTypeFeatures)
 
     def reset(
         self, *, seed: int | None = None, options: dict | None = None

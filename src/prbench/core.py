@@ -46,15 +46,24 @@ class ObjectCentricPRBenchEnv(
         self.config = config
         self.render_mode = render_mode
         self.observation_space = self._create_observation_space(config)
+        # Set up metadata for rendering. Subclasses will add to the metadata.
+        self.metadata = {
+            "render_modes": ["rgb_array"],
+            "render_fps": self.config.render_fps,
+        }
         # I'm not completely sure why this type: ignore is necessary. I tried to fix it
         # for a while and gave up.
         self.action_space = self._create_action_space(config)  # type: ignore
 
         # Maintain an independent initial_constant_state, including static objects
         # that never change throughout the lifetime of the environment.
-        self._initial_constant_state: _ObsType | None = None
+        self._initial_constant_state = self._create_constant_initial_state()
 
         super().__init__()
+
+    @abc.abstractmethod
+    def _create_constant_initial_state(self) -> _ObsType:
+        """Create the constant initial state."""
 
     @abc.abstractmethod
     def _create_observation_space(self, config: _ConfigType) -> ObjectCentricStateSpace:
