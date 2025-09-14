@@ -13,13 +13,25 @@ from pybullet_helpers.inverse_kinematics import check_body_collisions
 from pybullet_helpers.utils import create_pybullet_block
 
 from prbench.envs.geom3d.base_env import (
-    Geom3DAction,
     Geom3DEnv,
     Geom3DEnvSpec,
-    Geom3DObjectState,
-    Geom3DState,
 )
-from prbench.envs.geom3d.utils import PURPLE
+from prbench.envs.utils import PURPLE
+from relational_structs.utils import create_state_from_dict
+
+from prbench.envs.geom3d.base_env import (
+    Geom3DEnv,
+    Geom3DEnvSpec,
+)
+
+from prbench.envs.geom3d.object_types import (
+    Geom3DEnvTypeFeatures,
+    Geom3DRobotType,
+    Geom3DCuboidType,
+)
+from prbench.envs.geom3d.utils import Geom3DObjectCentricState
+from prbench.envs.geom3d.base_env import ConstantObjectGeom3DEnv
+
 
 
 @dataclass(frozen=True)
@@ -171,21 +183,59 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
         )
 
 
-@dataclass(frozen=True)
-class Obstruction3DState(Geom3DState):
-    """A state for Obstruction3DEnv()."""
+class Obstruction3DObjectCentricState(Geom3DObjectCentricState):
+    """A state in the Obstruction3DEnv().
+    
+    Adds convenience methods on top of Geom3DObjectCentricState().
+    """
 
-    target_region: Geom3DObjectState
-    target_block: Geom3DObjectState
-    obstructions: dict[str, Geom3DObjectState]
+    def get_cuboid_half_extents(self, name: str) -> tuple[float, float, float]:
+        """The half extents of the cuboid."""
+        obj = self.get_object_from_name(name)
+        return (
+            self.get(obj, "half_extent_x"),
+            self.get(obj, "half_extent_y"),
+            self.get(obj, "half_extent_z"),
+        )
+    
+    def get_cuboid_pose(self, name: str) -> Pose:
+        """The pose of the cuboid."""
+        obj = self.get_object_from_name(name)
+        position = (
+            self.get(obj, "pose_x"),
+            self.get(obj, "pose_y"),
+            self.get(obj, "pose_z"),
+        )
+        orientation = (
+            self.get(obj, "pose_qx"),
+            self.get(obj, "pose_qy"),
+            self.get(obj, "pose_qz"),
+            self.get(obj, "pose_qw"),
+        )
+        return Pose(position, orientation)
+    
+    @property
+    def target_region_half_extents(self) -> tuple[float, float, float]:
+        """The half extents of the target region, assuming the name "target_region"."""
+        return self.get_cuboid_half_extents("target_region")
+    
+    @property
+    def target_block_half_extents(self) -> tuple[float, float, float]:
+        """The half extents of the target block, assuming the name "target_block"."""
+        return self.get_cuboid_half_extents("target_block")
+    
+    @property
+    def target_region_pose(self) -> Pose:
+        """The pose of the target region, assuming the name "target_region"."""
+        return self.get_cuboid_pose("target_region")
+    
+    @property
+    def target_block_pose(self) -> Pose:
+        """The pose of the target block, assuming the name "target_block"."""
+        return self.get_cuboid_pose("target_block")
 
 
-@dataclass(frozen=True)
-class Obstruction3DAction(Geom3DAction):
-    """An action for Obstruction3DEnv()."""
-
-
-class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
+class ObjectCentricObstruction3DEnv(Geom3DEnv):
     """Environment where obstructions must be cleared to place a target on a region."""
 
     metadata = {"render_modes": ["rgb_array"]}
@@ -219,14 +269,6 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
         self._obstruction_ids: dict[str, int] = {}
         self._obstruction_id_to_half_extents: dict[int, tuple[float, float, float]] = {}
 
-    def _create_observation_space(self) -> Space[Obstruction3DState]:
-        return FunctionalSpace(contains_fn=lambda o: isinstance(o, Obstruction3DState))
-
-    def _create_action_space(self) -> Space[Obstruction3DAction]:
-        return FunctionalSpace(
-            contains_fn=lambda a: isinstance(a, Obstruction3DAction),
-            sample_fn=self._sample_action,
-        )
 
     def _reset_objects(self) -> None:
 
@@ -335,9 +377,9 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
             else:
                 raise RuntimeError("Failed to sample target block pose")
 
-    def _set_object_states(self, obs: Obstruction3DState) -> None:
+    def _set_object_states(self, obs: Obstruction3DObjectCentricState) -> None:
         # Check if target region needs to be recreated.
-        if self._target_region_half_extents != obs.target_region.geometry:
+        if self._target_region_half_extents != obs.target_region_half_extents:
             # Recreate the target region.
             if self._target_region_id is not None:
                 p.removeBody(
@@ -345,16 +387,16 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
                 )
             self._target_region_id = create_pybullet_block(
                 self._spec.target_region_rgba,
-                half_extents=obs.target_region.geometry,
+                half_extents=obs.target_region_half_extents,
                 physics_client_id=self.physics_client_id,
             )
-            self._target_region_half_extents = obs.target_region.geometry
+            self._target_region_half_extents = obs.target_region_half_extents
         # Update target region pose.
         assert self._target_region_id is not None
-        set_pose(self._target_region_id, obs.target_region.pose, self.physics_client_id)
+        set_pose(self._target_region_id, obs.target_region_pose, self.physics_client_id)
 
         # Check if target block needs to be recreated.
-        if self._target_block_half_extents != obs.target_block.geometry:
+        if self._target_block_half_extents != obs.target_block_half_extents:
             # Recreate the target block.
             if self._target_block_id is not None:
                 p.removeBody(
@@ -362,16 +404,20 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
                 )
             self._target_block_id = create_pybullet_block(
                 self._spec.target_block_rgba,
-                half_extents=obs.target_block.geometry,
+                half_extents=obs.target_block_half_extents,
                 physics_client_id=self.physics_client_id,
             )
-            self._target_block_half_extents = obs.target_block.geometry
+            self._target_block_half_extents = obs.target_block_half_extents
         # Update target block pose.
         assert self._target_block_id is not None
-        set_pose(self._target_block_id, obs.target_block.pose, self.physics_client_id)
+        set_pose(self._target_block_id, obs.target_block_pose, self.physics_client_id)
 
         # Handle obstructions.
-        for obstruction_name, obstruction_state in obs.obstructions.items():
+        # TODO handle obstructions...
+        for obstruction_idx in range(self._num_obstructions):
+            obstruction_name = f"obstruction{obstruction_idx}"
+            obstruction_half_extents = obs.get_cuboid_half_extents(obstruction_name)
+            obstruction_pose = obs.get_cuboid_pose(obstruction_name)
             # Check if the block needs to be recreated.
             need_recreate = False
             need_destroy = False
@@ -382,7 +428,7 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
                 current_half_extents = self._obstruction_id_to_half_extents[
                     obstruction_id
                 ]
-                need_recreate = current_half_extents != obstruction_state.geometry
+                need_recreate = current_half_extents != obstruction_half_extents
                 need_destroy = need_recreate
             if need_recreate:
                 # Recreate the obstruction.
@@ -390,15 +436,15 @@ class Obstruction3DEnv(Geom3DEnv[Obstruction3DState, Obstruction3DAction]):
                     p.removeBody(obstruction_id, physicsClientId=self.physics_client_id)
                 obstruction_id = create_pybullet_block(
                     self._spec.obstruction_rgba,
-                    half_extents=obstruction_state.geometry,
+                    half_extents=obstruction_half_extents,
                     physics_client_id=self.physics_client_id,
                 )
                 self._obstruction_ids[obstruction_name] = obstruction_id
                 self._obstruction_id_to_half_extents[obstruction_id] = (
-                    obstruction_state.geometry
+                    obstruction_half_extents
                 )
             # Update obstruction block pose.
-            set_pose(obstruction_id, obstruction_state.pose, self.physics_client_id)
+            set_pose(obstruction_id, obstruction_pose, self.physics_client_id)
 
     def _object_name_to_pybullet_id(self, object_name: str) -> int:
         if object_name == "target_region":

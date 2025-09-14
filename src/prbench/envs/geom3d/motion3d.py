@@ -11,7 +11,6 @@ from pybullet_helpers.inverse_kinematics import (
     InverseKinematicsError,
     inverse_kinematics,
 )
-from relational_structs import Array
 from relational_structs.utils import create_state_from_dict
 
 from prbench.envs.geom3d.base_env import (
