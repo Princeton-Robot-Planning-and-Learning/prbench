@@ -22,6 +22,18 @@ from pybullet_helpers.inverse_kinematics import (
 from pybullet_helpers.joint import JointPositions
 from pybullet_helpers.robots import create_pybullet_robot
 from pybullet_helpers.robots.single_arm import FingeredSingleArmPyBulletRobot
+from relational_structs import (
+    Array,
+    ObjectCentricState,
+    ObjectCentricStateSpace,
+)
+from relational_structs.spaces import ObjectCentricBoxSpace
+from prbench.envs.geom3d.object_types import (
+    Geom3DEnvTypeFeatures,
+    Geom3DCuboidType,
+    Geom3DRobotType,
+)
+from prbench.envs.geom3d.utils import Geom3DRobotActionSpace, Geom3DObjectCentricState
 
 
 @dataclass(frozen=True)
@@ -75,42 +87,8 @@ class Geom3DEnvSpec:
         }
 
 
-@dataclass(frozen=True)
-class Geom3DState:
-    """A state for Geom3DEnv()."""
-
-    joint_positions: JointPositions
-    grasped_object: str | None
-    grasped_object_transform: Pose | None  # end effector -> obj
-
-
-@dataclass(frozen=True)
-class Geom3DObjectState:
-    """The state of a rigid object in Geom3DEnv()."""
-
-    pose: Pose
-    geometry: tuple[float, float, float]  # for now assuming cuboids; half extents
-
-
-@dataclass(frozen=True)
-class Geom3DAction:
-    """An action for Geom3DEnv().
-
-    NOTE: the environment enforces a limit on the magnitude of the deltas.
-    """
-
-    # NOTE: this is only a delta on the 7 DOF of the arm, not the fingers, which do not
-    # need to change in this environment.
-    delta_arm_joints: JointPositions
-    gripper: Literal["open", "close", "none"] = "none"  # none = no change
-
-
-_ObsType = TypeVar("_ObsType", bound=Geom3DState)
-_ActType = TypeVar("_ActType", bound=Geom3DAction)
-
-
-class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
-    """Environment where only 3D motion planning is needed to reach a goal region."""
+class Geom3DEnv(gymnasium.Env, abc.ABC):
+    """Base class for Geom3D environments."""
 
     # Only RGB rendering is implemented.
     metadata = {"render_modes": ["rgb_array"]}
@@ -123,29 +101,12 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
     ) -> None:
         super().__init__()
         self._spec = spec
-
-        # Set up Gymnasium env fields.
-        obs_md = self._create_observation_space_markdown_description()
-        act_md = self._create_action_space_markdown_description()
-        env_md = self._create_env_markdown_description()
-        reward_md = self._create_reward_markdown_description()
-        references_md = self._create_references_markdown_description()
-        # Update the metadata. Note that we need to define the render_modes in the class
-        # rather than in the instance because gym.make() extracts render_modes from cls.
-        self.metadata = self.metadata.copy()
-        self.metadata.update(
-            {
-                "description": env_md,
-                "observation_space_description": obs_md,
-                "action_space_description": act_md,
-                "reward_description": reward_md,
-                "references": references_md,
-                "render_fps": self._spec.render_fps,
-            }
-        )
+        self._types = {Geom3DRobotType, Geom3DCuboidType}
         self.render_mode = render_mode
-        self.observation_space = self._create_observation_space()
-        self.action_space = self._create_action_space()
+        self.observation_space = ObjectCentricStateSpace(self._types)
+        self.action_space = Geom3DRobotActionSpace(
+            max_magnitude=self._spec.max_action_mag
+        )
 
         # Create the PyBullet client.
         if use_gui:
@@ -196,15 +157,7 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         self._grasped_object_transform: Pose | None = None
 
     @abc.abstractmethod
-    def _create_observation_space(self) -> Space[_ObsType]:
-        """Create the observation space."""
-
-    @abc.abstractmethod
-    def _create_action_space(self) -> Space[_ActType]:
-        """Create the action space."""
-
-    @abc.abstractmethod
-    def _get_obs(self) -> _ObsType:
+    def _get_obs(self) -> Geom3DObjectCentricState:
         """Get the current observation."""
 
     @abc.abstractmethod
@@ -216,7 +169,7 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         """Reset objects."""
 
     @abc.abstractmethod
-    def _set_object_states(self, obs: _ObsType) -> None:
+    def _set_object_states(self, obs: Geom3DObjectCentricState) -> None:
         """Reset the state of objects; helper for set_state()."""
 
     @abc.abstractmethod
@@ -248,7 +201,7 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         self,
         *args,
         **kwargs,
-    ) -> tuple[_ObsType, dict]:
+    ) -> tuple[Geom3DObjectCentricState, dict]:
         super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
 
         # Reset the robot. In the future, we may want to allow randomizing the initial
@@ -260,7 +213,7 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
 
         return self._get_obs(), {}
 
-    def set_state(self, obs: _ObsType) -> None:
+    def set_state(self, obs: Geom3DObjectCentricState) -> None:
         """Set the state of the environment to the given one.
 
         This is useful when treating the environment as a simulator.
@@ -270,7 +223,7 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
         self._grasped_object_transform = obs.grasped_object_transform
         self._set_object_states(obs)
 
-    def step(self, action: _ActType) -> tuple[_ObsType, float, bool, bool, dict]:
+    def step(self, action: Array) -> tuple[Geom3DObjectCentricState, float, bool, bool, dict]:
         # Store the current robot joints because we may need to revert in collision.
         current_joints = self.robot.get_joint_positions()
 
@@ -399,22 +352,110 @@ class Geom3DEnv(gymnasium.Env[_ObsType, _ActType], abc.ABC):
                 supporting_surface_ids.add(surface_id)
         return supporting_surface_ids
 
+
+class ConstantObjectGeom3DEnv(
+    gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]
+):
+    """Defined by an object-centric Geom3D environment and a constant object set.
+
+    The point of this pattern is to allow implementing object-centric environments with
+    variable numbers of objects, but then also create versions of the environment with a
+    constant number of objects so it is easy to apply, e.g., RL approaches that use
+    fixed-dimensional observation and action spaces.
+    """
+
+    # NOTE: we need to define render_modes in the class instead of the instance because
+    # gym.make extracts render_modes from the class (entry_point) before instantiation.
+    metadata: dict[str, Any] = {"render_modes": ["rgb_array"]}
+
+    def __init__(self, *args, render_mode: str | None = None, **kwargs) -> None:
+        super().__init__()
+        self._geom3d_env = self._create_object_centric_geom3d_env(*args, **kwargs)
+        # Create a Box version of the observation space by extracting the constant
+        # objects from an exemplar state.
+        assert isinstance(
+            self._geom3d_env.observation_space, ObjectCentricStateSpace
+        )
+        exemplar_object_centric_state, _ = self._geom3d_env.reset()
+        obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
+        obj_names = self._get_constant_object_names(exemplar_object_centric_state)
+        self._constant_objects = [obj_name_to_obj[o] for o in obj_names]
+        # This is a Box space with some extra functionality to allow easy vectorizing.
+        self.observation_space = self._geom3d_env.observation_space.to_box(
+            self._constant_objects, Geom3DEnvTypeFeatures
+        )
+        self.action_space = self._geom3d_env.action_space
+        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
+        # The action space already inherits from Box, so we don't need to change it.
+        assert isinstance(self.action_space, Geom3DRobotActionSpace)
+        # Add descriptions to metadata for doc generation.
+        obs_md = self.observation_space.create_markdown_description()
+        act_md = self.action_space.create_markdown_description()
+        env_md = self._create_env_markdown_description()
+        reward_md = self._create_reward_markdown_description()
+        references_md = self._create_references_markdown_description()
+        # Update the metadata. Note that we need to define the render_modes in the class
+        # rather than in the instance because gym.make() extracts render_modes from cls.
+        self.metadata = self.metadata.copy()
+        self.metadata.update(
+            {
+                "description": env_md,
+                "observation_space_description": obs_md,
+                "action_space_description": act_md,
+                "reward_description": reward_md,
+                "references": references_md,
+                "render_fps": self._geom3d_env.metadata.get("render_fps", 20),
+            }
+        )
+        self.render_mode = render_mode
+
+    @abc.abstractmethod
+    def _create_object_centric_geom3d_env(
+        self, *args, **kwargs
+    ) -> Geom3DEnv:
+        """Create the underlying object-centric environment."""
+
+    @abc.abstractmethod
+    def _get_constant_object_names(
+        self, exemplar_state: ObjectCentricState
+    ) -> list[str]:
+        """The ordered names of the constant objects extracted from the observations."""
+
     @abc.abstractmethod
     def _create_env_markdown_description(self) -> str:
-        """Create environment description."""
-
-    @abc.abstractmethod
-    def _create_observation_space_markdown_description(self) -> str:
-        """Create observation space description."""
-
-    @abc.abstractmethod
-    def _create_action_space_markdown_description(self) -> str:
-        """Create action space description."""
+        """Create a markdown description of the overall environment."""
 
     @abc.abstractmethod
     def _create_reward_markdown_description(self) -> str:
-        """Create reward description."""
+        """Create a markdown description of the environment rewards."""
 
     @abc.abstractmethod
     def _create_references_markdown_description(self) -> str:
-        """Create references description."""
+        """Create a markdown description of the reference (e.g. papers) for this env."""
+
+    def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
+        super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
+        obs, info = self._geom3d_env.reset(*args, **kwargs)
+        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
+        vec_obs = self.observation_space.vectorize(obs)
+        return vec_obs, info
+
+    def step(
+        self, *args, **kwargs
+    ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
+        obs, reward, terminated, truncated, done = self._geom3d_env.step(
+            *args, **kwargs
+        )
+        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
+        vec_obs = self.observation_space.vectorize(obs)
+        return vec_obs, reward, terminated, truncated, done
+
+    def render(self):
+        return self._geom3d_env.render()
+
+    def get_action_from_gui_input(
+        self, gui_input: dict[str, Any]
+    ) -> NDArray[np.float32]:
+        """Get the mapping from human inputs to actions."""
+        # This will be implemented later
+        raise NotImplementedError
