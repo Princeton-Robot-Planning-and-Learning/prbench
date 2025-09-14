@@ -13,9 +13,9 @@ from pybullet_helpers.motion_planning import (
 )
 
 from prbench.envs.geom3d.obstruction3d import (
-    Obstruction3DAction,
+    ObjectCentricObstruction3DEnv,
     Obstruction3DEnv,
-    Obstruction3DState,
+    Obstruction3DObjectCentricState,
 )
 
 
@@ -24,11 +24,10 @@ def test_obstruction3d_env():
 
     env = Obstruction3DEnv(use_gui=False)  # set use_gui=True to debug
     obs, _ = env.reset(seed=123)
-    assert isinstance(obs, Obstruction3DState)
+    assert isinstance(obs, Obstruction3DObjectCentricState)
 
     for _ in range(10):
         act = env.action_space.sample()
-        assert isinstance(act, Obstruction3DAction)
         obs, _, _, _, _ = env.step(act)
 
     # Uncomment to debug.
@@ -48,7 +47,7 @@ def test_pick_place_no_obstructions():
     obs, _ = env.reset(seed=123)
 
     # Create a simulator for planning.
-    sim = Obstruction3DEnv(spec=spec)
+    sim = ObjectCentricObstruction3DEnv(num_obstructions=0, spec=spec)
     sim.set_state(obs)
 
     # Run motion planning.
@@ -79,14 +78,17 @@ def test_pick_place_no_obstructions():
     for target_joints in joint_plan[1:]:
         delta = np.subtract(target_joints, obs.joint_positions)[:7]
         delta_lst = [wrap_angle(a) for a in delta]
-        action = Obstruction3DAction(delta_lst)
+        action_lst = delta_lst + [0.0]
+        action = np.array(action_lst, dtype=np.float32)
         obs, _, _, _, _ = env.step(action)
 
     # Close the gripper to grasp.
-    action = Obstruction3DAction(delta_arm_joints=[0.0] * 7, gripper="close")
+    action = np.array([0.0] * 7 + [-1.0], dtype=np.float32)
     obs, _, _, _, _ = env.step(action)
 
     # The target block should now be grasped.
+    # TODO: fix things so this is no longer needed.
+    assert isinstance(obs, Obstruction3DObjectCentricState)
     assert obs.grasped_object == "target_block"
 
     # Move up slightly to break contact with the table.
@@ -117,22 +119,25 @@ def test_pick_place_no_obstructions():
     for target_joints in joint_plan[1:]:
         delta = np.subtract(target_joints, obs.joint_positions)[:7]
         delta_lst = [wrap_angle(a) for a in delta]
-        action = Obstruction3DAction(delta_lst)
+        action_lst = delta_lst + [0.0]
+        action = np.array(action_lst, dtype=np.float32)
         obs, _, _, _, _ = env.step(action)
 
     # Determine placement pose and pre-placement pose. Place directly in the center of
     # the target region for this test.
     placement_padding = 1e-4  # leave some room to prevent collisions with surface
+    # TODO: fix things so this is no longer needed.
+    assert isinstance(obs, Obstruction3DObjectCentricState)
     block_placement_pose = Pose(
         (
-            obs.target_region.pose.position[0],
-            obs.target_region.pose.position[1],
-            obs.target_region.pose.position[2]
-            + obs.target_region.geometry[2]
-            + obs.target_block.geometry[2]
+            obs.target_region_pose.position[0],
+            obs.target_region_pose.position[1],
+            obs.target_region_pose.position[2]
+            + obs.target_region_half_extents[2]
+            + obs.target_block_half_extents[2]
             + placement_padding,
         ),
-        obs.target_region.pose.orientation,
+        obs.target_region_pose.orientation,
     )
     end_effector_placement_pose = multiply_poses(
         block_placement_pose,
@@ -170,11 +175,12 @@ def test_pick_place_no_obstructions():
     for target_joints in joint_plan[1:]:
         delta = np.subtract(target_joints, obs.joint_positions)[:7]
         delta_lst = [wrap_angle(a) for a in delta]
-        action = Obstruction3DAction(delta_lst)
+        action_lst = delta_lst + [0.0]
+        action = np.array(action_lst, dtype=np.float32)
         obs, _, _, _, _ = env.step(action)
 
     # Open the gripper to finish the placement. Should trigger "done" (goal reached).
-    action = Obstruction3DAction(delta_arm_joints=[0.0] * 7, gripper="open")
+    action = np.array([0.0] * 7 + [1.0], dtype=np.float32)
     obs, _, done, _, _ = env.step(action)
     assert obs.grasped_object is None, "Object not released"
     assert done, "Goal not reached"

@@ -9,27 +9,21 @@ import pybullet as p
 from pybullet_helpers.geometry import Pose, set_pose
 from pybullet_helpers.inverse_kinematics import check_body_collisions
 from pybullet_helpers.utils import create_pybullet_block
-
-from prbench.envs.geom3d.base_env import (
-    Geom3DEnv,
-    Geom3DEnvSpec,
-)
-from prbench.envs.utils import PURPLE
+from relational_structs import ObjectCentricState
 from relational_structs.utils import create_state_from_dict
 
 from prbench.envs.geom3d.base_env import (
+    ConstantObjectGeom3DEnv,
     Geom3DEnv,
     Geom3DEnvSpec,
 )
-
 from prbench.envs.geom3d.object_types import (
+    Geom3DCuboidType,
     Geom3DEnvTypeFeatures,
     Geom3DRobotType,
-    Geom3DCuboidType,
 )
 from prbench.envs.geom3d.utils import Geom3DObjectCentricState
-from prbench.envs.geom3d.base_env import ConstantObjectGeom3DEnv
-
+from prbench.envs.utils import PURPLE
 
 
 @dataclass(frozen=True)
@@ -183,7 +177,7 @@ class Obstruction3DEnvSpec(Geom3DEnvSpec):
 
 class Obstruction3DObjectCentricState(Geom3DObjectCentricState):
     """A state in the Obstruction3DEnv().
-    
+
     Adds convenience methods on top of Geom3DObjectCentricState().
     """
 
@@ -195,7 +189,7 @@ class Obstruction3DObjectCentricState(Geom3DObjectCentricState):
             self.get(obj, "half_extent_y"),
             self.get(obj, "half_extent_z"),
         )
-    
+
     def get_cuboid_pose(self, name: str) -> Pose:
         """The pose of the cuboid."""
         obj = self.get_object_from_name(name)
@@ -211,22 +205,22 @@ class Obstruction3DObjectCentricState(Geom3DObjectCentricState):
             self.get(obj, "pose_qw"),
         )
         return Pose(position, orientation)
-    
+
     @property
     def target_region_half_extents(self) -> tuple[float, float, float]:
         """The half extents of the target region, assuming the name "target_region"."""
         return self.get_cuboid_half_extents("target_region")
-    
+
     @property
     def target_block_half_extents(self) -> tuple[float, float, float]:
         """The half extents of the target block, assuming the name "target_block"."""
         return self.get_cuboid_half_extents("target_block")
-    
+
     @property
     def target_region_pose(self) -> Pose:
         """The pose of the target region, assuming the name "target_region"."""
         return self.get_cuboid_pose("target_region")
-    
+
     @property
     def target_block_pose(self) -> Pose:
         """The pose of the target block, assuming the name "target_block"."""
@@ -266,7 +260,6 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
         self._target_block_half_extents: tuple[float, float, float] = (0.0, 0.0, 0.0)
         self._obstruction_ids: dict[str, int] = {}
         self._obstruction_id_to_half_extents: dict[int, tuple[float, float, float]] = {}
-
 
     def _reset_objects(self) -> None:
 
@@ -375,7 +368,8 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
             else:
                 raise RuntimeError("Failed to sample target block pose")
 
-    def _set_object_states(self, obs: Obstruction3DObjectCentricState) -> None:
+    def _set_object_states(self, obs: Geom3DObjectCentricState) -> None:
+        assert isinstance(obs, Obstruction3DObjectCentricState)
         # Check if target region needs to be recreated.
         if self._target_region_half_extents != obs.target_region_half_extents:
             # Recreate the target region.
@@ -470,12 +464,26 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
     def _get_surface_object_names(self) -> set[str]:
         return {"target_region", "table"}
 
+    def _get_half_extents(self, object_name: str) -> tuple[float, float, float]:
+        if object_name == "target_region":
+            return self._target_region_half_extents
+        if object_name == "target_block":
+            return self._target_block_half_extents
+        assert object_name.startswith("obstruction")
+        obj_id = self._object_name_to_pybullet_id(object_name)
+        return self._obstruction_id_to_half_extents[obj_id]
+
     def _get_obs(self) -> Obstruction3DObjectCentricState:
-        state_dict = self._create_state_dict([
-            ("robot", Geom3DRobotType),
-            ("target_region", Geom3DCuboidType),
-            ("target_block", Geom3DCuboidType),
-        ] + [(f"obstruction{i}", Geom3DCuboidType) for i in range(self._num_obstructions)]
+        state_dict = self._create_state_dict(
+            [
+                ("robot", Geom3DRobotType),
+                ("target_region", Geom3DCuboidType),
+                ("target_block", Geom3DCuboidType),
+            ]
+            + [
+                (f"obstruction{i}", Geom3DCuboidType)
+                for i in range(self._num_obstructions)
+            ]
         )
         s = create_state_from_dict(state_dict, Geom3DEnvTypeFeatures)
         return Obstruction3DObjectCentricState(s.data, Geom3DEnvTypeFeatures)
@@ -491,16 +499,17 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
 class Obstruction3DEnv(ConstantObjectGeom3DEnv):
     """Obstruction 3D env with a constant number of objects."""
 
-    def __init__(self, *args, render_mode = None, **kwargs):
-        super().__init__(*args, render_mode=render_mode, **kwargs)
-        # Allow the markdown references to use the spec.
-        self._spec: Obstruction3DEnvSpec = self._geom3d_env._spec  # pylint: disable=protected-access
+    def __init__(
+        self, spec: Obstruction3DEnvSpec = Obstruction3DEnvSpec(), **kwargs
+    ) -> None:
+        self._spec = spec
+        super().__init__(**kwargs)
 
-    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom3DEnv:
+    def _create_object_centric_geom3d_env(self, *args, **kwargs) -> Geom3DEnv:
         return ObjectCentricObstruction3DEnv(*args, **kwargs)
 
     def _get_constant_object_names(
-        self, exemplar_state: Obstruction3DObjectCentricState
+        self, exemplar_state: ObjectCentricState
     ) -> list[str]:
         constant_objects = ["robot", "target_region", "target_block"]
         for obj in sorted(exemplar_state):
@@ -511,14 +520,13 @@ class Obstruction3DEnv(ConstantObjectGeom3DEnv):
     def _create_env_markdown_description(self) -> str:
         """Create environment description."""
         # pylint: disable=line-too-long
-        num_obstructions = len(self._get_constant_object_names()) - 3
         return f"""A 3D obstruction clearance environment where the goal is to place a target block on a designated target region by first clearing obstructions.
 
 The robot is a Kinova Gen-3 with 7 degrees of freedom that can grasp and manipulate objects. The environment consists of:
 - A **table** with dimensions {self._spec.table_half_extents[0]*2:.3f}m × {self._spec.table_half_extents[1]*2:.3f}m × {self._spec.table_half_extents[2]*2:.3f}m
 - A **target region** (purple block) with random dimensions between {self._spec.target_region_half_extents_lb} and {self._spec.target_region_half_extents_ub} half-extents
 - A **target block** that must be placed on the target region, sized at {self._spec.target_block_size_scale}× the target region's x,y dimensions
-- **{num_obstructions} obstruction(s)** (red blocks) that may be placed on or near the target region, blocking access
+- **Obstruction(s)** (red blocks) that may be placed on or near the target region, blocking access
 
 Obstructions have random dimensions between {self._spec.obstruction_half_extents_lb} and {self._spec.obstruction_half_extents_ub} half-extents. During initialization, there's a {self._spec.obstruction_init_on_target_prob} probability that each obstruction will be placed on the target region, requiring clearance.
 

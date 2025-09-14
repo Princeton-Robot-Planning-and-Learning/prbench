@@ -2,15 +2,16 @@
 
 import numpy as np
 from gymnasium.spaces import Box
-from relational_structs import ObjectCentricState, Object
-from pybullet_helpers.joint import JointPositions
 from pybullet_helpers.geometry import Pose
+from pybullet_helpers.joint import JointPositions
+from relational_structs import Object, ObjectCentricState
+
 from prbench.envs.geom3d.object_types import Geom3DCuboidType
 
 
 class Geom3DObjectCentricState(ObjectCentricState):
     """A state in the Geom3D environment.
-    
+
     Inherits from ObjectCentricState but adds some conveninent look ups.
     """
 
@@ -30,7 +31,7 @@ class Geom3DObjectCentricState(ObjectCentricState):
         """The robot joint positions."""
         joint_names = [f"joint_{i}" for i in range(1, 8)]
         return [self.get(self.robot, n) for n in joint_names]
-    
+
     @property
     def grasped_object(self) -> str | None:
         """The name of the currently grasped object, or None if there is none."""
@@ -43,13 +44,13 @@ class Geom3DObjectCentricState(ObjectCentricState):
         assert len(grasped_objs) == 1, "Multiple objects should not be grasped"
         grasped_obj = grasped_objs[0]
         return grasped_obj.name
-    
+
     @property
     def grasped_object_transform(self) -> Pose | None:
         """The grasped object transform, or None if there is no grasped object."""
-        grasped_object = self.get_object_from_name(self.grasped_object)
-        if grasped_object is None:
+        if self.grasped_object is None:
             return None
+        grasped_object = self.get_object_from_name(self.grasped_object)
         x = self.get(grasped_object, "grasp_tf_x")
         y = self.get(grasped_object, "grasp_tf_y")
         z = self.get(grasped_object, "grasp_tf_z")

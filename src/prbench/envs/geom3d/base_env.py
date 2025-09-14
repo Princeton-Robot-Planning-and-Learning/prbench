@@ -23,19 +23,20 @@ from pybullet_helpers.robots import create_pybullet_robot
 from pybullet_helpers.robots.single_arm import FingeredSingleArmPyBulletRobot
 from relational_structs import (
     Array,
+    Object,
     ObjectCentricState,
     ObjectCentricStateSpace,
     Type,
-    Object,
 )
 from relational_structs.spaces import ObjectCentricBoxSpace
+
 from prbench.envs.geom3d.object_types import (
-    Geom3DEnvTypeFeatures,
     Geom3DCuboidType,
-    Geom3DRobotType,
+    Geom3DEnvTypeFeatures,
     Geom3DPointType,
+    Geom3DRobotType,
 )
-from prbench.envs.geom3d.utils import Geom3DRobotActionSpace, Geom3DObjectCentricState
+from prbench.envs.geom3d.utils import Geom3DObjectCentricState, Geom3DRobotActionSpace
 
 
 @dataclass(frozen=True)
@@ -229,7 +230,9 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
         self._grasped_object_transform = obs.grasped_object_transform
         self._set_object_states(obs)
 
-    def step(self, action: Array) -> tuple[Geom3DObjectCentricState, float, bool, bool, dict]:
+    def step(
+        self, action: Array
+    ) -> tuple[Geom3DObjectCentricState, float, bool, bool, dict]:
         # Store the current robot joints because we may need to revert in collision.
         current_joints = self.robot.get_joint_positions()
 
@@ -365,12 +368,14 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             ):
                 supporting_surface_ids.add(surface_id)
         return supporting_surface_ids
-    
-    def _create_state_dict(self, objects: list[tuple[str, Type]]) -> dict[Object, dict[str, float]]:
+
+    def _create_state_dict(
+        self, objects: list[tuple[str, Type]]
+    ) -> dict[Object, dict[str, float]]:
         state_dict: dict[Object, dict[str, float]] = {}
         for object_name, object_type in objects:
             obj = Object(object_name, object_type)
-            feats : dict[str, float] = {}
+            feats: dict[str, float] = {}
             # Handle robots.
             if object_type == Geom3DRobotType:
                 # Add joints.
@@ -378,24 +383,42 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
                 for i, v in enumerate(joints):
                     feats[f"joint_{i+1}"] = v
                 # Add grasp.
-                grasp_tf_feat_names = ["grasp_tf_x", "grasp_tf_y", "grasp_tf_z",
-                                       "grasp_tf_qx", "grasp_tf_qy", "grasp_tf_qz",
-                                       "grasp_tf_qw"]
+                grasp_tf_feat_names = [
+                    "grasp_tf_x",
+                    "grasp_tf_y",
+                    "grasp_tf_z",
+                    "grasp_tf_qx",
+                    "grasp_tf_qy",
+                    "grasp_tf_qz",
+                    "grasp_tf_qw",
+                ]
                 if self._grasped_object_transform is None:
                     feats["grasp_active"] = 0
                     for feat_name in grasp_tf_feat_names:
                         feats[feat_name] = 0
                 else:
                     feats["grasp_active"] = 1
-                    grasp_tf_feats = list(self._grasped_object_transform.position) + list(self._grasped_object_transform.orientation)
-                    for feat_name, feat in zip(grasp_tf_feat_names, grasp_tf_feats, strict=True):
+                    grasp_tf_feats = list(
+                        self._grasped_object_transform.position
+                    ) + list(self._grasped_object_transform.orientation)
+                    for feat_name, feat in zip(
+                        grasp_tf_feat_names, grasp_tf_feats, strict=True
+                    ):
                         feats[feat_name] = feat
             # Handle cuboids.
             elif object_type == Geom3DCuboidType:
                 # Add pose.
                 body_id = self._object_name_to_pybullet_id(object_name)
                 pose = get_pose(body_id, self.physics_client_id)
-                pose_feat_names = ["pose_x", "pose_y", "pose_z", "pose_qx", "pose_qy", "pose_qz", "pose_qw"]
+                pose_feat_names = [
+                    "pose_x",
+                    "pose_y",
+                    "pose_z",
+                    "pose_qx",
+                    "pose_qy",
+                    "pose_qz",
+                    "pose_qw",
+                ]
                 pose_feats = list(pose.position) + list(pose.orientation)
                 for feat_name, feat in zip(pose_feat_names, pose_feats, strict=True):
                     feats[feat_name] = feat
@@ -407,7 +430,9 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
                 # Add half extents.
                 half_extent_names = ["half_extent_x", "half_extent_y", "half_extent_z"]
                 half_extents = self._get_half_extents(object_name)
-                for feat_name, feat in zip(half_extent_names, half_extents, strict=True):
+                for feat_name, feat in zip(
+                    half_extent_names, half_extents, strict=True
+                ):
                     feats[feat_name] = feat
             # Handle points.
             elif object_type == Geom3DPointType:
@@ -424,10 +449,7 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
         return state_dict
 
 
-
-class ConstantObjectGeom3DEnv(
-    gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]
-):
+class ConstantObjectGeom3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
     """Defined by an object-centric Geom3D environment and a constant object set.
 
     The point of this pattern is to allow implementing object-centric environments with
@@ -445,9 +467,7 @@ class ConstantObjectGeom3DEnv(
         self._geom3d_env = self._create_object_centric_geom3d_env(*args, **kwargs)
         # Create a Box version of the observation space by extracting the constant
         # objects from an exemplar state.
-        assert isinstance(
-            self._geom3d_env.observation_space, ObjectCentricStateSpace
-        )
+        assert isinstance(self._geom3d_env.observation_space, ObjectCentricStateSpace)
         exemplar_object_centric_state, _ = self._geom3d_env.reset()
         obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
         obj_names = self._get_constant_object_names(exemplar_object_centric_state)
@@ -482,9 +502,7 @@ class ConstantObjectGeom3DEnv(
         self.render_mode = render_mode
 
     @abc.abstractmethod
-    def _create_object_centric_geom3d_env(
-        self, *args, **kwargs
-    ) -> Geom3DEnv:
+    def _create_object_centric_geom3d_env(self, *args, **kwargs) -> Geom3DEnv:
         """Create the underlying object-centric environment."""
 
     @abc.abstractmethod
@@ -530,4 +548,5 @@ class ConstantObjectGeom3DEnv(
     ) -> NDArray[np.float32]:
         """Get the mapping from human inputs to actions."""
         # This will be implemented later
-        raise NotImplementedError
+        del gui_input
+        return np.array([], dtype=np.float32)

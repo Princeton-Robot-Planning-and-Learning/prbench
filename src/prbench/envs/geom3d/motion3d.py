@@ -11,21 +11,20 @@ from pybullet_helpers.inverse_kinematics import (
     InverseKinematicsError,
     inverse_kinematics,
 )
+from relational_structs import ObjectCentricState
 from relational_structs.utils import create_state_from_dict
 
 from prbench.envs.geom3d.base_env import (
+    ConstantObjectGeom3DEnv,
     Geom3DEnv,
     Geom3DEnvSpec,
 )
-
 from prbench.envs.geom3d.object_types import (
     Geom3DEnvTypeFeatures,
-    Geom3DRobotType,
     Geom3DPointType,
+    Geom3DRobotType,
 )
 from prbench.envs.geom3d.utils import Geom3DObjectCentricState
-from prbench.envs.geom3d.base_env import ConstantObjectGeom3DEnv
-
 
 
 @dataclass(frozen=True)
@@ -41,7 +40,7 @@ class Motion3DEnvSpec(Geom3DEnvSpec):
 
 class Motion3DObjectCentricState(Geom3DObjectCentricState):
     """A state in the Motion3DEnv().
-    
+
     Adds convenience methods on top of Geom3DObjectCentricState().
     """
 
@@ -99,7 +98,8 @@ class ObjectCentricMotion3DEnv(Geom3DEnv):
             raise RuntimeError("Failed to find reachable target position")
         set_pose(self.target_id, target_pose, self.physics_client_id)
 
-    def _set_object_states(self, obs: Motion3DObjectCentricState) -> None:
+    def _set_object_states(self, obs: Geom3DObjectCentricState) -> None:
+        assert isinstance(obs, Motion3DObjectCentricState)
         assert self.target_id is not None
         set_pose(self.target_id, Pose(obs.target_position), self.physics_client_id)
 
@@ -117,11 +117,13 @@ class ObjectCentricMotion3DEnv(Geom3DEnv):
     def _get_surface_object_names(self) -> set[str]:
         return set()
 
+    def _get_half_extents(self, object_name: str) -> tuple[float, float, float]:
+        raise NotImplementedError("No objects have half extents")
+
     def _get_obs(self) -> Motion3DObjectCentricState:
-        state_dict = self._create_state_dict([
-            ("robot", Geom3DRobotType),
-            ("target", Geom3DPointType)
-        ])
+        state_dict = self._create_state_dict(
+            [("robot", Geom3DRobotType), ("target", Geom3DPointType)]
+        )
         s = create_state_from_dict(state_dict, Geom3DEnvTypeFeatures)
         return Motion3DObjectCentricState(s.data, Geom3DEnvTypeFeatures)
 
@@ -135,38 +137,17 @@ class ObjectCentricMotion3DEnv(Geom3DEnv):
 class Motion3DEnv(ConstantObjectGeom3DEnv):
     """Motion 3D env with a constant number of objects."""
 
-    def __init__(self, *args, render_mode = None, **kwargs):
-        super().__init__(*args, render_mode=render_mode, **kwargs)
-        # Allow the markdown references to use the spec.
-        self._spec: Motion3DEnvSpec = self._geom3d_env._spec  # pylint: disable=protected-access
+    def __init__(self, spec: Motion3DEnvSpec = Motion3DEnvSpec(), **kwargs) -> None:
+        self._spec = spec
+        super().__init__(spec=spec, **kwargs)
 
-    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom3DEnv:
+    def _create_object_centric_geom3d_env(self, *args, **kwargs) -> Geom3DEnv:
         return ObjectCentricMotion3DEnv(*args, **kwargs)
 
     def _get_constant_object_names(
-        self, exemplar_state: Motion3DObjectCentricState
+        self, exemplar_state: ObjectCentricState
     ) -> list[str]:
         return ["robot", "target"]
-
-    def _create_env_markdown_description(self) -> str:
-        num_obstructions = len(self._constant_objects) - 2
-        # pylint: disable=line-too-long
-        if num_obstructions > 0:
-            obstruction_sentence = f"\nThe target block may be initially obstructed. In this environment, there are always {num_obstructions} obstacle blocks.\n"
-        else:
-            obstruction_sentence = ""
-
-        return f"""A 2D environment where the goal is to "pick up" (suction) a target block.
-{obstruction_sentence}
-The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
-"""
-
-    def _create_reward_markdown_description(self) -> str:
-        return "A penalty of -1.0 is given at every time step until termination, which occurs when the target block is held.\n"  # pylint: disable=line-too-long
-
-    def _create_references_markdown_description(self) -> str:
-        return 'Similar environments have been considered by many others, especially in the task and motion planning literature, e.g., "Combined Task and Motion Planning Through an Extensible Planner-Independent Interface Layer" (Srivastava et al., ICRA 2014).\n'  # pylint: disable=line-too-long
-
 
     def _create_env_markdown_description(self) -> str:
         """Create environment description."""
