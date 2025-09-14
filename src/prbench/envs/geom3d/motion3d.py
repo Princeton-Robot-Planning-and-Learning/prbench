@@ -11,7 +11,7 @@ from pybullet_helpers.inverse_kinematics import (
     InverseKinematicsError,
     inverse_kinematics,
 )
-from relational_structs import Object
+from relational_structs import Array
 from relational_structs.utils import create_state_from_dict
 
 from prbench.envs.geom3d.base_env import (
@@ -24,7 +24,8 @@ from prbench.envs.geom3d.object_types import (
     Geom3DRobotType,
     Geom3DPointType,
 )
-from prbench.envs.geom3d.utils import Geom3DRobotActionSpace, Geom3DObjectCentricState
+from prbench.envs.geom3d.utils import Geom3DObjectCentricState
+from prbench.envs.geom3d.base_env import ConstantObjectGeom3DEnv
 
 
 
@@ -52,7 +53,7 @@ class Motion3DObjectCentricState(Geom3DObjectCentricState):
         return (self.get(target, "x"), self.get(target, "y"), self.get(target, "z"))
 
 
-class Motion3DEnv(Geom3DEnv):
+class ObjectCentricMotion3DEnv(Geom3DEnv):
     """Environment where only 3D motion planning is needed to reach a goal region."""
 
     def __init__(self, spec: Motion3DEnvSpec = Motion3DEnvSpec(), **kwargs) -> None:
@@ -131,12 +132,42 @@ class Motion3DEnv(Geom3DEnv):
         dist = float(np.linalg.norm(np.subtract(target, end_effector_pose.position)))
         return dist < self._spec.target_radius
 
-    def _sample_action(self, rng: np.random.Generator) -> Motion3DAction:
-        num_dof = 7
-        arr = rng.uniform(
-            -self._spec.max_action_mag, self._spec.max_action_mag, size=(num_dof,)
-        )
-        return Motion3DAction(arr.tolist())
+
+class Motion3DEnv(ConstantObjectGeom3DEnv):
+    """Motion 3D env with a constant number of objects."""
+
+    def __init__(self, *args, render_mode = None, **kwargs):
+        super().__init__(*args, render_mode=render_mode, **kwargs)
+        # Allow the markdown references to use the spec.
+        self._spec: Motion3DEnvSpec = self._geom3d_env._spec  # pylint: disable=protected-access
+
+    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom3DEnv:
+        return ObjectCentricMotion3DEnv(*args, **kwargs)
+
+    def _get_constant_object_names(
+        self, exemplar_state: Motion3DObjectCentricState
+    ) -> list[str]:
+        return ["robot", "target"]
+
+    def _create_env_markdown_description(self) -> str:
+        num_obstructions = len(self._constant_objects) - 2
+        # pylint: disable=line-too-long
+        if num_obstructions > 0:
+            obstruction_sentence = f"\nThe target block may be initially obstructed. In this environment, there are always {num_obstructions} obstacle blocks.\n"
+        else:
+            obstruction_sentence = ""
+
+        return f"""A 2D environment where the goal is to "pick up" (suction) a target block.
+{obstruction_sentence}
+The robot has a movable circular base and a retractable arm with a rectangular vacuum end effector. Objects can be grasped and ungrasped when the end effector makes contact.
+"""
+
+    def _create_reward_markdown_description(self) -> str:
+        return "A penalty of -1.0 is given at every time step until termination, which occurs when the target block is held.\n"  # pylint: disable=line-too-long
+
+    def _create_references_markdown_description(self) -> str:
+        return 'Similar environments have been considered by many others, especially in the task and motion planning literature, e.g., "Combined Task and Motion Planning Through an Extensible Planner-Independent Interface Layer" (Srivastava et al., ICRA 2014).\n'  # pylint: disable=line-too-long
+
 
     def _create_env_markdown_description(self) -> str:
         """Create environment description."""
