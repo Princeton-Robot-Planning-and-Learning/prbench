@@ -124,8 +124,8 @@ class ObjectCentricClutteredRetrieval2DEnv(
 
     def __init__(
         self,
-        config: ClutteredRetrieval2DEnvConfig = ClutteredRetrieval2DEnvConfig(),
         num_obstructions: int = 2,
+        config: ClutteredRetrieval2DEnvConfig = ClutteredRetrieval2DEnvConfig(),
         **kwargs,
     ) -> None:
         super().__init__(config, **kwargs)
