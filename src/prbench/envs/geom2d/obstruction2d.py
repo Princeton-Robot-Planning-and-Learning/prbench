@@ -19,14 +19,12 @@ from prbench.envs.geom2d.object_types import (
 )
 from prbench.envs.geom2d.structs import MultiBody2D, ZOrder
 from prbench.envs.geom2d.utils import (
-    PURPLE,
     CRVRobotActionSpace,
     SE2Pose,
     create_walls_from_world_boundaries,
     is_on,
-    sample_se2_pose,
-    state_has_collision,
 )
+from prbench.envs.utils import PURPLE, sample_se2_pose, state_2d_has_collision
 
 TargetBlockType = Type("target_block", parent=RectangleType)
 TargetSurfaceType = Type("target_surface", parent=RectangleType)
@@ -165,7 +163,7 @@ class ObjectCentricObstruction2DEnv(Geom2DRobotEnv):
     def _sample_initial_state(self) -> ObjectCentricState:
         assert self._initial_constant_state is not None
         static_objects = set(self._initial_constant_state)
-        assert not state_has_collision(
+        assert not state_2d_has_collision(
             self._initial_constant_state,
             static_objects,
             static_objects,
@@ -229,7 +227,7 @@ class ObjectCentricObstruction2DEnv(Geom2DRobotEnv):
             full_state = state.copy()
             full_state.data.update(self._initial_constant_state.data)
             all_objects = set(full_state)
-            if state_has_collision(full_state, all_objects, all_objects, {}):
+            if state_2d_has_collision(full_state, all_objects, all_objects, {}):
                 continue
             return state
         raise RuntimeError(f"Failed to sample initial state after {n} attempts")

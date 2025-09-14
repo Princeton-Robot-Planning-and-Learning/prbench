@@ -26,10 +26,9 @@ from prbench.envs.geom2d.utils import (
     CRVRobotActionSpace,
     get_geom2d_crv_robot_action_from_gui_input,
     get_suctioned_objects,
-    render_state,
     snap_suctioned_objects,
-    state_has_collision,
 )
+from prbench.envs.utils import render_2dstate, state_2d_has_collision
 
 
 @dataclass(frozen=True)
@@ -212,7 +211,7 @@ class Geom2DRobotEnv(gymnasium.Env):
             # Merge the initial constant state with the current state.
             full_state.data.update(self._initial_constant_state.data)
         obstacles = set(full_state) - moving_objects
-        if not state_has_collision(
+        if not state_2d_has_collision(
             full_state, moving_objects, obstacles, self._static_object_body_cache
         ):
             self._current_state = state
@@ -245,7 +244,7 @@ class Geom2DRobotEnv(gymnasium.Env):
         if self._initial_constant_state is not None:
             # Merge the initial constant state with the current state.
             render_input_state.data.update(self._initial_constant_state.data)
-        return render_state(
+        return render_2dstate(
             render_input_state,
             self._static_object_body_cache,
             self._spec.world_min_x,

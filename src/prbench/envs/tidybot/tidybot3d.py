@@ -6,22 +6,28 @@ from pathlib import Path
 from typing import Any
 
 import cv2 as cv
-import gymnasium
 import numpy as np
-from gymnasium import spaces
+from gymnasium.spaces import Space
 from numpy.typing import NDArray
+from prpl_utils.spaces import FunctionalSpace
 
+from prbench.envs.tidybot.mujoco_utils import MjAct, MjObs
 from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
 from prbench.envs.tidybot.tidybot_robot_env import TidyBotRobotEnv
 
 
-class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
+class TidyBot3DEnv(TidyBotRobotEnv):
     """TidyBot 3D environment with mobile manipulation tasks."""
 
     metadata: dict[str, Any] = {"render_modes": ["rgb_array"]}
 
     def __init__(
         self,
+        control_frequency: int = 20,
+        horizon: int = 1000,
+        camera_names: list[str] | None = None,
+        camera_width: int = 640,
+        camera_height: int = 480,
         scene_type: str = "ground",
         num_objects: int = 3,
         render_mode: str | None = None,
@@ -31,7 +37,15 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         show_viewer: bool = False,
         show_images: bool = False,
     ) -> None:
-        super().__init__()
+        super().__init__(
+            control_frequency,
+            horizon=horizon,
+            camera_names=camera_names,
+            camera_width=camera_width,
+            camera_height=camera_height,
+            seed=seed,
+            show_viewer=show_viewer,
+        )
 
         self.scene_type = scene_type
         self.num_objects = num_objects
@@ -46,16 +60,8 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             if not self.render_images:
                 raise ValueError("Cannot show images if render_images is False")
 
-        # Initialize TidyBot environment
-        camera_names = None
-        if render_images:
-            camera_names = ["overview", "wrist", "base"]
-        self._tidybot_robot_env = self._create_robot_tidybot_env(
-            seed=seed, camera_names=camera_names, show_viewer=show_viewer
-        )
-
-        # Set random number generator
-        self.np_random = self._tidybot_robot_env.np_random
+        # Initialize empty object list
+        self._object_names: list[str] = []
 
         self._reward_calculator = create_reward_calculator(
             self.scene_type, self.num_objects
@@ -81,42 +87,27 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             }
         )
 
-    def _create_robot_tidybot_env(
-        self,
-        seed: int | None = None,
-        camera_names: list[str] | None = None,
-        show_viewer: bool = False,
-    ) -> TidyBotRobotEnv:
-        """Create the underlying TidyBot Robot MuJoCo environment."""
-
-        return TidyBotRobotEnv(
-            control_frequency=20,
-            seed=seed,
-            camera_names=camera_names,
-            show_viewer=show_viewer,
-        )
-
-    def _create_observation_space(self) -> spaces.Box:
+    def _create_observation_space(self) -> Space[MjObs]:
         """Create observation space based on TidyBot's observation structure."""
-        # Get example observation to determine dimensions
-        self._tidybot_robot_env.reset(self._create_scene_xml())
-        example_obs = self._tidybot_robot_env.get_obs()
+        # NOTE: this will be refactored soon after we introduce object-centric structs.
+        return FunctionalSpace(contains_fn=lambda _: True)
 
-        # Calculate total observation dimension (all values are ndarrays)
-        obs_dim = sum(value.size for value in example_obs.values())
-
-        return spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
-
-    def _create_action_space(self) -> spaces.Box:
+    def _create_action_space(self) -> Space[MjAct]:
         """Create action space for TidyBot's control interface."""
         # TidyBot actions: base_pose (3), arm_pos (3), arm_quat (4), gripper_pos (1)
-        return spaces.Box(
-            low=np.array(
-                [-1.0, -1.0, -np.pi, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 0.0]
-            ),
-            high=np.array([1.0, 1.0, np.pi, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]),
-            dtype=np.float32,
+        low = np.array(
+            [-1.0, -1.0, -np.pi, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 0.0]
         )
+        high = np.array([1.0, 1.0, np.pi, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+
+        def _contains_fn(x: Any) -> bool:
+            return isinstance(x, MjAct)
+
+        def _sample_fn(rng: np.random.Generator) -> MjAct:
+            ctrl = rng.uniform(low, high)
+            return MjAct(position_ctrl=ctrl)
+
+        return FunctionalSpace(contains_fn=_contains_fn, sample_fn=_sample_fn)
 
     def _vectorize_observation(self, obs: dict[str, Any]) -> NDArray[np.float32]:
         """Convert TidyBot observation dict to vector."""
@@ -125,15 +116,6 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             value = obs[key]
             obs_vector.extend(value.flatten())
         return np.array(obs_vector, dtype=np.float32)
-
-    def _action_to_dict(self, action_vector: NDArray[np.float32]) -> dict[str, Any]:
-        """Convert action vector to TidyBot action dict."""
-        return {
-            "base_pose": action_vector[:3],
-            "arm_pos": action_vector[3:6],
-            "arm_quat": action_vector[6:10],
-            "gripper_pos": action_vector[10:11],
-        }
 
     def _create_scene_xml(self) -> str:
         """Create the MuJoCo XML string for the current scene configuration."""
@@ -165,31 +147,8 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                 # Insert new cubes
                 for i in range(self.num_objects):
                     name = f"cube{i+1}"
-                    body = ET.Element("body", name=name, pos="0 0 0")
-                    ET.SubElement(body, "freejoint")
-                    pos = "0 0 0"
-                    if self.scene_type == "cupboard":
-                        pass  # no position randomization for cupboard scene
-                    elif self.scene_type == "table":
-                        # Randomize position within a reasonable range
-                        # for the table environment
-                        x = round(self.np_random.uniform(0.2, 0.8), 3)
-                        y = round(self.np_random.uniform(-0.15, 0.15), 3)
-                        z = 0.44
-                        pos = f"{x} {y} {z}"
-                    else:
-                        # Randomize position within a reasonable range
-                        # for the ground environment
-                        x = round(self.np_random.uniform(0.4, 0.8), 3)
-                        y = round(self.np_random.uniform(-0.3, 0.3), 3)
-                        z = 0.02
-                        pos = f"{x} {y} {z}"
-                    # Randomize orientation around Z-axis (yaw)
-                    theta = self.np_random.uniform(-math.pi, math.pi)
-                    quat_array = np.array(
-                        [math.cos(theta / 2), 0, 0, math.sin(theta / 2)]
-                    )
-                    quat = " ".join(map(str, quat_array))
+                    body = ET.Element("body")
+                    ET.SubElement(body, "freejoint", name=f"{name}_joint")
                     ET.SubElement(
                         body,
                         "geom",
@@ -197,10 +156,9 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
                         size="0.02 0.02 0.02",
                         rgba=".5 .7 .5 1",
                         mass="0.1",
-                        pos=pos,
-                        quat=quat,
                     )
                     worldbody.append(body)
+                    self._object_names.append(name)
 
                 # Get XML string from tree
                 xml_string = ET.tostring(root, encoding="unicode")
@@ -213,24 +171,85 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
 
         return xml_string
 
+    def _set_object_pos_quat(
+        self, name: str, pos: NDArray[np.float32], quat: NDArray[np.float32]
+    ) -> None:
+        """Set object position and orientation in the environment."""
+
+        assert self.sim is not None, "Simulation not initialized"
+        joint_id = self.sim.model.get_joint_qpos_addr(f"{name}_joint")
+        self.sim.data.qpos[joint_id : joint_id + 7] = np.array(
+            [float(x) for x in pos] + [float(q) for q in quat]
+        )
+
+    def get_object_pos_quat(self, name: str) -> tuple[float, float]:
+        """Set object position and orientation in the environment."""
+
+        assert self.sim is not None, "Simulation not initialized"
+        joint_id = self.sim.model.get_joint_qpos_addr(f"{name}_joint")
+        pos = self.sim.data.qpos[joint_id : joint_id + 3]
+        quat = self.sim.data.qpos[joint_id + 3 : joint_id + 7]
+        return pos, quat
+
+    def _initialize_object_poses(self) -> None:
+        """Initialize object poses in the environment."""
+
+        assert self.sim is not None, "Simulation not initialized"
+
+        for name in self._object_names:
+            pos = np.array([0.0, 0.0, 0.0])
+            if self.scene_type == "cupboard":
+                pass  # no position randomization for cupboard scene
+            elif self.scene_type == "table":
+                # Randomize position within a reasonable range
+                # for the table environment
+                x = round(self.np_random.uniform(0.2, 0.8), 3)
+                y = round(self.np_random.uniform(-0.15, 0.15), 3)
+                z = 0.44
+                pos = np.array([x, y, z])
+            else:
+                # Randomize position within a reasonable range
+                # for the ground environment
+                x = round(self.np_random.uniform(0.4, 0.8), 3)
+                y = round(self.np_random.uniform(-0.3, 0.3), 3)
+                z = 0.02
+                pos = np.array([x, y, z])
+            # Randomize orientation around Z-axis (yaw)
+            theta = self.np_random.uniform(-math.pi, math.pi)
+            quat = np.array([math.cos(theta / 2), 0, 0, math.sin(theta / 2)])
+
+            # Set object pose in the environment
+            self._set_object_pos_quat(name, pos, quat)
+
+        self.sim.forward()
+
     def reset(
-        self, *args: Any, **kwargs: Any
-    ) -> tuple[NDArray[np.float32], dict[str, Any]]:
-        """Reset the environment."""
-
-        if "seed" in kwargs:
-            self._tidybot_robot_env.seed(kwargs.get("seed"))
-            self.np_random = self._tidybot_robot_env.np_random
-
-        super().reset(*args, **kwargs)
-
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> tuple[MjObs, dict[str, Any]]:
+        # Create scene XML
+        self._object_names = []
         xml_string = self._create_scene_xml()
 
         # Reset the underlying TidyBot robot environment
-        obs, _, _, _ = self._tidybot_robot_env.reset(xml_string)
+        robot_options = options.copy() if options is not None else {}
+        robot_options["xml"] = xml_string
+        super().reset(seed=seed, options=robot_options)
+
+        # Initialize object poses
+        self._initialize_object_poses()
+
+        # Get observation and vectorize
+        obs = super().get_obs()
 
         vec_obs = self._vectorize_observation(obs)
-        return vec_obs, {}
+
+        # NOTE: this will be refactored soon after we introduce object-centric structs.
+        final_obs = {"vec": vec_obs}
+
+        return final_obs, {}
 
     def _visualize_image_in_window(
         self, image: NDArray[np.uint8], window_name: str
@@ -244,44 +263,44 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
             cv.imshow(window_name, display_image)  # pylint: disable=no-member
             cv.waitKey(1)  # pylint: disable=no-member
 
-    def step(
-        self, action: NDArray[np.float32]
-    ) -> tuple[NDArray[np.float32], float, bool, bool, dict[str, Any]]:
-        """Execute action and return next observation."""
-        action_dict = self._action_to_dict(action)
-        self._tidybot_robot_env.step(action_dict)
+    def step(self, action: MjAct) -> tuple[MjObs, float, bool, bool, dict[str, Any]]:
+        # Run the action.
+        super().step(action)
 
         # Get observation
-        obs = self._tidybot_robot_env.get_obs()
+        obs = self.get_obs()
         vec_obs = self._vectorize_observation(obs)
 
         # Visualization loop for rendered image
         if self.show_images:
-            for camera_name in self._tidybot_robot_env.camera_names:
+            for camera_name in self.camera_names:
                 self._visualize_image_in_window(
                     obs[f"{camera_name}_image"],
                     f"TidyBot {camera_name} camera",
                 )
 
         # Calculate reward and termination
-        reward = self._calculate_reward(obs)
+        reward = self.reward(obs)
         terminated = self._is_terminated(obs)
         truncated = False
 
-        return vec_obs, reward, terminated, truncated, {}
+        # NOTE: this will be refactored soon after we introduce object-centric structs.
+        final_obs = {"vec": vec_obs}
 
-    def _calculate_reward(self, obs: dict[str, Any]) -> float:
+        return final_obs, reward, terminated, truncated, {}
+
+    def reward(self, obs: MjObs) -> float:
         """Calculate reward based on task completion."""
         return self._reward_calculator.calculate_reward(obs)
 
-    def _is_terminated(self, obs: dict[str, Any]) -> bool:
+    def _is_terminated(self, obs: MjObs) -> bool:
         """Check if episode should terminate."""
         return self._reward_calculator.is_terminated(obs)
 
     def render(self) -> Any:
         """Render the environment."""
         if self.render_mode == "rgb_array":
-            obs = self._tidybot_robot_env.get_obs()
+            obs = super().get_obs()
             # If a specific camera is requested, use it.
             if self._render_camera_name:
                 key = f"{self._render_camera_name}_image"
@@ -299,7 +318,7 @@ class TidyBot3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
         if self.show_images:
             # Close OpenCV windows
             cv.destroyAllWindows()  # pylint: disable=no-member
-        self._tidybot_robot_env.close()
+        super().close()
 
     def set_render_camera(self, camera_name: str | None) -> None:
         """Set the camera to use for rendering."""

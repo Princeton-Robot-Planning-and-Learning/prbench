@@ -1,6 +1,7 @@
 """This module defines the TidyBotRobotEnv class, which is the base class for the
 TidyBot robot in simulation."""
 
+import abc
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Optional
@@ -8,14 +9,14 @@ from typing import Any, Optional
 import numpy as np
 from numpy.typing import NDArray
 
-from prbench.envs.tidybot.arm_controller import ArmController
-from prbench.envs.tidybot.base_controller import BaseController
-from prbench.envs.tidybot.mujoco_utils import MujocoEnv
+from prbench.envs.tidybot.mujoco_utils import MjObs, MujocoEnv
 
 
-class TidyBotRobotEnv(MujocoEnv):
-    """This is the base class for TidyBot environments that use MuJoCo for
-    simulation."""
+class TidyBotRobotEnv(MujocoEnv, abc.ABC):
+    """This is the base class for TidyBot environments that use MuJoCo for sim.
+
+    It is still abstract: subclasses define rewards and add objects to the env.
+    """
 
     def __init__(
         self,
@@ -43,9 +44,6 @@ class TidyBotRobotEnv(MujocoEnv):
             seed=seed,
             show_viewer=show_viewer,
         )
-
-        self.base_controller: Optional[BaseController] = None
-        self.arm_controller: Optional[ArmController] = None
 
         # Robot state/actuator references (initialized in _setup_robot_references)
         self.qpos_base: Optional[NDArray[np.float64]] = None
@@ -157,22 +155,18 @@ class TidyBotRobotEnv(MujocoEnv):
         self.ctrl_gripper = self.sim.data.ctrl[gripper_ctrl_id : gripper_ctrl_id + 1]
 
     def reset(
-        self, xml_string: str
-    ) -> tuple[dict[str, NDArray[Any]], None, None, None]:
-        """Reset the environment using xml string.
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> tuple[MjObs, dict[str, Any]]:
+        # Access the original xml.
+        assert options is not None and "xml" in options, "XML required to reset env"
+        xml_string = options["xml"]
 
-        Args:
-            xml_string: A string containing the MuJoCo XML model.
-
-        Returns:
-            observation: The observation from the environment.
-            reward: None (placeholder for compatibility).
-            done: None (placeholder for compatibility).
-            info: None (placeholder for compatibility).
-        """
-        # Insert robot in the xml_string
+        # Insert the robot into the xml string.
         xml_string = self._insert_robot_into_xml(xml_string)
-        super().reset(xml_string)
+        super().reset(seed=seed, options={"xml": xml_string})
 
         # Setup references to robot state/actuator buffers
         self._setup_robot_references()
@@ -180,10 +174,7 @@ class TidyBotRobotEnv(MujocoEnv):
         # Randomize the base pose of the robot in the sim
         self._randomize_base_pose()
 
-        # Setup controllers after resetting the environment
-        self._setup_controllers()
-
-        return self.get_obs(), None, None, None  # reward, done, info
+        return self.get_obs(), {}
 
     def _randomize_base_pose(self) -> None:
         """Randomize the base pose of the robot within defined limits."""
@@ -267,70 +258,3 @@ class TidyBotRobotEnv(MujocoEnv):
 
         # Return the merged XML as string
         return ET.tostring(input_root, encoding="unicode")
-
-    def _pre_action(self, action: NDArray[Any] | dict[str, Any]) -> None:
-        """Do any preprocessing before taking an action.
-
-        Args:
-            action: Action to execute within the environment.
-        """
-        if self.base_controller is not None and action is not None:
-            self.base_controller.run_controller(action)
-        if self.arm_controller is not None and action is not None:
-            self.arm_controller.run_controller(action)
-
-    def step(
-        self, action: NDArray[Any] | dict[str, Any]
-    ) -> tuple[dict[str, NDArray[Any]], float, bool, dict[str, Any]]:
-        """Step the environment.
-
-        Args:
-            action: Optional action to apply before stepping.
-
-        Returns:
-            Tuple of (observation, reward, done, info).
-        """
-        assert isinstance(action, dict), "Action must be a dictionary."
-        return super().step(action)
-
-    def reward(self, **kwargs: Any) -> float:
-        """Compute the reward for the current state and action."""
-        return 0.0  # Placeholder reward
-
-    def _setup_controllers(self) -> None:
-        """Setup the controllers for the robot."""
-
-        assert (
-            self.sim is not None
-        ), "Simulation must be initialized before setting up controllers."
-
-        # Ensure robot references are properly initialized
-        assert self.qpos_base is not None, "Robot references must be set up first"
-        assert self.qvel_base is not None, "Robot references must be set up first"
-        assert self.ctrl_base is not None, "Robot references must be set up first"
-        assert self.qpos_arm is not None, "Robot references must be set up first"
-        assert self.qvel_arm is not None, "Robot references must be set up first"
-        assert self.ctrl_arm is not None, "Robot references must be set up first"
-        assert self.ctrl_gripper is not None, "Robot references must be set up first"
-
-        # Initialize controllers
-        self.base_controller = BaseController(
-            self.qpos_base,
-            self.qvel_base,
-            self.ctrl_base,
-            self.sim.model._model.opt.timestep,  # pylint: disable=protected-access
-        )
-        self.arm_controller = ArmController(
-            self.qpos_arm,
-            self.qvel_arm,
-            self.ctrl_arm,
-            self.qpos_gripper,
-            self.ctrl_gripper,
-            self.sim.model._model.opt.timestep,  # pylint: disable=protected-access
-        )
-
-        # Reset controllers
-        self.base_controller.reset()
-        self.arm_controller.reset()  # also resets arm to retract position
-
-        self.sim.forward()

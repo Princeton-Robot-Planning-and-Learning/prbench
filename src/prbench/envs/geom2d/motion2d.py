@@ -16,17 +16,13 @@ from prbench.envs.geom2d.object_types import (
     Geom2DRobotEnvTypeFeatures,
     RectangleType,
 )
-from prbench.envs.geom2d.structs import ZOrder
+from prbench.envs.geom2d.structs import SE2Pose, ZOrder
 from prbench.envs.geom2d.utils import (
-    BLACK,
-    PURPLE,
     CRVRobotActionSpace,
-    SE2Pose,
     create_walls_from_world_boundaries,
     rectangle_object_to_geom,
-    sample_se2_pose,
-    state_has_collision,
 )
+from prbench.envs.utils import BLACK, PURPLE, sample_se2_pose, state_2d_has_collision
 
 TargetRegionType = Type("target_region", parent=RectangleType)
 Geom2DRobotEnvTypeFeatures[TargetRegionType] = list(
@@ -186,7 +182,7 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         # Sanity check.
         robot = state.get_objects(CRVRobotType)[0]
         target_region = state.get_objects(TargetRegionType)[0]
-        assert not state_has_collision(state, {robot, target_region}, set(state), {})
+        assert not state_2d_has_collision(state, {robot, target_region}, set(state), {})
 
         return state
 
@@ -217,7 +213,6 @@ class ObjectCentricMotion2DEnv(Geom2DRobotEnv):
         target_region_pose: SE2Pose | None = None,
         obstacles: list[tuple[SE2Pose, tuple[float, float]]] | None = None,
     ) -> ObjectCentricState:
-
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
         assert self._initial_constant_state is not None
