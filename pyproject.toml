@@ -20,8 +20,8 @@ dependencies = [
    "mujoco==3.2.4",
    "opencv-python>=4.9.0",
    # PyBullet dependencies
-   "pybullet==3.2.5",
-   "pybullet-helpers@git+https://github.com/tomsilver/pybullet-helpers.git",
+   # "pybullet==3.2.5",
+   # "pybullet-helpers@git+https://github.com/tomsilver/pybullet-helpers.git",
    "pymunk==7.1.0"
 ]
 
