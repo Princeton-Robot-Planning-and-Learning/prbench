@@ -228,9 +228,10 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
         current_joints = self.robot.get_joint_positions()
 
         # Tentatively apply robot action.
+        delta_arm_joints = action[:7]
         # Clip the action to be within the allowed limits.
         delta_joints = np.clip(
-            action.delta_arm_joints,
+            delta_arm_joints,
             -self._spec.max_action_mag,
             self._spec.max_action_mag,
         )
@@ -250,7 +251,14 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             self._set_robot_and_held_object(current_joints)
 
         # Check for grasping.
-        if action.gripper == "close" and self._grasped_object is None:
+        if action[7] < -0.5:
+            gripper_action = "close"
+        elif action[7] > 0.5:
+            gripper_action = "open"
+        else:
+            gripper_action = "none"
+
+        if gripper_action == "close" and self._grasped_object is None:
             # Check if an object is in collision with the end effector marker.
             # If multiple objects are in collision, treat this as a failed grasp.
             objects_in_grasp_zone: set[str] = set()
@@ -292,7 +300,7 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
                     self.robot.set_finger_state(next_finger_state)
 
         # Check for ungrasping.
-        elif action.gripper == "open" and self._grasped_object_id is not None:
+        elif gripper_action == "open" and self._grasped_object_id is not None:
             # Check if the held object is being placed on a surface. The rule is that
             # the distance between the object and the surface must be less than thresh.
             surface_supports = self._get_surfaces_supporting_object(
