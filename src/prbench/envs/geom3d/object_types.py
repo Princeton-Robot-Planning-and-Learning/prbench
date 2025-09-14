@@ -39,3 +39,11 @@ Geom3DEnvTypeFeatures[Geom3DCuboidType] = [
     "half_extent_y",
     "half_extent_z",
 ]
+
+# A point is just a position. For example, it could be a target point to reach.
+Geom3DPointType = Type("Geom3DPoint")
+Geom3DEnvTypeFeatures[Geom3DPointType] = [
+    "x",
+    "y",
+    "z",
+]

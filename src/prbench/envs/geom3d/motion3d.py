@@ -6,20 +6,26 @@ from dataclasses import dataclass
 
 import numpy as np
 import pybullet as p
-from gymnasium.spaces import Space
-from prpl_utils.spaces import FunctionalSpace
 from pybullet_helpers.geometry import Pose, get_pose, set_pose
 from pybullet_helpers.inverse_kinematics import (
     InverseKinematicsError,
     inverse_kinematics,
 )
+from relational_structs import Object
+from relational_structs.utils import create_state_from_dict
 
 from prbench.envs.geom3d.base_env import (
-    Geom3DAction,
     Geom3DEnv,
     Geom3DEnvSpec,
-    Geom3DState,
 )
+
+from prbench.envs.geom3d.object_types import (
+    Geom3DEnvTypeFeatures,
+    Geom3DRobotType,
+    Geom3DPointType,
+)
+from prbench.envs.geom3d.utils import Geom3DRobotActionSpace, Geom3DObjectCentricState
+
 
 
 @dataclass(frozen=True)
@@ -33,19 +39,20 @@ class Motion3DEnvSpec(Geom3DEnvSpec):
     target_upper_bound: tuple[float, float, float] = (0.5, 0.8, 0.5)
 
 
-@dataclass(frozen=True)
-class Motion3DState(Geom3DState):
-    """A state for Motion3DEnv()."""
+class Motion3DObjectCentricState(Geom3DObjectCentricState):
+    """A state in the Motion3DEnv().
+    
+    Adds convenience methods on top of Geom3DObjectCentricState().
+    """
 
-    target: tuple[float, float, float]  # 3D position to reach with end effector
+    @property
+    def target_position(self) -> tuple[float, float, float]:
+        """The position of the target, assuming the name "target"."""
+        target = self.get_object_from_name("target")
+        return (self.get(target, "x"), self.get(target, "y"), self.get(target, "z"))
 
 
-@dataclass(frozen=True)
-class Motion3DAction(Geom3DAction):
-    """An action for Motion3DEnv()."""
-
-
-class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
+class Motion3DEnv(Geom3DEnv):
     """Environment where only 3D motion planning is needed to reach a goal region."""
 
     def __init__(self, spec: Motion3DEnvSpec = Motion3DEnvSpec(), **kwargs) -> None:
@@ -72,15 +79,6 @@ class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
             physicsClientId=self.physics_client_id,
         )
 
-    def _create_observation_space(self) -> Space[Motion3DState]:
-        return FunctionalSpace(contains_fn=lambda o: isinstance(o, Motion3DState))
-
-    def _create_action_space(self) -> Space[Motion3DAction]:
-        return FunctionalSpace(
-            contains_fn=lambda a: isinstance(a, Motion3DAction),
-            sample_fn=self._sample_action,
-        )
-
     def _reset_objects(self) -> None:
         # Reset the target. Sample and check reachability.
         target_pose: Pose | None = None
@@ -101,9 +99,9 @@ class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
             raise RuntimeError("Failed to find reachable target position")
         set_pose(self.target_id, target_pose, self.physics_client_id)
 
-    def _set_object_states(self, obs: Motion3DState) -> None:
+    def _set_object_states(self, obs: Motion3DObjectCentricState) -> None:
         assert self.target_id is not None
-        set_pose(self.target_id, Pose(obs.target), self.physics_client_id)
+        set_pose(self.target_id, Pose(obs.target_position), self.physics_client_id)
 
     def _object_name_to_pybullet_id(self, object_name: str) -> int:
         if object_name == "target":
@@ -119,15 +117,13 @@ class Motion3DEnv(Geom3DEnv[Motion3DState, Motion3DAction]):
     def _get_surface_object_names(self) -> set[str]:
         return set()
 
-    def _get_obs(self) -> Motion3DState:
-        joint_positions = self.robot.get_joint_positions()
-        target = get_pose(self.target_id, self.physics_client_id).position
-        return Motion3DState(
-            joint_positions,
-            grasped_object_transform=None,
-            grasped_object=None,
-            target=target,
-        )
+    def _get_obs(self) -> Motion3DObjectCentricState:
+        state_dict = self._create_state_dict([
+            ("robot", Geom3DRobotType),
+            ("target", Geom3DPointType)
+        ])
+        s = create_state_from_dict(state_dict, Geom3DEnvTypeFeatures)
+        return Motion3DObjectCentricState(s.data, Geom3DEnvTypeFeatures)
 
     def _goal_reached(self) -> bool:
         target = get_pose(self.target_id, self.physics_client_id).position

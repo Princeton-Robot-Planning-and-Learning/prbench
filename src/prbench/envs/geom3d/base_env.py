@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass, field
-from typing import Any, Literal, TypeVar
+from typing import Any
 
 import gymnasium
 import numpy as np
 import pybullet as p
-from gymnasium.spaces import Space
 from numpy.typing import NDArray
 from pybullet_helpers.camera import capture_image
 from pybullet_helpers.geometry import Pose, get_pose, multiply_poses, set_pose
@@ -26,12 +25,15 @@ from relational_structs import (
     Array,
     ObjectCentricState,
     ObjectCentricStateSpace,
+    Type,
+    Object,
 )
 from relational_structs.spaces import ObjectCentricBoxSpace
 from prbench.envs.geom3d.object_types import (
     Geom3DEnvTypeFeatures,
     Geom3DCuboidType,
     Geom3DRobotType,
+    Geom3DPointType,
 )
 from prbench.envs.geom3d.utils import Geom3DRobotActionSpace, Geom3DObjectCentricState
 
@@ -101,7 +103,7 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
     ) -> None:
         super().__init__()
         self._spec = spec
-        self._types = {Geom3DRobotType, Geom3DCuboidType}
+        self._types = {Geom3DRobotType, Geom3DCuboidType, Geom3DPointType}
         self.render_mode = render_mode
         self.observation_space = ObjectCentricStateSpace(self._types)
         self.action_space = Geom3DRobotActionSpace(
@@ -190,6 +192,10 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
 
         Note that surfaces might be movable, for example, consider block stacking.
         """
+
+    @abc.abstractmethod
+    def _get_half_extents(self, object_name: str) -> tuple[float, float, float]:
+        """Get the half extents for a cuboid object."""
 
     @property
     def _grasped_object_id(self) -> int | None:
@@ -359,6 +365,64 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             ):
                 supporting_surface_ids.add(surface_id)
         return supporting_surface_ids
+    
+    def _create_state_dict(self, objects: list[tuple[str, Type]]) -> dict[Object, dict[str, float]]:
+        state_dict: dict[Object, dict[str, float]] = {}
+        for object_name, object_type in objects:
+            obj = Object(object_name, object_type)
+            feats : dict[str, float] = {}
+            # Handle robots.
+            if object_type == Geom3DRobotType:
+                # Add joints.
+                joints = self.robot.get_joint_positions()
+                for i, v in enumerate(joints):
+                    feats[f"joint_{i+1}"] = v
+                # Add grasp.
+                grasp_tf_feat_names = ["grasp_tf_x", "grasp_tf_y", "grasp_tf_z",
+                                       "grasp_tf_qx", "grasp_tf_qy", "grasp_tf_qz",
+                                       "grasp_tf_qw"]
+                if self._grasped_object_transform is None:
+                    feats["grasp_active"] = 0
+                    for feat_name in grasp_tf_feat_names:
+                        feats[feat_name] = 0
+                else:
+                    feats["grasp_active"] = 1
+                    grasp_tf_feats = list(self._grasped_object_transform.position) + list(self._grasped_object_transform.orientation)
+                    for feat_name, feat in zip(grasp_tf_feat_names, grasp_tf_feats, strict=True):
+                        feats[feat_name] = feat
+            # Handle cuboids.
+            elif object_type == Geom3DCuboidType:
+                # Add pose.
+                body_id = self._object_name_to_pybullet_id(object_name)
+                pose = get_pose(body_id, self.physics_client_id)
+                pose_feat_names = ["pose_x", "pose_y", "pose_z", "pose_qx", "pose_qy", "pose_qz", "pose_qw"]
+                pose_feats = list(pose.position) + list(pose.orientation)
+                for feat_name, feat in zip(pose_feat_names, pose_feats, strict=True):
+                    feats[feat_name] = feat
+                # Add grasp active.
+                if self._grasped_object == object_name:
+                    feats["grasp_active"] = 1
+                else:
+                    feats["grasp_active"] = 0
+                # Add half extents.
+                half_extent_names = ["half_extent_x", "half_extent_y", "half_extent_z"]
+                half_extents = self._get_half_extents(object_name)
+                for feat_name, feat in zip(half_extent_names, half_extents, strict=True):
+                    feats[feat_name] = feat
+            # Handle points.
+            elif object_type == Geom3DPointType:
+                # Add position.
+                body_id = self._object_name_to_pybullet_id(object_name)
+                pose = get_pose(body_id, self.physics_client_id)
+                feats["x"] = pose.position[0]
+                feats["y"] = pose.position[1]
+                feats["z"] = pose.position[2]
+            else:
+                raise NotImplementedError(f"Unsupported object type: {object_type}")
+            # Add feats to state dict.
+            state_dict[obj] = feats
+        return state_dict
+
 
 
 class ConstantObjectGeom3DEnv(
