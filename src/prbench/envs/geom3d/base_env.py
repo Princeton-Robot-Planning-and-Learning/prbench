@@ -90,13 +90,13 @@ class Geom3DEnvConfig(PRBenchEnvConfig):
 
 
 # Subclasses may extend the state.
-_StateType = TypeVar("_StateType", bound=Geom3DObjectCentricState)
+_ObsType = TypeVar("_ObsType", bound=Geom3DObjectCentricState)
 _ConfigType = TypeVar("_ConfigType", bound=Geom3DEnvConfig)
 
 
 class ObjectCentricGeom3DRobotEnv(
-    ObjectCentricPRBenchEnv[_StateType, Array, _ConfigType],
-    Generic[_StateType, _ConfigType],
+    ObjectCentricPRBenchEnv[_ObsType, Array, _ConfigType],
+    Generic[_ObsType, _ConfigType],
 ):
     """Base class for Geom3D environments."""
 
@@ -164,7 +164,7 @@ class ObjectCentricGeom3DRobotEnv(
         """Create the constant initial state dict."""
 
     @abc.abstractmethod
-    def _get_obs(self) -> _StateType:
+    def _get_obs(self) -> _ObsType:
         """Get the current observation."""
 
     @abc.abstractmethod
@@ -176,7 +176,7 @@ class ObjectCentricGeom3DRobotEnv(
         """Reset objects."""
 
     @abc.abstractmethod
-    def _set_object_states(self, obs: _StateType) -> None:
+    def _set_object_states(self, obs: _ObsType) -> None:
         """Reset the state of objects; helper for set_state()."""
 
     @abc.abstractmethod
@@ -220,20 +220,20 @@ class ObjectCentricGeom3DRobotEnv(
     def _create_action_space(self, config: _ConfigType) -> RobotActionSpace:
         return Geom3DRobotActionSpace(max_magnitude=config.max_action_mag)
 
-    def _create_constant_initial_state(self) -> _StateType:
+    def _create_constant_initial_state(self) -> _ObsType:
         initial_state_dict = self._create_constant_initial_state_dict()
         state = create_state_from_dict(
             initial_state_dict, Geom3DEnvTypeFeatures, state_cls=self.state_cls
         )
         # This is tricky for type annotation because we are dynamically setting the
-        # class to be self.state_cls, which should be _StateType.
+        # class to be self.state_cls, which should be _ObsType.
         return state  # type: ignore
 
     def reset(
         self,
         *args,
         **kwargs,
-    ) -> tuple[_StateType, dict]:
+    ) -> tuple[_ObsType, dict]:
         # Reset the random seed.
         gymnasium.Env.reset(self, *args, **kwargs)
 
@@ -248,7 +248,7 @@ class ObjectCentricGeom3DRobotEnv(
 
         return self._get_obs(), {}
 
-    def set_state(self, obs: _StateType) -> None:
+    def set_state(self, obs: _ObsType) -> None:
         """Set the state of the environment to the given one.
 
         This is useful when treating the environment as a simulator.
@@ -258,7 +258,7 @@ class ObjectCentricGeom3DRobotEnv(
         self._grasped_object_transform = obs.grasped_object_transform
         self._set_object_states(obs)
 
-    def step(self, action: Array) -> tuple[_StateType, float, bool, bool, dict]:
+    def step(self, action: Array) -> tuple[_ObsType, float, bool, bool, dict]:
         # Store the current robot joints because we may need to revert in collision.
         current_joints = remove_fingers_from_extended_joints(
             self.robot.get_joint_positions()
