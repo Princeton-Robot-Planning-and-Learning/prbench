@@ -6,7 +6,7 @@ from gymnasium.spaces import Box
 from gymnasium.wrappers import RecordVideo
 
 import prbench
-from prbench.envs.geom2d.motion2d import Motion2DEnvSpec, ObjectCentricMotion2DEnv
+from prbench.envs.geom2d.motion2d import Motion2DEnvConfig, ObjectCentricMotion2DEnv
 
 prbench.register_all_environments()
 
@@ -41,7 +41,7 @@ def test_motion2d_stay_in_bounds():
     directions = {"up": up, "down": down, "left": left, "right": right}
 
     # Get world bounds from the default spec
-    default_spec = Motion2DEnvSpec()
+    default_spec = Motion2DEnvConfig()
     world_min_x, world_max_x = default_spec.world_min_x, default_spec.world_max_x
     world_min_y, world_max_y = default_spec.world_min_y, default_spec.world_max_y
 

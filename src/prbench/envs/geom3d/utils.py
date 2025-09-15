@@ -15,12 +15,6 @@ class Geom3DObjectCentricState(ObjectCentricState):
     Inherits from ObjectCentricState but adds some conveninent look ups.
     """
 
-    def get_object_from_name(self, name: str) -> Object:
-        """Look up an object from its name."""
-        matches = [o for o in self if o.name == name]
-        assert len(matches) == 1, f"Object '{name}' not found in state"
-        return matches[0]
-
     @property
     def robot(self) -> Object:
         """Assumes there is a unique robot object named "robot"."""
