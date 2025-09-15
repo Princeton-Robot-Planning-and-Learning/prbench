@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Type as TypingType
 
 import numpy as np
 import pybullet as p
 from pybullet_helpers.geometry import Pose, set_pose
 from pybullet_helpers.inverse_kinematics import check_body_collisions
 from pybullet_helpers.utils import create_pybullet_block
-from relational_structs import ObjectCentricState
+from relational_structs import Object, ObjectCentricState
 from relational_structs.utils import create_state_from_dict
 
+from prbench.core import ConstantObjectPRBenchEnv
 from prbench.envs.geom3d.base_env import (
-    ConstantObjectGeom3DEnv,
-    Geom3DEnv,
-    Geom3DEnvSpec,
+    Geom3DEnvConfig,
+    ObjectCentricGeom3DRobotEnv,
 )
 from prbench.envs.geom3d.object_types import (
     Geom3DCuboidType,
@@ -27,8 +28,8 @@ from prbench.envs.utils import PURPLE
 
 
 @dataclass(frozen=True)
-class Obstruction3DEnvSpec(Geom3DEnvSpec):
-    """Spec for Obstruction3DEnv()."""
+class Obstruction3DEnvConfig(Geom3DEnvConfig):
+    """Config for Obstruction3DEnv()."""
 
     # Table.
     table_pose: Pose = Pose((0.3, 0.0, -0.175))
@@ -227,30 +228,27 @@ class Obstruction3DObjectCentricState(Geom3DObjectCentricState):
         return self.get_cuboid_pose("target_block")
 
 
-class ObjectCentricObstruction3DEnv(Geom3DEnv):
+class ObjectCentricObstruction3DEnv(
+    ObjectCentricGeom3DRobotEnv[Obstruction3DObjectCentricState, Obstruction3DEnvConfig]
+):
     """Environment where obstructions must be cleared to place a target on a region."""
-
-    metadata = {"render_modes": ["rgb_array"]}
 
     def __init__(
         self,
         num_obstructions: int = 2,
-        spec: Obstruction3DEnvSpec = Obstruction3DEnvSpec(),
+        config: Obstruction3DEnvConfig = Obstruction3DEnvConfig(),
         **kwargs,
     ) -> None:
         self._num_obstructions = num_obstructions
-        super().__init__(spec, **kwargs)
-
-        # The spec is of the right type.
-        self._spec: Obstruction3DEnvSpec
+        super().__init__(config=config, **kwargs)
 
         # Create table.
         self.table_id = create_pybullet_block(
-            self._spec.table_rgba,
-            half_extents=self._spec.table_half_extents,
+            self.config.table_rgba,
+            half_extents=self.config.table_half_extents,
             physics_client_id=self.physics_client_id,
         )
-        set_pose(self.table_id, self._spec.table_pose, self.physics_client_id)
+        set_pose(self.table_id, self.config.table_pose, self.physics_client_id)
 
         # The objects are created in reset() because they have geometries that change
         # in each episode.
@@ -260,6 +258,14 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
         self._target_block_half_extents: tuple[float, float, float] = (0.0, 0.0, 0.0)
         self._obstruction_ids: dict[str, int] = {}
         self._obstruction_id_to_half_extents: dict[int, tuple[float, float, float]] = {}
+
+    @property
+    def state_cls(self) -> TypingType[Geom3DObjectCentricState]:
+        return Obstruction3DObjectCentricState
+
+    def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
+        # TODO
+        return {}
 
     def _reset_objects(self) -> None:
 
@@ -274,31 +280,31 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
         # Recreate the target region.
         self._target_region_half_extents = tuple(
             self.np_random.uniform(
-                self._spec.target_region_half_extents_lb,
-                self._spec.target_region_half_extents_ub,
+                self.config.target_region_half_extents_lb,
+                self.config.target_region_half_extents_ub,
             )
         )
-        target_region_pose = self._spec.sample_block_on_table_pose(
+        target_region_pose = self.config.sample_block_on_table_pose(
             self._target_region_half_extents, self.np_random
         )
         self._target_region_id = create_pybullet_block(
-            self._spec.target_region_rgba,
+            self.config.target_region_rgba,
             half_extents=self._target_region_half_extents,
             physics_client_id=self.physics_client_id,
         )
         set_pose(self._target_region_id, target_region_pose, self.physics_client_id)
 
         # Recreate the target block.
-        self._target_block_half_extents = self._spec.get_target_block_half_extents(
+        self._target_block_half_extents = self.config.get_target_block_half_extents(
             self._target_region_half_extents
         )
         self._target_block_id = create_pybullet_block(
-            self._spec.target_block_rgba,
+            self.config.target_block_rgba,
             half_extents=self._target_block_half_extents,
             physics_client_id=self.physics_client_id,
         )
         for _ in range(100_000):
-            target_block_pose = self._spec.sample_block_on_table_pose(
+            target_block_pose = self.config.sample_block_on_table_pose(
                 self._target_block_half_extents, self.np_random
             )
             set_pose(self._target_block_id, target_block_pose, self.physics_client_id)
@@ -319,12 +325,12 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
             obstruction_name = f"obstruction{obstruction_idx}"
             obstruction_half_extents: tuple[float, float, float] = tuple(
                 self.np_random.uniform(
-                    self._spec.obstruction_half_extents_lb,
-                    self._spec.obstruction_half_extents_ub,
+                    self.config.obstruction_half_extents_lb,
+                    self.config.obstruction_half_extents_ub,
                 )
             )
             obstruction_id = create_pybullet_block(
-                self._spec.obstruction_rgba,
+                self.config.obstruction_rgba,
                 half_extents=obstruction_half_extents,
                 physics_client_id=self.physics_client_id,
             )
@@ -335,20 +341,20 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
             for _ in range(100_000):
                 obstruction_init_on_target = (
                     self.np_random.uniform()
-                    < self._spec.obstruction_init_on_target_prob
+                    < self.config.obstruction_init_on_target_prob
                 )
                 collision_ids = (
                     {self._target_block_id} | set(self._obstruction_ids.values())
                 ) - {obstruction_id}
                 if obstruction_init_on_target:
-                    obstruction_pose = self._spec.sample_obstruction_pose_on_target(
+                    obstruction_pose = self.config.sample_obstruction_pose_on_target(
                         obstruction_half_extents,
                         self._target_region_half_extents,
                         target_region_pose,
                         self.np_random,
                     )
                 else:
-                    obstruction_pose = self._spec.sample_block_on_table_pose(
+                    obstruction_pose = self.config.sample_block_on_table_pose(
                         obstruction_half_extents, self.np_random
                     )
                     collision_ids.add(self._target_region_id)
@@ -378,7 +384,7 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
                     self._target_region_id, physicsClientId=self.physics_client_id
                 )
             self._target_region_id = create_pybullet_block(
-                self._spec.target_region_rgba,
+                self.config.target_region_rgba,
                 half_extents=obs.target_region_half_extents,
                 physics_client_id=self.physics_client_id,
             )
@@ -395,7 +401,7 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
                     self._target_block_id, physicsClientId=self.physics_client_id
                 )
             self._target_block_id = create_pybullet_block(
-                self._spec.target_block_rgba,
+                self.config.target_block_rgba,
                 half_extents=obs.target_block_half_extents,
                 physics_client_id=self.physics_client_id,
             )
@@ -426,7 +432,7 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
                 if need_destroy:
                     p.removeBody(obstruction_id, physicsClientId=self.physics_client_id)
                 obstruction_id = create_pybullet_block(
-                    self._spec.obstruction_rgba,
+                    self.config.obstruction_rgba,
                     half_extents=obstruction_half_extents,
                     physics_client_id=self.physics_client_id,
                 )
@@ -495,16 +501,12 @@ class ObjectCentricObstruction3DEnv(Geom3DEnv):
         return self._target_region_id in target_supports
 
 
-class Obstruction3DEnv(ConstantObjectGeom3DEnv):
+class Obstruction3DEnv(ConstantObjectPRBenchEnv):
     """Obstruction 3D env with a constant number of objects."""
 
-    def __init__(
-        self, spec: Obstruction3DEnvSpec = Obstruction3DEnvSpec(), **kwargs
-    ) -> None:
-        self._spec = spec
-        super().__init__(**kwargs)
-
-    def _create_object_centric_geom3d_env(self, *args, **kwargs) -> Geom3DEnv:
+    def _create_object_centric_env(
+        self, *args, **kwargs
+    ) -> ObjectCentricGeom3DRobotEnv:
         return ObjectCentricObstruction3DEnv(*args, **kwargs)
 
     def _get_constant_object_names(
@@ -519,15 +521,17 @@ class Obstruction3DEnv(ConstantObjectGeom3DEnv):
     def _create_env_markdown_description(self) -> str:
         """Create environment description."""
         # pylint: disable=line-too-long
+        config = self._object_centric_env.config
+        assert isinstance(config, Obstruction3DEnvConfig)
         return f"""A 3D obstruction clearance environment where the goal is to place a target block on a designated target region by first clearing obstructions.
 
 The robot is a Kinova Gen-3 with 7 degrees of freedom that can grasp and manipulate objects. The environment consists of:
-- A **table** with dimensions {self._spec.table_half_extents[0]*2:.3f}m × {self._spec.table_half_extents[1]*2:.3f}m × {self._spec.table_half_extents[2]*2:.3f}m
-- A **target region** (purple block) with random dimensions between {self._spec.target_region_half_extents_lb} and {self._spec.target_region_half_extents_ub} half-extents
-- A **target block** that must be placed on the target region, sized at {self._spec.target_block_size_scale}× the target region's x,y dimensions
+- A **table** with dimensions {config.table_half_extents[0]*2:.3f}m × {config.table_half_extents[1]*2:.3f}m × {config.table_half_extents[2]*2:.3f}m
+- A **target region** (purple block) with random dimensions between {config.target_region_half_extents_lb} and {config.target_region_half_extents_ub} half-extents
+- A **target block** that must be placed on the target region, sized at {config.target_block_size_scale}× the target region's x,y dimensions
 - **Obstruction(s)** (red blocks) that may be placed on or near the target region, blocking access
 
-Obstructions have random dimensions between {self._spec.obstruction_half_extents_lb} and {self._spec.obstruction_half_extents_ub} half-extents. During initialization, there's a {self._spec.obstruction_init_on_target_prob} probability that each obstruction will be placed on the target region, requiring clearance.
+Obstructions have random dimensions between {config.obstruction_half_extents_lb} and {config.obstruction_half_extents_ub} half-extents. During initialization, there's a {config.obstruction_init_on_target_prob} probability that each obstruction will be placed on the target region, requiring clearance.
 
 The task requires planning to grasp and move obstructions out of the way, then place the target block on the target region.
 """
@@ -535,8 +539,10 @@ The task requires planning to grasp and move obstructions out of the way, then p
     def _create_observation_space_markdown_description(self) -> str:
         """Create observation space description."""
         # pylint: disable=line-too-long
+        config = self._object_centric_env.config
+        assert isinstance(config, Obstruction3DEnvConfig)
         return f"""Observations consist of:
-- **joint_positions**: Current joint positions of the {len(self._spec.initial_joints)}-DOF robot arm (list of floats)
+- **joint_positions**: Current joint positions of the {len(config.initial_joints)}-DOF robot arm (list of floats)
 - **grasped_object**: Name of currently grasped object, or None if not grasping anything (string or None)
 - **grasped_object_transform**: Relative transform of grasped object to gripper, or None if not grasping (transform or None)
 - **target_region**: State of the target region including:
@@ -555,10 +561,12 @@ The observation is returned as an Obstruction3DState dataclass with these fields
     def _create_action_space_markdown_description(self) -> str:
         """Create action space description."""
         # pylint: disable=line-too-long
+        config = self._object_centric_env.config
+        assert isinstance(config, Obstruction3DEnvConfig)
         return f"""Actions control the change in joint positions:
-- **delta_arm_joints**: Change in joint positions for all {len(self._spec.initial_joints)} joints (list of floats)
+- **delta_arm_joints**: Change in joint positions for all {len(config.initial_joints)} joints (list of floats)
 
-The action is an Obstruction3DAction dataclass with delta_arm_joints field. Each delta is clipped to the range [-{self._spec.max_action_mag:.3f}, {self._spec.max_action_mag:.3f}].
+The action is an Obstruction3DAction dataclass with delta_arm_joints field. Each delta is clipped to the range [-{config.max_action_mag:.3f}, {config.max_action_mag:.3f}].
 
 The resulting joint positions are clipped to the robot's joint limits before being applied. The robot can automatically grasp objects when the gripper is close enough and release them with appropriate actions.
 """

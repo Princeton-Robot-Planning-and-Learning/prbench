@@ -71,9 +71,6 @@ class ObjectCentricGeom2DRobotEnv(
     If we add other robot types in the future, we will need to refactor a bit.
     """
 
-    # Only RGB rendering is implemented.
-    metadata = {"render_modes": ["rgb_array"]}
-
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 

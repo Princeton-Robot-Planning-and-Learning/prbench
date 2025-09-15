@@ -43,7 +43,7 @@ def test_pick_place_no_obstructions():
     # Create the real environment.
     env = Obstruction3DEnv(num_obstructions=0, use_gui=False, render_mode="rgb_array")
     assert isinstance(env.observation_space, ObjectCentricBoxSpace)
-    spec = env._spec  # pylint: disable=protected-access
+    config = env._object_centric_env.config  # pylint: disable=protected-access
     if MAKE_VIDEOS:
         env = RecordVideo(env, "unit_test_videos")
 
@@ -53,7 +53,7 @@ def test_pick_place_no_obstructions():
     obs = Obstruction3DObjectCentricState(oc_obs.data, oc_obs.type_features)
 
     # Create a simulator for planning.
-    sim = ObjectCentricObstruction3DEnv(num_obstructions=0, spec=spec)
+    sim = ObjectCentricObstruction3DEnv(num_obstructions=0, config=config)
     sim.set_state(obs)
 
     # Run motion planning.
@@ -78,7 +78,7 @@ def test_pick_place_no_obstructions():
 
     # Make sure we stay below the required max_action_mag by a fair amount.
     joint_plan = remap_joint_position_plan_to_constant_distance(
-        joint_plan, sim.robot, max_distance=spec.max_action_mag / 2
+        joint_plan, sim.robot, max_distance=config.max_action_mag / 2
     )
 
     for target_joints in joint_plan[1:]:
@@ -123,7 +123,7 @@ def test_pick_place_no_obstructions():
     )
 
     joint_plan = remap_joint_position_plan_to_constant_distance(
-        joint_plan, sim.robot, max_distance=spec.max_action_mag / 2
+        joint_plan, sim.robot, max_distance=config.max_action_mag / 2
     )
 
     for target_joints in joint_plan[1:]:
@@ -180,7 +180,7 @@ def test_pick_place_no_obstructions():
         max_smoothing_iters_per_step=max_candidate_plans,
     )
     joint_plan = remap_joint_position_plan_to_constant_distance(
-        joint_plan, sim.robot, max_distance=spec.max_action_mag / 2
+        joint_plan, sim.robot, max_distance=config.max_action_mag / 2
     )
 
     for target_joints in joint_plan[1:]:
