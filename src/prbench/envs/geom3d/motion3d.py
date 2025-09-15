@@ -85,7 +85,7 @@ class ObjectCentricMotion3DEnv(
         return Motion3DObjectCentricState
 
     def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
-        # TODO
+        # Neither the target nor the robot are constant in this env.
         return {}
 
     def _reset_objects(self) -> None:
@@ -135,8 +135,11 @@ class ObjectCentricMotion3DEnv(
         state_dict = self._create_state_dict(
             [("robot", Geom3DRobotType), ("target", Geom3DPointType)]
         )
-        s = create_state_from_dict(state_dict, Geom3DEnvTypeFeatures)
-        return Motion3DObjectCentricState(s.data, Geom3DEnvTypeFeatures)
+        state = create_state_from_dict(
+            state_dict, Geom3DEnvTypeFeatures, state_cls=Motion3DObjectCentricState
+        )
+        assert isinstance(state, Motion3DObjectCentricState)
+        return state
 
     def _goal_reached(self) -> bool:
         target = get_pose(self.target_id, self.physics_client_id).position

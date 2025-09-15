@@ -132,14 +132,13 @@ class ObjectCentricClutteredRetrieval2DEnv(
         self._num_obstructions = num_obstructions
 
     def _sample_initial_state(self) -> ObjectCentricState:
-        assert self._initial_constant_state is not None
-        static_objects = set(self._initial_constant_state)
+        static_objects = set(self.initial_constant_state)
         robot_pose = sample_se2_pose(self.config.robot_init_pose_bounds, self.np_random)
         state = self._create_initial_state(robot_pose)
         robot = state.get_objects(CRVRobotType)[0]
         # Check for collisions with the robot and static objects.
         full_state = state.copy()
-        full_state.data.update(self._initial_constant_state.data)
+        full_state.data.update(self.initial_constant_state.data)
         assert not state_2d_has_collision(full_state, {robot}, static_objects, {})
         # Sample target pose and check for collisions with robot and static objects.
         for _ in range(self.config.max_init_sampling_attempts):
@@ -152,7 +151,7 @@ class ObjectCentricClutteredRetrieval2DEnv(
             )
             target_block = state.get_objects(TargetBlockType)[0]
             full_state = state.copy()
-            full_state.data.update(self._initial_constant_state.data)
+            full_state.data.update(self.initial_constant_state.data)
             if not state_2d_has_collision(
                 full_state, {target_block}, {robot} | static_objects, {}
             ):
@@ -195,7 +194,7 @@ class ObjectCentricClutteredRetrieval2DEnv(
                 )
                 obj_name_to_obj = {o.name: o for o in state}
                 full_state = state.copy()
-                full_state.data.update(self._initial_constant_state.data)
+                full_state.data.update(self.initial_constant_state.data)
                 new_obstruction = obj_name_to_obj[f"obstruction{len(obstructions)}"]
                 assert new_obstruction.name.startswith("obstruction")
                 if not state_2d_has_collision(
@@ -238,7 +237,7 @@ class ObjectCentricClutteredRetrieval2DEnv(
     ) -> ObjectCentricState:
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
-        assert self._initial_constant_state is not None
+        assert self.initial_constant_state is not None
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.

@@ -158,10 +158,9 @@ class ObjectCentricObstruction2DEnv(
         self._num_obstructions = num_obstructions
 
     def _sample_initial_state(self) -> ObjectCentricState:
-        assert self._initial_constant_state is not None
-        static_objects = set(self._initial_constant_state)
+        static_objects = set(self.initial_constant_state)
         assert not state_2d_has_collision(
-            self._initial_constant_state,
+            self.initial_constant_state,
             static_objects,
             static_objects,
             {},
@@ -222,7 +221,7 @@ class ObjectCentricObstruction2DEnv(
             if self._target_satisfied(state, {}):
                 continue
             full_state = state.copy()
-            full_state.data.update(self._initial_constant_state.data)
+            full_state.data.update(self.initial_constant_state.data)
             all_objects = set(full_state)
             if state_2d_has_collision(full_state, all_objects, all_objects, {}):
                 continue

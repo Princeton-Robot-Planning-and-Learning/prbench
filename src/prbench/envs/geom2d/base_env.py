@@ -183,9 +183,7 @@ class ObjectCentricGeom2DRobotEnv(
             {robot} | {o for o, _ in suctioned_objs} | {o for o, _ in moved_objects}
         )
         full_state = state.copy()
-        if self._initial_constant_state is not None:
-            # Merge the initial constant state with the current state.
-            full_state.data.update(self._initial_constant_state.data)
+        full_state.data.update(self.initial_constant_state.data)
         obstacles = set(full_state) - moving_objects
         if not state_2d_has_collision(
             full_state, moving_objects, obstacles, self._static_object_body_cache
@@ -244,9 +242,7 @@ class ObjectCentricGeom2DRobotEnv(
         assert self.render_mode == "rgb_array"
         assert self._current_state is not None, "Need to call reset()"
         render_input_state = self._current_state.copy()
-        if self._initial_constant_state is not None:
-            # Merge the initial constant state with the current state.
-            render_input_state.data.update(self._initial_constant_state.data)
+        render_input_state.data.update(self.initial_constant_state.data)
         return render_2dstate(
             render_input_state,
             self._static_object_body_cache,

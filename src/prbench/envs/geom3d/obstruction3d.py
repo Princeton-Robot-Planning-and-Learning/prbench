@@ -264,8 +264,7 @@ class ObjectCentricObstruction3DEnv(
         return Obstruction3DObjectCentricState
 
     def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
-        # TODO
-        return {}
+        return self._create_state_dict([("table", Geom3DCuboidType)])
 
     def _reset_objects(self) -> None:
 
@@ -490,8 +489,11 @@ class ObjectCentricObstruction3DEnv(
                 for i in range(self._num_obstructions)
             ]
         )
-        s = create_state_from_dict(state_dict, Geom3DEnvTypeFeatures)
-        return Obstruction3DObjectCentricState(s.data, Geom3DEnvTypeFeatures)
+        state = create_state_from_dict(
+            state_dict, Geom3DEnvTypeFeatures, state_cls=Obstruction3DObjectCentricState
+        )
+        assert isinstance(state, Obstruction3DObjectCentricState)
+        return state
 
     def _goal_reached(self) -> bool:
         if self._grasped_object is not None:
