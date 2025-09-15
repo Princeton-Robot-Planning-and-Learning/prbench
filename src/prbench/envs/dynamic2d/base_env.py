@@ -13,15 +13,12 @@ from relational_structs import (
     Object,
     ObjectCentricState,
     ObjectCentricStateSpace,
+    Type,
 )
-from relational_structs.spaces import ObjectCentricBoxSpace
+from relational_structs.utils import create_state_from_dict
 
-from prbench.envs.dynamic2d.object_types import (
-    Dynamic2DRobotEnvTypeFeatures,
-    DynRectangleType,
-    KinRectangleType,
-    KinRobotType,
-)
+from prbench.core import ObjectCentricPRBenchEnv, PRBenchEnvConfig, RobotActionSpace
+from prbench.envs.dynamic2d.object_types import Dynamic2DRobotEnvTypeFeatures
 from prbench.envs.dynamic2d.utils import (
     DYNAMIC_COLLISION_TYPE,
     ROBOT_COLLISION_TYPE,
@@ -35,8 +32,6 @@ from prbench.envs.dynamic2d.utils import (
 )
 from prbench.envs.geom2d.structs import MultiBody2D
 from prbench.envs.utils import render_2dstate
-from prbench.core import PRBenchEnvConfig, ObjectCentricPRBenchEnv
-
 
 
 @dataclass(frozen=True)
@@ -105,34 +100,17 @@ class ObjectCentricDynamic2DRobotEnv(
     # Only RGB rendering is implemented.
     metadata = {"render_modes": ["rgb_array"]}
 
-    def __init__(
-        self, spec: Dynamic2DRobotEnvConfig, render_mode: str | None = "rgb_array"
-    ) -> None:
-        self._spec = spec
-        self._types = {KinRobotType, KinRectangleType, DynRectangleType}
-        self.render_mode = render_mode
-        self.observation_space = ObjectCentricStateSpace(self._types)
-        self.action_space = KinRobotActionSpace(
-            min_dx=self._spec.min_dx,
-            max_dx=self._spec.max_dx,
-            min_dy=self._spec.min_dy,
-            max_dy=self._spec.max_dy,
-            min_dtheta=self._spec.min_dtheta,
-            max_dtheta=self._spec.max_dtheta,
-            min_darm=self._spec.min_darm,
-            max_darm=self._spec.max_darm,
-            min_dgripper=self._spec.min_dgripper,
-            max_dgripper=self._spec.max_dgripper,
-        )
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
         # PyMunk physics space
         self.pymunk_space: pymunk.Space | None = None
         self.robot: KinRobot | None = None
         self.pd_controller = PDController(
-            kp_pos=self._spec.kp_pos,
-            kv_pos=self._spec.kv_pos,
-            kp_rot=self._spec.kp_rot,
-            kv_rot=self._spec.kv_rot,
+            kp_pos=self.config.kp_pos,
+            kv_pos=self.config.kv_pos,
+            kp_rot=self.config.kp_rot,
+            kv_rot=self.config.kv_rot,
         )
 
         # Initialized by reset().
@@ -140,28 +118,46 @@ class ObjectCentricDynamic2DRobotEnv(
         # Note: We assume each object corresponds to exactly one pymunk body.
         # This does not include the robot, which is handled separately.
         self._state_obj_to_pymunk_body: dict[Object, pymunk.Body] = {}
-        # Maintain an independent initial_constant_state, including static objects
-        # that never change throughout the lifetime of the environment.
-        self._initial_constant_state: ObjectCentricState | None = None
+        # Used for collision checking with Geom2D.
         self._static_object_body_cache: dict[Object, MultiBody2D] = {}
 
-        super().__init__()
+    def _create_observation_space(self, config: _ConfigType) -> ObjectCentricStateSpace:
+        types = set(self.type_features)
+        return ObjectCentricStateSpace(types)
+
+    def _create_action_space(self, config: _ConfigType) -> RobotActionSpace:
+        return KinRobotActionSpace(
+            min_dx=config.min_dx,
+            max_dx=config.max_dx,
+            min_dy=config.min_dy,
+            max_dy=config.max_dy,
+            min_dtheta=config.min_dtheta,
+            max_dtheta=config.max_dtheta,
+            min_darm=config.min_darm,
+            max_darm=config.max_darm,
+            min_dgripper=config.min_dgripper,
+            max_dgripper=config.max_dgripper,
+        )
+
+    def _create_constant_initial_state(self) -> ObjectCentricState:
+        initial_state_dict = self._create_constant_initial_state_dict()
+        return create_state_from_dict(initial_state_dict, Dynamic2DRobotEnvTypeFeatures)
 
     def _setup_physics_space(self) -> None:
         """Set up the PyMunk physics space."""
         self.pymunk_space = pymunk.Space()
-        self.pymunk_space.gravity = 0, self._spec.gravity_y
-        self.pymunk_space.collision_slop = self._spec.collision_slop
+        self.pymunk_space.gravity = 0, self.config.gravity_y
+        self.pymunk_space.collision_slop = self.config.collision_slop
 
         # Create robot
         self.robot = KinRobot(
-            init_pos=pymunk.Vec2d(*self._spec.init_robot_pos),
-            base_radius=self._spec.robot_base_radius,
-            arm_length_max=self._spec.robot_arm_length_max,
-            gripper_base_width=self._spec.gripper_base_width,
-            gripper_base_height=self._spec.gripper_base_height,
-            gripper_finger_width=self._spec.gripper_finger_width,
-            gripper_finger_height=self._spec.gripper_finger_height,
+            init_pos=pymunk.Vec2d(*self.config.init_robot_pos),
+            base_radius=self.config.robot_base_radius,
+            arm_length_max=self.config.robot_arm_length_max,
+            gripper_base_width=self.config.gripper_base_width,
+            gripper_base_height=self.config.gripper_base_height,
+            gripper_finger_width=self.config.gripper_finger_width,
+            gripper_finger_height=self.config.gripper_finger_height,
         )
         self.robot.add_to_space(self.pymunk_space)
 
@@ -205,12 +201,21 @@ class ObjectCentricDynamic2DRobotEnv(
         """Read the current state from the PyMunk space."""
 
     @abc.abstractmethod
+    def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
+        """Create the constant initial state dict."""
+
+    @abc.abstractmethod
     def _sample_initial_state(self) -> ObjectCentricState:
         """Use self.np_random to sample an initial state."""
 
     @abc.abstractmethod
     def _get_reward_and_done(self) -> tuple[float, bool]:
         """Calculate reward and termination based on self._current_state."""
+
+    @property
+    def type_features(self) -> dict[Type, list[str]]:
+        """The types and features for this environment."""
+        return Dynamic2DRobotEnvTypeFeatures
 
     def _get_obs(self) -> ObjectCentricState:
         """Get observation by reading from the physics simulation."""
@@ -220,14 +225,6 @@ class ObjectCentricDynamic2DRobotEnv(
 
     def _get_info(self) -> dict:
         return {}  # no extra info provided right now
-
-    @property
-    def initial_constant_state(self) -> ObjectCentricState:
-        """Get the initial constant state, which includes static objects."""
-        assert (
-            self._initial_constant_state is not None
-        ), "This env has no initial constant state"
-        return self._initial_constant_state.copy()
 
     @property
     def full_state(self) -> ObjectCentricState:
@@ -243,7 +240,8 @@ class ObjectCentricDynamic2DRobotEnv(
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
     ) -> tuple[ObjectCentricState, dict]:
-        super().reset(seed=seed)
+        # Reset the random seed.
+        gymnasium.Env.reset(self, seed=seed)
 
         # Clear existing physics space
         if self.pymunk_space:
@@ -272,10 +270,10 @@ class ObjectCentricDynamic2DRobotEnv(
         self._add_state_to_space(self.full_state)
 
         # Calculate simulation parameters
-        dt = 1.0 / self._spec.sim_hz
+        dt = 1.0 / self.config.sim_hz
         # Stepping physics to let things settle
         assert self.pymunk_space is not None, "Space not initialized"
-        for _ in range(self._spec.sim_hz):
+        for _ in range(self.config.sim_hz):
             self.pymunk_space.step(dt)
 
         observation = self._get_obs()
@@ -291,9 +289,9 @@ class ObjectCentricDynamic2DRobotEnv(
         assert self.robot is not None, "Robot not initialized"
 
         # Calculate simulation parameters
-        sim_dt = 1.0 / self._spec.sim_hz
-        control_dt = 1.0 / self._spec.control_hz
-        n_steps = self._spec.sim_hz // self._spec.control_hz
+        sim_dt = 1.0 / self.config.sim_hz
+        control_dt = 1.0 / self.config.control_hz
+        n_steps = self.config.sim_hz // self.config.control_hz
 
         # Calculate target positions
         tgt_x = self.robot.base_pose.x + dx
@@ -313,10 +311,12 @@ class ObjectCentricDynamic2DRobotEnv(
             kin_obj[0].id for kin_obj, _, _ in self.robot.held_objects
         ]
         # Allow small change in finger gap without changing state
-        if tgt_gripper - self.robot.curr_gripper > self._spec.finger_moving_threshold:
+        if tgt_gripper - self.robot.curr_gripper > self.config.finger_moving_threshold:
             self.robot.is_opening_finger = True
             self.robot.is_closing_finger = False
-        elif self.robot.curr_gripper - tgt_gripper > self._spec.finger_moving_threshold:
+        elif (
+            self.robot.curr_gripper - tgt_gripper > self.config.finger_moving_threshold
+        ):
             self.robot.is_opening_finger = False
             self.robot.is_closing_finger = True
         else:
@@ -350,7 +350,7 @@ class ObjectCentricDynamic2DRobotEnv(
                 held_obj_vel,
             )
             # Step physics simulation (more fine-grained than control freq)
-            for _ in range(self._spec.sim_hz // self._spec.control_hz):
+            for _ in range(self.config.sim_hz // self.config.control_hz):
                 self.pymunk_space.step(sim_dt)
 
         # NOTE: We currently assume the robot can only grasp one object at a time.
@@ -417,113 +417,12 @@ class ObjectCentricDynamic2DRobotEnv(
         return render_2dstate(
             render_input_state,
             self._static_object_body_cache,
-            self._spec.world_min_x,
-            self._spec.world_max_x,
-            self._spec.world_min_y,
-            self._spec.world_max_y,
-            self._spec.render_dpi,
+            self.config.world_min_x,
+            self.config.world_max_x,
+            self.config.world_min_y,
+            self.config.world_max_y,
+            self.config.render_dpi,
         )
-
-
-class ConstantObjectDynamic2DEnv(
-    gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]
-):
-    """Defined by an object-centric Dynamic2D environment and a constant object set.
-
-    The point of this pattern is to allow implementing object-centric environments with
-    variable numbers of objects, but then also create versions of the environment with a
-    constant number of objects so it is easy to apply, e.g., RL approaches that use
-    fixed-dimensional observation and action spaces.
-    """
-
-    # NOTE: we need to define render_modes in the class instead of the instance because
-    # gym.make extracts render_modes from the class (entry_point) before instantiation.
-    metadata: dict[str, Any] = {"render_modes": ["rgb_array"]}
-
-    def __init__(self, *args, render_mode: str | None = None, **kwargs) -> None:
-        super().__init__()
-        self._dynamic2d_env = self._create_object_centric_dynamic2d_env(*args, **kwargs)
-        # Create a Box version of the observation space by extracting the constant
-        # objects from an exemplar state.
-        assert isinstance(
-            self._dynamic2d_env.observation_space, ObjectCentricStateSpace
-        )
-        exemplar_object_centric_state, _ = self._dynamic2d_env.reset()
-        obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
-        obj_names = self._get_constant_object_names(exemplar_object_centric_state)
-        self._constant_objects = [obj_name_to_obj[o] for o in obj_names]
-        # This is a Box space with some extra functionality to allow easy vectorizing.
-        self.observation_space = self._dynamic2d_env.observation_space.to_box(
-            self._constant_objects, Dynamic2DRobotEnvTypeFeatures
-        )
-        self.action_space = self._dynamic2d_env.action_space
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        # The action space already inherits from Box, so we don't need to change it.
-        assert isinstance(self.action_space, KinRobotActionSpace)
-        # Add descriptions to metadata for doc generation.
-        obs_md = self.observation_space.create_markdown_description()
-        act_md = self.action_space.create_markdown_description()
-        env_md = self._create_env_markdown_description()
-        reward_md = self._create_reward_markdown_description()
-        references_md = self._create_references_markdown_description()
-        # Update the metadata. Note that we need to define the render_modes in the class
-        # rather than in the instance because gym.make() extracts render_modes from cls.
-        self.metadata = self.metadata.copy()
-        self.metadata.update(
-            {
-                "description": env_md,
-                "observation_space_description": obs_md,
-                "action_space_description": act_md,
-                "reward_description": reward_md,
-                "references": references_md,
-                "render_fps": self._dynamic2d_env.metadata.get("render_fps", 20),
-            }
-        )
-        self.render_mode = render_mode
-
-    @abc.abstractmethod
-    def _create_object_centric_dynamic2d_env(
-        self, *args, **kwargs
-    ) -> Dynamic2DRobotEnv:
-        """Create the underlying object-centric environment."""
-
-    @abc.abstractmethod
-    def _get_constant_object_names(
-        self, exemplar_state: ObjectCentricState
-    ) -> list[str]:
-        """The ordered names of the constant objects extracted from the observations."""
-
-    @abc.abstractmethod
-    def _create_env_markdown_description(self) -> str:
-        """Create a markdown description of the overall environment."""
-
-    @abc.abstractmethod
-    def _create_reward_markdown_description(self) -> str:
-        """Create a markdown description of the environment rewards."""
-
-    @abc.abstractmethod
-    def _create_references_markdown_description(self) -> str:
-        """Create a markdown description of the reference (e.g. papers) for this env."""
-
-    def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
-        super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
-        obs, info = self._dynamic2d_env.reset(*args, **kwargs)
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        vec_obs = self.observation_space.vectorize(obs)
-        return vec_obs, info
-
-    def step(
-        self, *args, **kwargs
-    ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
-        obs, reward, terminated, truncated, done = self._dynamic2d_env.step(
-            *args, **kwargs
-        )
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        vec_obs = self.observation_space.vectorize(obs)
-        return vec_obs, reward, terminated, truncated, done
-
-    def render(self):
-        return self._dynamic2d_env.render()
 
     def get_action_from_gui_input(
         self, gui_input: dict[str, Any]

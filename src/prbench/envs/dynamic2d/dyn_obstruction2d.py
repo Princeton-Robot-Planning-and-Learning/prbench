@@ -8,10 +8,10 @@ import pymunk
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
+from prbench.core import ConstantObjectPRBenchEnv
 from prbench.envs.dynamic2d.base_env import (
-    ConstantObjectDynamic2DEnv,
-    Dynamic2DRobotEnv,
     Dynamic2DRobotEnvConfig,
+    ObjectCentricDynamic2DRobotEnv,
 )
 from prbench.envs.dynamic2d.object_types import (
     Dynamic2DRobotEnvTypeFeatures,
@@ -41,8 +41,8 @@ Dynamic2DRobotEnvTypeFeatures[TargetSurfaceType] = list(
 
 
 @dataclass(frozen=True)
-class DynObstruction2DEnvSpec(Dynamic2DRobotEnvConfig):
-    """Scene specification for DynObstruction2DEnv()."""
+class DynObstruction2DEnvConfig(Dynamic2DRobotEnvConfig):
+    """Scene config for DynObstruction2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
     world_min_x: float = 0.0
@@ -157,7 +157,9 @@ class DynObstruction2DEnvSpec(Dynamic2DRobotEnvConfig):
     render_dpi: int = 250
 
 
-class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
+class ObjectCentricDynObstruction2DEnv(
+    ObjectCentricDynamic2DRobotEnv[DynObstruction2DEnvConfig]
+):
     """Dynamic environment where a block must be placed on an obstructed target. Uses
     PyMunk physics simulation.
 
@@ -169,20 +171,15 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
     def __init__(
         self,
         num_obstructions: int = 2,
-        spec: DynObstruction2DEnvSpec = DynObstruction2DEnvSpec(),
+        config: DynObstruction2DEnvConfig = DynObstruction2DEnvConfig(),
         **kwargs,
     ) -> None:
-        super().__init__(spec, **kwargs)
+        super().__init__(config, **kwargs)
         self._num_obstructions = num_obstructions
-        self._spec: DynObstruction2DEnvSpec = spec  # for type checking
 
         # Store object references for tracking
         self._target_block: Object | None = None
         self._target_surface: Object | None = None
-        initial_state_dict = self._create_constant_initial_state_dict()
-        self._initial_constant_state = create_state_from_dict(
-            initial_state_dict, Dynamic2DRobotEnvTypeFeatures
-        )
 
     def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
         init_state_dict: dict[Object, dict[str, float]] = {}
@@ -190,18 +187,18 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         # Create the table.
         table = Object("table", KinRectangleType)
         init_state_dict[table] = {
-            "x": self._spec.table_pose.x,
+            "x": self.config.table_pose.x,
             "vx": 0.0,
-            "y": self._spec.table_pose.y,
+            "y": self.config.table_pose.y,
             "vy": 0.0,
-            "theta": self._spec.table_pose.theta,
+            "theta": self.config.table_pose.theta,
             "omega": 0.0,
-            "width": self._spec.table_width,
-            "height": self._spec.table_height,
+            "width": self.config.table_width,
+            "height": self.config.table_height,
             "static": True,
-            "color_r": self._spec.table_rgb[0],
-            "color_g": self._spec.table_rgb[1],
-            "color_b": self._spec.table_rgb[2],
+            "color_r": self.config.table_rgb[0],
+            "color_g": self.config.table_rgb[1],
+            "color_b": self.config.table_rgb[2],
             "z_order": ZOrder.ALL.value,
         }
 
@@ -210,10 +207,10 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         min_dx, min_dy = self.action_space.low[:2]
         max_dx, max_dy = self.action_space.high[:2]
         wall_state_dict = create_walls_from_world_boundaries(
-            self._spec.world_min_x,
-            self._spec.world_max_x,
-            self._spec.world_min_y,
-            self._spec.world_max_y,
+            self.config.world_min_x,
+            self.config.world_max_x,
+            self.config.world_min_y,
+            self.config.world_max_y,
             min_dx,
             max_dx,
             min_dy,
@@ -225,49 +222,49 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
 
     def _sample_initial_state(self) -> ObjectCentricState:
         """Sample an initial state for the environment."""
-        n = self._spec.max_initial_state_sampling_attempts
+        n = self.config.max_initial_state_sampling_attempts
         for _ in range(n):
             # Sample all randomized values.
             robot_pose = sample_se2_pose(
-                self._spec.robot_init_pose_bounds, self.np_random
+                self.config.robot_init_pose_bounds, self.np_random
             )
             target_block_pose = sample_se2_pose(
-                self._spec.target_block_init_pose_bounds, self.np_random
+                self.config.target_block_init_pose_bounds, self.np_random
             )
             target_block_shape = (
-                self.np_random.uniform(*self._spec.target_block_width_bounds),
-                self.np_random.uniform(*self._spec.target_block_height_bounds),
+                self.np_random.uniform(*self.config.target_block_width_bounds),
+                self.np_random.uniform(*self.config.target_block_height_bounds),
             )
             target_surface_pose = sample_se2_pose(
-                self._spec.target_surface_init_pose_bounds, self.np_random
+                self.config.target_surface_init_pose_bounds, self.np_random
             )
             target_surface_width_addition = self.np_random.uniform(
-                *self._spec.target_surface_width_addition_bounds
+                *self.config.target_surface_width_addition_bounds
             )
             target_surface_shape = (
                 target_block_shape[0] + target_surface_width_addition,
-                self._spec.target_surface_height,
+                self.config.target_surface_height,
             )
 
             obstructions: list[tuple[SE2Pose, tuple[float, float]]] = []
             for _ in range(self._num_obstructions):
                 obstruction_shape = (
-                    self.np_random.uniform(*self._spec.obstruction_width_bounds),
-                    self.np_random.uniform(*self._spec.obstruction_height_bounds),
+                    self.np_random.uniform(*self.config.obstruction_width_bounds),
+                    self.np_random.uniform(*self.config.obstruction_height_bounds),
                 )
                 obstruction_init_on_target = (
                     self.np_random.uniform()
-                    < self._spec.obstruction_init_on_target_prob
+                    < self.config.obstruction_init_on_target_prob
                 )
                 if obstruction_init_on_target:
-                    old_lb, old_ub = self._spec.obstruction_init_pose_bounds
+                    old_lb, old_ub = self.config.obstruction_init_pose_bounds
                     new_x_lb = target_surface_pose.x - obstruction_shape[0]
                     new_x_ub = target_surface_pose.x + target_surface_shape[0]
                     new_lb = SE2Pose(new_x_lb, old_lb.y, old_lb.theta)
                     new_ub = SE2Pose(new_x_ub, old_ub.y, old_ub.theta)
                     pose_bounds = (new_lb, new_ub)
                 else:
-                    pose_bounds = self._spec.obstruction_init_pose_bounds
+                    pose_bounds = self.config.obstruction_init_pose_bounds
                 obstruction_pose = sample_se2_pose(pose_bounds, self.np_random)
                 obstructions.append((obstruction_pose, obstruction_shape))
 
@@ -317,14 +314,14 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
             "theta": robot_pose.theta,
             "omega": 0.0,
             "static": False,
-            "base_radius": self._spec.robot_base_radius,
-            "arm_joint": self._spec.robot_base_radius,
-            "arm_length": self._spec.robot_arm_length_max,
-            "gripper_base_width": self._spec.gripper_base_width,
-            "gripper_base_height": self._spec.gripper_base_height,
-            "finger_gap": self._spec.gripper_base_height,
-            "finger_height": self._spec.gripper_finger_height,
-            "finger_width": self._spec.gripper_finger_width,
+            "base_radius": self.config.robot_base_radius,
+            "arm_joint": self.config.robot_base_radius,
+            "arm_length": self.config.robot_arm_length_max,
+            "gripper_base_width": self.config.gripper_base_width,
+            "gripper_base_height": self.config.gripper_base_height,
+            "finger_gap": self.config.gripper_base_height,
+            "finger_height": self.config.gripper_finger_height,
+            "finger_width": self.config.gripper_finger_width,
         }
 
         # Create the target surface.
@@ -339,9 +336,9 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
             "width": target_surface_shape[0],
             "height": target_surface_shape[1],
             "static": True,
-            "color_r": self._spec.target_surface_rgb[0],
-            "color_g": self._spec.target_surface_rgb[1],
-            "color_b": self._spec.target_surface_rgb[2],
+            "color_r": self.config.target_surface_rgb[0],
+            "color_g": self.config.target_surface_rgb[1],
+            "color_b": self.config.target_surface_rgb[2],
             "z_order": ZOrder.NONE.value,
         }
 
@@ -357,10 +354,10 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
             "width": target_block_shape[0],
             "height": target_block_shape[1],
             "static": False,
-            "mass": self._spec.target_block_mass,
-            "color_r": self._spec.target_block_rgb[0],
-            "color_g": self._spec.target_block_rgb[1],
-            "color_b": self._spec.target_block_rgb[2],
+            "mass": self.config.target_block_mass,
+            "color_r": self.config.target_block_rgb[0],
+            "color_g": self.config.target_block_rgb[1],
+            "color_b": self.config.target_block_rgb[2],
             "z_order": ZOrder.ALL.value,
         }
 
@@ -374,13 +371,13 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
                 "vy": 0.0,
                 "theta": obstruction_pose.theta,
                 "omega": 0.0,
-                "mass": self._spec.obstruction_block_mass,
+                "mass": self.config.obstruction_block_mass,
                 "width": obstruction_shape[0],
                 "height": obstruction_shape[1],
                 "static": False,
-                "color_r": self._spec.obstruction_rgb[0],
-                "color_g": self._spec.obstruction_rgb[1],
-                "color_b": self._spec.obstruction_rgb[2],
+                "color_r": self.config.obstruction_rgb[0],
+                "color_g": self.config.obstruction_rgb[1],
+                "color_b": self.config.obstruction_rgb[2],
                 "z_order": ZOrder.ALL.value,
             }
 
@@ -519,12 +516,12 @@ class ObjectCentricDynObstruction2DEnv(Dynamic2DRobotEnv):
         return -1.0, terminated
 
 
-class DynObstruction2DEnv(ConstantObjectDynamic2DEnv):
+class DynObstruction2DEnv(ConstantObjectPRBenchEnv):
     """Dynamic Obstruction 2D env with a constant number of objects."""
 
-    def _create_object_centric_dynamic2d_env(
+    def _create_object_centric_env(
         self, *args, **kwargs
-    ) -> Dynamic2DRobotEnv:
+    ) -> ObjectCentricDynamic2DRobotEnv:
         return ObjectCentricDynObstruction2DEnv(*args, **kwargs)
 
     def _get_constant_object_names(
