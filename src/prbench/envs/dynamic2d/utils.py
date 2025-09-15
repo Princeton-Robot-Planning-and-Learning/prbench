@@ -5,7 +5,6 @@ from typing import Any
 
 import numpy as np
 import pymunk
-from gymnasium.spaces import Box
 from numpy.typing import NDArray
 from pymunk.vec2d import Vec2d
 from relational_structs import Object
@@ -17,9 +16,7 @@ from prbench.envs.geom2d.structs import (
     SE2Pose,
     ZOrder,
 )
-from prbench.envs.utils import (
-    BLACK,
-)
+from prbench.envs.utils import BLACK, RobotActionSpace
 
 # Collision types from the basic_pymunk.py script
 STATIC_COLLISION_TYPE = 0
@@ -27,7 +24,7 @@ DYNAMIC_COLLISION_TYPE = 1
 ROBOT_COLLISION_TYPE = 2
 
 
-class KinRobotActionSpace(Box):
+class KinRobotActionSpace(RobotActionSpace):
     """An action space for a fingered robot with gripper control.
 
     Actions are bounded relative movements of the base, arm extension, and gripper

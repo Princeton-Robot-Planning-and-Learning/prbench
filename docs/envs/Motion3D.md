@@ -20,20 +20,36 @@ Only targets that are reachable via inverse kinematics are sampled.
 ![demo GIF](assets/demo_gifs/Motion3D.gif)
 
 ### Observation Space
-Observations consist of:
-- **joint_positions**: Current joint positions of the 13-DOF robot arm (list of floats)
-- **target**: 3D position (x, y, z) of the target sphere to reach (tuple of 3 floats)
-
-The observation is returned as a Motion3DState dataclass with these two fields.
+The entries of an array in this Box space correspond to the following object features:
+| **Index** | **Object** | **Feature** |
+| --- | --- | --- |
+| 0 | robot | joint_1 |
+| 1 | robot | joint_2 |
+| 2 | robot | joint_3 |
+| 3 | robot | joint_4 |
+| 4 | robot | joint_5 |
+| 5 | robot | joint_6 |
+| 6 | robot | joint_7 |
+| 7 | robot | finger_state |
+| 8 | robot | grasp_active |
+| 9 | robot | grasp_tf_x |
+| 10 | robot | grasp_tf_y |
+| 11 | robot | grasp_tf_z |
+| 12 | robot | grasp_tf_qx |
+| 13 | robot | grasp_tf_qy |
+| 14 | robot | grasp_tf_qz |
+| 15 | robot | grasp_tf_qw |
+| 16 | target | x |
+| 17 | target | y |
+| 18 | target | z |
 
 
 ### Action Space
-Actions control the change in joint positions:
-- **delta_arm_joints**: Change in joint positions for all 13 joints (list of floats)
+An action space for a 7 DOF robot that can open and close its gripper.
 
-The action is a Motion3DAction dataclass with delta_arm_joints field. Each delta is clipped to the range [-0.050, 0.050].
+    Actions are bounded relative joint positions and open / close.
 
-The resulting joint positions are clipped to the robot's joint limits before being applied.
+    The open / close logic is: <-0.5 is close, >0.5 is open, and otherwise no change.
 
 
 ### Rewards

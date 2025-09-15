@@ -1,7 +1,10 @@
 """Utility functions shared across different types of environments."""
 
+import abc
+
 import matplotlib.pyplot as plt
 import numpy as np
+from gymnasium.spaces import Box
 from numpy.typing import NDArray
 from prpl_utils.utils import fig2data
 from relational_structs import (
@@ -33,6 +36,14 @@ from prbench.envs.geom2d.structs import (
 
 PURPLE: tuple[float, float, float] = (128 / 255, 0 / 255, 128 / 255)
 BLACK: tuple[float, float, float] = (0.1, 0.1, 0.1)
+
+
+class RobotActionSpace(Box):
+    """A space for robot actions."""
+
+    @abc.abstractmethod
+    def create_markdown_description(self) -> str:
+        """Create a markdown description of this space."""
 
 
 def get_se2_pose(state: ObjectCentricState, obj: Object) -> SE2Pose:

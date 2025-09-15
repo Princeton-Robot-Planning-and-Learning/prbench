@@ -96,10 +96,10 @@ The entries of an array in this Box space correspond to the following object fea
 | 67 | obstruction2 | height |
 | 68 | obstruction2 | mass |
 | 69 | robot | x |
-| 70 | robot | vx |
-| 71 | robot | y |
-| 72 | robot | vy |
-| 73 | robot | theta |
+| 70 | robot | y |
+| 71 | robot | theta |
+| 72 | robot | vx |
+| 73 | robot | vy |
 | 74 | robot | omega |
 | 75 | robot | static |
 | 76 | robot | base_radius |

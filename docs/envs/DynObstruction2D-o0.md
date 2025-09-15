@@ -52,10 +52,10 @@ The entries of an array in this Box space correspond to the following object fea
 | 25 | target_block | height |
 | 26 | target_block | mass |
 | 27 | robot | x |
-| 28 | robot | vx |
-| 29 | robot | y |
-| 30 | robot | vy |
-| 31 | robot | theta |
+| 28 | robot | y |
+| 29 | robot | theta |
+| 30 | robot | vx |
+| 31 | robot | vy |
 | 32 | robot | omega |
 | 33 | robot | static |
 | 34 | robot | base_radius |

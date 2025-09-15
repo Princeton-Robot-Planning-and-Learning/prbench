@@ -3,13 +3,19 @@
 import numpy as np
 from conftest import MAKE_VIDEOS
 from gymnasium.wrappers import RecordVideo
+from prpl_utils.utils import wrap_angle
 from pybullet_helpers.geometry import Pose
 from pybullet_helpers.motion_planning import (
     remap_joint_position_plan_to_constant_distance,
     run_smooth_motion_planning_to_pose,
 )
+from relational_structs.spaces import ObjectCentricBoxSpace
 
-from prbench.envs.geom3d.motion3d import Motion3DAction, Motion3DEnv, Motion3DState
+from prbench.envs.geom3d.motion3d import (
+    Motion3DEnv,
+    Motion3DObjectCentricState,
+    ObjectCentricMotion3DEnv,
+)
 
 
 def test_motion3d_env():
@@ -17,11 +23,11 @@ def test_motion3d_env():
 
     env = Motion3DEnv(use_gui=False)  # set use_gui=True to debug
     obs, _ = env.reset(seed=123)
-    assert isinstance(obs, Motion3DState)
+    assert isinstance(obs, np.ndarray)
 
     for _ in range(10):
         act = env.action_space.sample()
-        assert isinstance(act, Motion3DAction)
+        assert isinstance(act, np.ndarray)
         obs, _, _, _, _ = env.step(act)
 
     # Uncomment to debug.
@@ -35,14 +41,18 @@ def test_motion_planning_in_motion3d_env():
 
     # Create the real environment.
     env = Motion3DEnv(render_mode="rgb_array")
+    assert isinstance(env.observation_space, ObjectCentricBoxSpace)
     spec = env._spec  # pylint: disable=protected-access
     if MAKE_VIDEOS:
         env = RecordVideo(env, "unit_test_videos")
 
-    obs, _ = env.reset(seed=123)
+    vec_obs, _ = env.reset(seed=123)
+    # NOTE: we should soon make this smoother.
+    oc_obs = env.observation_space.devectorize(vec_obs)
+    obs = Motion3DObjectCentricState(oc_obs.data, oc_obs.type_features)
 
     # Create a simulator for planning.
-    sim = Motion3DEnv(spec=spec)
+    sim = ObjectCentricMotion3DEnv(spec=spec)
 
     # Run motion planning.
     if MAKE_VIDEOS:  # make a smooth motion plan for videos
@@ -51,7 +61,7 @@ def test_motion_planning_in_motion3d_env():
         max_candidate_plans = 1
 
     joint_plan = run_smooth_motion_planning_to_pose(
-        Pose(obs.target),
+        Pose(obs.target_position),
         sim.robot,
         collision_ids=set(),
         end_effector_frame_to_plan_frame=Pose.identity(),
@@ -66,11 +76,14 @@ def test_motion_planning_in_motion3d_env():
 
     env.action_space.seed(123)
     for target_joints in joint_plan[1:]:
-        delta = np.subtract(target_joints, obs.joint_positions)[:7]
-        assert max(delta) < spec.max_action_mag
-        assert min(delta) > -spec.max_action_mag
-        action = Motion3DAction(delta.tolist())
-        obs, _, done, _, _ = env.step(action)
+        delta = np.subtract(target_joints[:7], obs.joint_positions)
+        delta_lst = [wrap_angle(a) for a in delta]
+        action_lst = delta_lst + [0.0]
+        action = np.array(action_lst, dtype=np.float32)
+        vec_obs, _, done, _, _ = env.step(action)
+        # NOTE: we should soon make this smoother.
+        oc_obs = env.observation_space.devectorize(vec_obs)
+        obs = Motion3DObjectCentricState(oc_obs.data, oc_obs.type_features)
         if done:
             break
     else:
