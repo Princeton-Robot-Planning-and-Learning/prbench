@@ -8,6 +8,7 @@ import gymnasium
 import numpy as np
 from numpy.typing import NDArray
 from relational_structs import (
+    Object,
     ObjectCentricState,
     ObjectCentricStateSpace,
     Type,
@@ -135,7 +136,7 @@ class ConstantObjectPRBenchEnv(gymnasium.Env[NDArray[Any], NDArray[Any]]):
         exemplar_object_centric_state, _ = self._object_centric_env.reset()
         obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
         obj_names = self._get_constant_object_names(exemplar_object_centric_state)
-        self._constant_objects = [obj_name_to_obj[o] for o in obj_names]
+        self._constant_objects: list[Object] = [obj_name_to_obj[o] for o in obj_names]
         # This is a Box space with some extra functionality to allow easy vectorizing.
         assert isinstance(
             self._object_centric_env.observation_space, ObjectCentricStateSpace

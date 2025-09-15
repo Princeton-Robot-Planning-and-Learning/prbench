@@ -111,12 +111,16 @@ def test_dyn_obstruction2d_grasping_droppping():
     # Check the grasping behavior
     _, _, _, _, _ = env.step(stable_move)
     # Should not hold the object yet
-    obj_centric_env = env.unwrapped._dynamic2d_env  # pylint: disable=protected-access
+    obj_centric_env = (
+        env.unwrapped._object_centric_env  # pylint: disable=protected-access
+    )
     assert len(obj_centric_env.robot.held_objects) == 0
     for _ in range(6):
         obs, _, _, _, _ = env.step(stable_move)
     # Should hold the object now
-    obj_centric_env = env.unwrapped._dynamic2d_env  # pylint: disable=protected-access
+    obj_centric_env = (
+        env.unwrapped._object_centric_env  # pylint: disable=protected-access
+    )
     assert len(obj_centric_env.robot.held_objects) == 1
     # Check move the object with the robot
     move_with_object = np.array([0.0, 0.05, 0.0, 0.0, 0.0], dtype=np.float32)
@@ -170,7 +174,9 @@ def test_dyn_obstruction2d_grasping_droppping():
     state = env.observation_space.devectorize(obs)
     curr_y = state.get(target_block_object, "y")
     # Should not hold the object
-    obj_centric_env = env.unwrapped._dynamic2d_env  # pylint: disable=protected-access
+    obj_centric_env = (
+        env.unwrapped._object_centric_env  # pylint: disable=protected-access
+    )
     assert len(obj_centric_env.robot.held_objects) == 0
     # The dropping behavior happends in the next step
     obs, _, _, _, _ = env.step(stable_move)
