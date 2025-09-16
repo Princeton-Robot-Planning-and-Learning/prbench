@@ -626,6 +626,10 @@ def create_walls_from_world_boundaries(
 
     Velocities are used to determine how large the walls need to be to avoid the
     possibility that the robot will transport over the wall.
+
+    Left and right walls are considered "surfaces" (z_order=1) while top and bottom
+    walls are considered "floors" (z_order=0). Otherwise there might be weird collision
+    betweent left/right walls and top/bottom walls.
     """
     state_dict: dict[Object, dict[str, float]] = {}
     # Right wall.

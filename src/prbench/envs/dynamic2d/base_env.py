@@ -356,11 +356,15 @@ class ObjectCentricDynamic2DRobotEnv(
         new_held_obj_pymunk_idx = {
             kin_obj[0].id: kin_obj[0] for kin_obj, _, _ in self.robot.held_objects
         }
-        if list(new_held_obj_pymunk_idx.keys()) != curr_held_obj_pymunk_idx:
+        if len(list(new_held_obj_pymunk_idx.keys())) > 1:
+            self.robot.is_closing_finger = False
+            self.robot.is_opening_finger = True  # Grasping failed, open fingers
+
+        if (
+            list(new_held_obj_pymunk_idx.keys()) != curr_held_obj_pymunk_idx
+        ) and self.robot.is_closing_finger:
             # Grasping happened
-            assert self.robot.is_closing_finger
             assert len(curr_held_obj_pymunk_idx) == 0
-            assert len(list(new_held_obj_pymunk_idx.keys())) == 1
             new_body = list(new_held_obj_pymunk_idx.values())[0]
             for state_obj, body in self._state_obj_to_pymunk_body.items():
                 if body not in self.pymunk_space.bodies:
@@ -369,25 +373,40 @@ class ObjectCentricDynamic2DRobotEnv(
 
         # Drop objects after internal steps
         if self.robot.is_opening_finger:
-            for kin_obj, mass, _ in self.robot.held_objects:
-                kinematic_body, kinematic_shape = kin_obj
-                points = kinematic_shape.get_vertices()
-                moment = pymunk.moment_for_poly(mass, points, (0, 0))
-                dynamic_body = pymunk.Body(mass, moment)
-                dynamic_body.position = kinematic_body.position
-                dynamic_body.velocity = kinematic_body.velocity  # Preserve velocity
-                dynamic_body.angular_velocity = kinematic_body.angular_velocity
-                dynamic_body.angle = kinematic_body.angle
-                shape = pymunk.Poly(dynamic_body, points)
-                shape.friction = 1.0
-                shape.density = 1.0
-                shape.collision_type = DYNAMIC_COLLISION_TYPE
-                self.pymunk_space.add(dynamic_body, shape)
-                self.pymunk_space.remove(kinematic_body, kinematic_shape)
-                # Update the mapping
-                for state_obj, body in self._state_obj_to_pymunk_body.items():
-                    if body.id == kinematic_body.id:
-                        self._state_obj_to_pymunk_body[state_obj] = dynamic_body
+            # First, for all state objects, if their pymunk body is held,
+            # change to dynamic body and remove the held body.
+            held_body_ids_shape = {
+                kin_obj[0].id: kin_obj[1] for kin_obj, _, _ in self.robot.held_objects
+            }
+            for state_obj, body in self._state_obj_to_pymunk_body.items():
+                if body.id in held_body_ids_shape.keys():
+                    # Change to dynamic body
+                    kinematic_body = body
+                    points = held_body_ids_shape[body.id].get_vertices()
+                    mass = 1.0  # Assume uniform mass for now
+                    moment = pymunk.moment_for_poly(mass, points, (0, 0))
+                    dynamic_body = pymunk.Body(mass, moment)
+                    dynamic_body.position = kinematic_body.position
+                    dynamic_body.velocity = kinematic_body.velocity  # Preserve velocity
+                    dynamic_body.angular_velocity = kinematic_body.angular_velocity
+                    dynamic_body.angle = kinematic_body.angle
+                    shape = pymunk.Poly(dynamic_body, points)
+                    shape.friction = 1.0
+                    shape.density = 1.0
+                    shape.collision_type = DYNAMIC_COLLISION_TYPE
+                    self.pymunk_space.add(dynamic_body, shape)
+                    self.pymunk_space.remove(
+                        kinematic_body, held_body_ids_shape[body.id]
+                    )
+                    self._state_obj_to_pymunk_body[state_obj] = dynamic_body
+                    held_body_ids_shape.pop(body.id)
+            # Then, for any remaining held objects not matched to state objects,
+            # directly remove them from the space.
+            for kin_obj, _, _ in self.robot.held_objects:
+                if kin_obj[0].id in held_body_ids_shape.keys():
+                    # Remove any extra objects in hand
+                    self.pymunk_space.remove(kin_obj[0], kin_obj[1])
+                    continue
             self.robot.held_objects = []
 
         self.robot.is_closing_finger = False  # reset

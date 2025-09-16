@@ -90,7 +90,18 @@ def state_2d_has_collision(
     # Check pairwise collisions.
     for obj1 in group1:
         for obj2 in group2:
-            if obj1 == obj2:
+            obj1_static = (
+                state.get(obj1, "static")
+                if "static" in state.type_features[obj1.type]
+                else False
+            )
+            obj2_static = (
+                state.get(obj2, "static")
+                if "static" in state.type_features[obj2.type]
+                else False
+            )
+            if obj1 == obj2 or (obj1_static and obj2_static):
+                # Skip self-collision and static-static collision.
                 continue
             multibody1 = obj_to_multibody[obj1]
             multibody2 = obj_to_multibody[obj2]
