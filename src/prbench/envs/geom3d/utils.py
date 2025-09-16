@@ -1,12 +1,12 @@
 """Utilities."""
 
 import numpy as np
-from gymnasium.spaces import Box
 from pybullet_helpers.geometry import Pose
 from pybullet_helpers.joint import JointPositions
 from relational_structs import Object, ObjectCentricState
 
 from prbench.envs.geom3d.object_types import Geom3DCuboidType
+from prbench.envs.utils import RobotActionSpace
 
 
 class Geom3DObjectCentricState(ObjectCentricState):
@@ -61,7 +61,7 @@ class Geom3DObjectCentricState(ObjectCentricState):
         return grasp_tf
 
 
-class Geom3DRobotActionSpace(Box):
+class Geom3DRobotActionSpace(RobotActionSpace):
     """An action space for a 7 DOF robot that can open and close its gripper.
 
     Actions are bounded relative joint positions and open / close.

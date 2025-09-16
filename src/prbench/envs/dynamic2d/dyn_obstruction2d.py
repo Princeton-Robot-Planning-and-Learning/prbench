@@ -281,8 +281,7 @@ class ObjectCentricDynObstruction2DEnv(
             if self._target_satisfied(state, {}):
                 continue
             full_state = state.copy()
-            if self._initial_constant_state is not None:
-                full_state.data.update(self._initial_constant_state.data)
+            full_state.data.update(self.initial_constant_state.data)
             all_objects = set(full_state)
             # We use Geom2D collision checker for now, maybe need to update it.
             if state_2d_has_collision(full_state, all_objects, all_objects, {}):

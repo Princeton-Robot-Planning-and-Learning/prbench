@@ -58,7 +58,9 @@ class ObjectCentricPRBenchEnv(
 
         # Maintain an independent initial_constant_state, including static objects
         # that never change throughout the lifetime of the environment.
-        self._initial_constant_state = self._create_constant_initial_state()
+        # NOTE: we defer the creation of the initial constant state because subclasses
+        # may create objects inside their __init__() after this parent method is called.
+        self._initial_constant_state: _ObsType | None = None
 
         super().__init__()
 
@@ -96,17 +98,15 @@ class ObjectCentricPRBenchEnv(
     @property
     def initial_constant_state(self) -> _ObsType:
         """Get the initial constant state, which includes static objects."""
-        assert (
-            self._initial_constant_state is not None
-        ), "This env has no initial constant state"
+        if self._initial_constant_state is None:
+            self._initial_constant_state = self._create_constant_initial_state()
         return self._initial_constant_state.copy()
 
     def get_state_with_constant_objects(self, state: _ObsType) -> _ObsType:
         """Get the full state, which includes both dynamic and static objects."""
+        # Merge the initial constant state with the current state.
         full_state = state.copy()
-        if self._initial_constant_state is not None:
-            # Merge the initial constant state with the current state.
-            full_state.data.update(self._initial_constant_state.data)
+        full_state.data.update(self.initial_constant_state.data)
         return full_state
 
     def get_action_from_gui_input(self, gui_input: dict[str, Any]) -> _ActType:

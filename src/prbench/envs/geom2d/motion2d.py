@@ -206,7 +206,6 @@ class ObjectCentricMotion2DEnv(ObjectCentricGeom2DRobotEnv[Motion2DEnvConfig]):
     ) -> ObjectCentricState:
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
-        assert self._initial_constant_state is not None
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.
