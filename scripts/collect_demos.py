@@ -135,6 +135,7 @@ class DemoCollector:
 
         # Initialize pygame.
         pygame.init()
+        pygame.joystick.init()
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
@@ -142,6 +143,19 @@ class DemoCollector:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, font_size)
         self.render_fps = render_fps
+
+        # Initialize joystick/controller support
+        self.joysticks = []
+        self.controller = None
+        joystick_count = pygame.joystick.get_count()
+        if joystick_count > 0:
+            self.controller = pygame.joystick.Joystick(0)
+            self.controller.init()
+            print(f"✓ Controller connected: {self.controller.get_name()}")
+            print(f"  Axes: {self.controller.get_numaxes()}")
+            print(f"  Buttons: {self.controller.get_numbuttons()}")
+        else:
+            print("⚠ No controller detected - using mouse/keyboard controls")
 
         # Initialize analog sticks with side panel positioning
         stick_radius = 40
@@ -200,40 +214,70 @@ class DemoCollector:
         Returns False if should quit.
         """
         if self.terminated or self.truncated:
-            while True:
-                response = (
-                    input(
-                        "Episode terminated! Do you want to save before reset? (y/n) "
-                    )
-                    .strip()
-                    .lower()
-                )
-                if response not in ("y", "n"):
-                    continue
-                if response == "y":
-                    self.save_demo()
-                self.reset_env()
-                break
+            # Auto-save successful demos and reset
+            if self.terminated:  # Goal reached
+                print("✓ Goal reached! Auto-saving demo and resetting...")
+                self.save_demo()
+            else:  # Truncated (failed/timeout)
+                print("⚠ Episode truncated. Not saving demo. Resetting...")
+            self.reset_env()
 
         assert not (self.terminated or self.truncated)
 
         # Check if something happened.
         some_action_input = False
 
-        mouse_pos = pygame.mouse.get_pos()
-        mouse_pressed = pygame.mouse.get_pressed()[0]  # left mouse button
+        # Update controller inputs if controller is connected
+        if self.controller:
+            # Update analog sticks from controller
+            # PS5 DualSense mapping:
+            # Axis 0: Left stick X, Axis 1: Left stick Y
+            # Axis 2: Right stick X, Axis 3: Right stick Y
+            left_x = self.controller.get_axis(0)
+            left_y = -self.controller.get_axis(1)  # Invert Y for intuitive control
+            right_x = self.controller.get_axis(2)
+            right_y = -self.controller.get_axis(3)  # Invert Y for intuitive control
 
-        # Update analog sticks - only update the one being clicked on.
-        left_stick_clicked = self.left_stick.is_mouse_over(mouse_pos) and mouse_pressed
-        right_stick_clicked = (
-            self.right_stick.is_mouse_over(mouse_pos) and mouse_pressed
-        )
-        self.left_stick.update_from_mouse(mouse_pos, left_stick_clicked)
-        self.right_stick.update_from_mouse(mouse_pos, right_stick_clicked)
-        if left_stick_clicked or right_stick_clicked:
-            some_action_input = True
+            # Apply deadzone (ignore small movements)
+            deadzone = 0.1
+            if abs(left_x) < deadzone:
+                left_x = 0.0
+            if abs(left_y) < deadzone:
+                left_y = 0.0
+            if abs(right_x) < deadzone:
+                right_x = 0.0
+            if abs(right_y) < deadzone:
+                right_y = 0.0
 
-        # Collect key press events.
+            # Update virtual sticks for display
+            self.left_stick.x = left_x
+            self.left_stick.y = left_y
+            self.left_stick.is_active = abs(left_x) > 0 or abs(left_y) > 0
+
+            self.right_stick.x = right_x
+            self.right_stick.y = right_y
+            self.right_stick.is_active = abs(right_x) > 0 or abs(right_y) > 0
+
+            if self.left_stick.is_active or self.right_stick.is_active:
+                some_action_input = True
+        else:
+            # Fallback to mouse control if no controller
+            mouse_pos = pygame.mouse.get_pos()
+            mouse_pressed = pygame.mouse.get_pressed()[0]  # left mouse button
+
+            # Update analog sticks - only update the one being clicked on.
+            left_stick_clicked = (
+                self.left_stick.is_mouse_over(mouse_pos) and mouse_pressed
+            )
+            right_stick_clicked = (
+                self.right_stick.is_mouse_over(mouse_pos) and mouse_pressed
+            )
+            self.left_stick.update_from_mouse(mouse_pos, left_stick_clicked)
+            self.right_stick.update_from_mouse(mouse_pos, right_stick_clicked)
+            if left_stick_clicked or right_stick_clicked:
+                some_action_input = True
+
+        # Collect events (keyboard and controller)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
@@ -253,6 +297,39 @@ class DemoCollector:
                 key_name = pygame.key.name(event.key)
                 if key_name in self.keys_pressed:
                     self.keys_pressed.discard(key_name)
+                    some_action_input = True
+
+            # Handle controller button events
+            if event.type == pygame.JOYBUTTONDOWN and self.controller:
+                # PS5 DualSense button mapping:
+                # Button 0: X (Cross) - used for vacuum/gripper
+                # Button 1: Circle - restart/reset demo
+                # Button 3: Square - save demo
+                # Button 11: D-pad Up - extend arm
+                # Button 12: D-pad Down - retract arm
+                if event.button == 0:  # X button
+                    self.keys_pressed.add("space")  # Vacuum on
+                    some_action_input = True
+                elif event.button == 1:  # Circle button
+                    self.reset_env()
+                elif event.button == 3:  # Square button
+                    self.save_demo()
+                elif event.button == 11:  # D-pad Up
+                    self.keys_pressed.add("w")  # Extend arm
+                    some_action_input = True
+                elif event.button == 12:  # D-pad Down
+                    self.keys_pressed.add("s")  # Retract arm
+                    some_action_input = True
+
+            if event.type == pygame.JOYBUTTONUP and self.controller:
+                if event.button == 0:  # X button
+                    self.keys_pressed.discard("space")  # Vacuum off
+                    some_action_input = True
+                elif event.button == 11:  # D-pad Up
+                    self.keys_pressed.discard("w")  # Stop extending arm
+                    some_action_input = True
+                elif event.button == 12:  # D-pad Down
+                    self.keys_pressed.discard("s")  # Stop retracting arm
                     some_action_input = True
 
         # Execute the actions.
@@ -321,11 +398,21 @@ class DemoCollector:
         self.screen.blit(text_surface, text_rect)
 
         # Draw instructions.
-        instructions = [
-            "Press 'r' to start/reset demo",
-            "Press 'g' to save demo",
-            "Press 'q' to quit",
-        ]
+        if self.controller:
+            instructions = [
+                "Left Stick: Rotate robot",
+                "Right Stick: Move robot (x,y)",
+                "X Button: Toggle vacuum",
+                "D-pad Up/Down: Extend/retract arm",
+                "Circle: Reset | Square: Save",
+            ]
+        else:
+            instructions = [
+                "Mouse: Click analog sticks",
+                "W/S: Extend/retract arm",
+                "Space: Toggle vacuum",
+                "R: Reset | G: Save | Q: Quit",
+            ]
         for i, instruction in enumerate(instructions):
             text_surface = self.font.render(instruction, True, (200, 200, 200))
             text_rect = text_surface.get_rect()
