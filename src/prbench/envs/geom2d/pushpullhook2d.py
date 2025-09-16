@@ -152,7 +152,6 @@ class ObjectCentricPushPullHook2DEnv(
 
     def _sample_initial_state(self) -> ObjectCentricState:
         # Sample initial robot pose.
-        assert self._initial_constant_state is not None
         robot_pose = sample_se2_pose(self.config.robot_init_pose_bounds, self.np_random)
 
         # Sample hook pose.
@@ -187,7 +186,7 @@ class ObjectCentricPushPullHook2DEnv(
             )
 
             full_state = state.copy()
-            full_state.data.update(self._initial_constant_state.data)
+            full_state.data.update(self.initial_constant_state.data)
             if (
                 not state_2d_has_collision(
                     full_state,
@@ -259,7 +258,7 @@ class ObjectCentricPushPullHook2DEnv(
     ) -> ObjectCentricState:
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
-        assert self._initial_constant_state is not None
+        assert self.initial_constant_state is not None
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.
@@ -383,7 +382,7 @@ class ObjectCentricPushPullHook2DEnv(
         If robot travels in opposite direction, button disconnects and does not move.
         """
         assert self._current_state is not None
-        assert self._initial_constant_state is not None
+        assert self.initial_constant_state is not None
 
         hook = self._current_state.get("hook")
         button = self._current_state.get("movable_button")
@@ -395,7 +394,7 @@ class ObjectCentricPushPullHook2DEnv(
     ) -> tuple[ObjectCentricState, float, bool, bool, dict]:
         super().step(action)
         assert self._current_state is not None
-        assert self._initial_constant_state is not None
+        assert self.initial_constant_state is not None
         obj_name_to_obj = {o.name: o for o in self._current_state}
         movable_button = obj_name_to_obj["movable_button"]
         target_button = obj_name_to_obj["target_button"]

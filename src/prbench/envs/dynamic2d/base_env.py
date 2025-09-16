@@ -97,9 +97,6 @@ class ObjectCentricDynamic2DRobotEnv(
     This environment uses PyMunk for physics simulation with a KinRobot.
     """
 
-    # Only RGB rendering is implemented.
-    metadata = {"render_modes": ["rgb_array"]}
-
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Generic
+from typing import Type as TypingType
+from typing import TypeVar
 
 import gymnasium
 import numpy as np
@@ -24,12 +26,12 @@ from pybullet_helpers.robots.single_arm import FingeredSingleArmPyBulletRobot
 from relational_structs import (
     Array,
     Object,
-    ObjectCentricState,
     ObjectCentricStateSpace,
     Type,
 )
-from relational_structs.spaces import ObjectCentricBoxSpace
+from relational_structs.utils import create_state_from_dict
 
+from prbench.core import ObjectCentricPRBenchEnv, PRBenchEnvConfig, RobotActionSpace
 from prbench.envs.geom3d.object_types import (
     Geom3DCuboidType,
     Geom3DEnvTypeFeatures,
@@ -45,8 +47,8 @@ from prbench.envs.geom3d.utils import (
 
 
 @dataclass(frozen=True)
-class Geom3DEnvSpec:
-    """Spec for Geom3DEnv()."""
+class Geom3DEnvConfig(PRBenchEnvConfig):
+    """Config for Geom3DEnv()."""
 
     # Robot.
     robot_name: str = "kinova-gen3"
@@ -87,42 +89,36 @@ class Geom3DEnvSpec:
         }
 
 
-class Geom3DEnv(gymnasium.Env, abc.ABC):
+# Subclasses may extend the state.
+_ObsType = TypeVar("_ObsType", bound=Geom3DObjectCentricState)
+_ConfigType = TypeVar("_ConfigType", bound=Geom3DEnvConfig)
+
+
+class ObjectCentricGeom3DRobotEnv(
+    ObjectCentricPRBenchEnv[_ObsType, Array, _ConfigType],
+    Generic[_ObsType, _ConfigType],
+):
     """Base class for Geom3D environments."""
 
-    # Only RGB rendering is implemented.
-    metadata = {"render_modes": ["rgb_array"]}
-
-    def __init__(
-        self,
-        spec: Geom3DEnvSpec,
-        render_mode: str | None = None,
-        use_gui: bool = False,
-    ) -> None:
-        super().__init__()
-        self._spec = spec
-        self._types = {Geom3DRobotType, Geom3DCuboidType, Geom3DPointType}
-        self.render_mode = render_mode
-        self.observation_space = ObjectCentricStateSpace(self._types)
-        self.action_space = Geom3DRobotActionSpace(
-            max_magnitude=self._spec.max_action_mag
-        )
+    def __init__(self, *args, use_gui: bool = False, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.use_gui = use_gui
 
         # Create the PyBullet client.
         if use_gui:
-            camera_info = self._spec.get_camera_kwargs()
+            camera_info = self.config.get_camera_kwargs()
             self.physics_client_id = create_gui_connection(**camera_info)
         else:
             self.physics_client_id = p.connect(p.DIRECT)
 
         # Create robot.
         robot = create_pybullet_robot(
-            self._spec.robot_name,
+            self.config.robot_name,
             self.physics_client_id,
-            base_pose=self._spec.robot_base_pose,
+            base_pose=self.config.robot_base_pose,
             control_mode="reset",
             home_joint_positions=extend_joints_to_include_fingers(
-                self._spec.initial_joints
+                self.config.initial_joints
             ),
         )
         assert isinstance(robot, FingeredSingleArmPyBulletRobot)
@@ -131,15 +127,15 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
         # Show a visualization of the end effector.
         visual_id = p.createVisualShape(
             p.GEOM_SPHERE,
-            radius=self._spec.end_effector_viz_radius,
-            rgbaColor=self._spec.end_effector_viz_color,
+            radius=self.config.end_effector_viz_radius,
+            rgbaColor=self.config.end_effector_viz_color,
             physicsClientId=self.physics_client_id,
         )
 
         # Also create a collision body because we use it for grasp detection.
         collision_id = p.createCollisionShape(
             p.GEOM_SPHERE,
-            radius=self._spec.end_effector_viz_radius,
+            radius=self.config.end_effector_viz_radius,
             physicsClientId=self.physics_client_id,
         )
 
@@ -158,8 +154,17 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
         self._grasped_object: str | None = None
         self._grasped_object_transform: Pose | None = None
 
+    @property
     @abc.abstractmethod
-    def _get_obs(self) -> Geom3DObjectCentricState:
+    def state_cls(self) -> TypingType[Geom3DObjectCentricState]:
+        """The type of states in this environment."""
+
+    @abc.abstractmethod
+    def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
+        """Create the constant initial state dict."""
+
+    @abc.abstractmethod
+    def _get_obs(self) -> _ObsType:
         """Get the current observation."""
 
     @abc.abstractmethod
@@ -171,7 +176,7 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
         """Reset objects."""
 
     @abc.abstractmethod
-    def _set_object_states(self, obs: Geom3DObjectCentricState) -> None:
+    def _set_object_states(self, obs: _ObsType) -> None:
         """Reset the state of objects; helper for set_state()."""
 
     @abc.abstractmethod
@@ -203,17 +208,39 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             return self._object_name_to_pybullet_id(self._grasped_object)
         return None
 
+    @property
+    def type_features(self) -> dict[Type, list[str]]:
+        """The types and features for this environment."""
+        return Geom3DEnvTypeFeatures
+
+    def _create_observation_space(self, config: _ConfigType) -> ObjectCentricStateSpace:
+        types = set(self.type_features)
+        return ObjectCentricStateSpace(types, state_cls=self.state_cls)
+
+    def _create_action_space(self, config: _ConfigType) -> RobotActionSpace:
+        return Geom3DRobotActionSpace(max_magnitude=config.max_action_mag)
+
+    def _create_constant_initial_state(self) -> _ObsType:
+        initial_state_dict = self._create_constant_initial_state_dict()
+        state = create_state_from_dict(
+            initial_state_dict, Geom3DEnvTypeFeatures, state_cls=self.state_cls
+        )
+        # This is tricky for type annotation because we are dynamically setting the
+        # class to be self.state_cls, which should be _ObsType.
+        return state  # type: ignore
+
     def reset(
         self,
         *args,
         **kwargs,
-    ) -> tuple[Geom3DObjectCentricState, dict]:
-        super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
+    ) -> tuple[_ObsType, dict]:
+        # Reset the random seed.
+        gymnasium.Env.reset(self, *args, **kwargs)
 
         # Reset the robot. In the future, we may want to allow randomizing the initial
         # robot joint positions.
         self._set_robot_and_held_object(
-            self._spec.initial_joints, self._spec.initial_finger_state
+            self.config.initial_joints, self.config.initial_finger_state
         )
 
         # Reset objects.
@@ -221,7 +248,7 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
 
         return self._get_obs(), {}
 
-    def set_state(self, obs: Geom3DObjectCentricState) -> None:
+    def set_state(self, obs: _ObsType) -> None:
         """Set the state of the environment to the given one.
 
         This is useful when treating the environment as a simulator.
@@ -231,9 +258,7 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
         self._grasped_object_transform = obs.grasped_object_transform
         self._set_object_states(obs)
 
-    def step(
-        self, action: Array
-    ) -> tuple[Geom3DObjectCentricState, float, bool, bool, dict]:
+    def step(self, action: Array) -> tuple[_ObsType, float, bool, bool, dict]:
         # Store the current robot joints because we may need to revert in collision.
         current_joints = remove_fingers_from_extended_joints(
             self.robot.get_joint_positions()
@@ -245,8 +270,8 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
         # Clip the action to be within the allowed limits.
         delta_joints = np.clip(
             delta_arm_joints,
-            -self._spec.max_action_mag,
-            self._spec.max_action_mag,
+            -self.config.max_action_mag,
+            self.config.max_action_mag,
         )
         next_joints = np.clip(
             current_joints + delta_joints,
@@ -329,9 +354,9 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
     def render(self) -> NDArray[np.uint8]:  # type: ignore
         return capture_image(
             self.physics_client_id,
-            image_width=self._spec.render_image_width,
-            image_height=self._spec.render_image_height,
-            **self._spec.get_camera_kwargs(),
+            image_width=self.config.render_image_width,
+            image_height=self.config.render_image_height,
+            **self.config.get_camera_kwargs(),
         )
 
     def _set_robot_and_held_object(
@@ -365,7 +390,7 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
         )
 
     def _get_surfaces_supporting_object(self, object_id: int) -> set[int]:
-        thresh = self._spec.min_placement_dist
+        thresh = self.config.min_placement_dist
         supporting_surface_ids: set[int] = set()
         for surface in self._get_surface_object_names():
             surface_id = self._object_name_to_pybullet_id(surface)
@@ -457,106 +482,3 @@ class Geom3DEnv(gymnasium.Env, abc.ABC):
             # Add feats to state dict.
             state_dict[obj] = feats
         return state_dict
-
-
-class ConstantObjectGeom3DEnv(gymnasium.Env[NDArray[np.float32], NDArray[np.float32]]):
-    """Defined by an object-centric Geom3D environment and a constant object set.
-
-    The point of this pattern is to allow implementing object-centric environments with
-    variable numbers of objects, but then also create versions of the environment with a
-    constant number of objects so it is easy to apply, e.g., RL approaches that use
-    fixed-dimensional observation and action spaces.
-    """
-
-    # NOTE: we need to define render_modes in the class instead of the instance because
-    # gym.make extracts render_modes from the class (entry_point) before instantiation.
-    metadata: dict[str, Any] = {"render_modes": ["rgb_array"]}
-
-    def __init__(self, *args, render_mode: str | None = None, **kwargs) -> None:
-        super().__init__()
-        self._geom3d_env = self._create_object_centric_geom3d_env(*args, **kwargs)
-        # Create a Box version of the observation space by extracting the constant
-        # objects from an exemplar state.
-        assert isinstance(self._geom3d_env.observation_space, ObjectCentricStateSpace)
-        exemplar_object_centric_state, _ = self._geom3d_env.reset()
-        obj_name_to_obj = {o.name: o for o in exemplar_object_centric_state}
-        obj_names = self._get_constant_object_names(exemplar_object_centric_state)
-        self._constant_objects = [obj_name_to_obj[o] for o in obj_names]
-        # This is a Box space with some extra functionality to allow easy vectorizing.
-        self.observation_space = self._geom3d_env.observation_space.to_box(
-            self._constant_objects, Geom3DEnvTypeFeatures
-        )
-        self.action_space = self._geom3d_env.action_space
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        # The action space already inherits from Box, so we don't need to change it.
-        assert isinstance(self.action_space, Geom3DRobotActionSpace)
-        # Add descriptions to metadata for doc generation.
-        obs_md = self.observation_space.create_markdown_description()
-        act_md = self.action_space.create_markdown_description()
-        env_md = self._create_env_markdown_description()
-        reward_md = self._create_reward_markdown_description()
-        references_md = self._create_references_markdown_description()
-        # Update the metadata. Note that we need to define the render_modes in the class
-        # rather than in the instance because gym.make() extracts render_modes from cls.
-        self.metadata = self.metadata.copy()
-        self.metadata.update(
-            {
-                "description": env_md,
-                "observation_space_description": obs_md,
-                "action_space_description": act_md,
-                "reward_description": reward_md,
-                "references": references_md,
-                "render_fps": self._geom3d_env.metadata.get("render_fps", 20),
-            }
-        )
-        self.render_mode = render_mode
-
-    @abc.abstractmethod
-    def _create_object_centric_geom3d_env(self, *args, **kwargs) -> Geom3DEnv:
-        """Create the underlying object-centric environment."""
-
-    @abc.abstractmethod
-    def _get_constant_object_names(
-        self, exemplar_state: ObjectCentricState
-    ) -> list[str]:
-        """The ordered names of the constant objects extracted from the observations."""
-
-    @abc.abstractmethod
-    def _create_env_markdown_description(self) -> str:
-        """Create a markdown description of the overall environment."""
-
-    @abc.abstractmethod
-    def _create_reward_markdown_description(self) -> str:
-        """Create a markdown description of the environment rewards."""
-
-    @abc.abstractmethod
-    def _create_references_markdown_description(self) -> str:
-        """Create a markdown description of the reference (e.g. papers) for this env."""
-
-    def reset(self, *args, **kwargs) -> tuple[NDArray[np.float32], dict]:
-        super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
-        obs, info = self._geom3d_env.reset(*args, **kwargs)
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        vec_obs = self.observation_space.vectorize(obs)
-        return vec_obs, info
-
-    def step(
-        self, *args, **kwargs
-    ) -> tuple[NDArray[np.float32], float, bool, bool, dict]:
-        obs, reward, terminated, truncated, done = self._geom3d_env.step(
-            *args, **kwargs
-        )
-        assert isinstance(self.observation_space, ObjectCentricBoxSpace)
-        vec_obs = self.observation_space.vectorize(obs)
-        return vec_obs, reward, terminated, truncated, done
-
-    def render(self):
-        return self._geom3d_env.render()
-
-    def get_action_from_gui_input(
-        self, gui_input: dict[str, Any]
-    ) -> NDArray[np.float32]:
-        """Get the mapping from human inputs to actions."""
-        # This will be implemented later
-        del gui_input
-        return np.array([], dtype=np.float32)

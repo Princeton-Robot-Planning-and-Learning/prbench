@@ -129,7 +129,6 @@ class ObjectCentricStickButton2DEnv(
 
     def _sample_initial_state(self) -> ObjectCentricState:
         # Sample initial robot pose.
-        assert self._initial_constant_state is not None
         robot_pose = sample_se2_pose(self.config.robot_init_pose_bounds, self.np_random)
         # Sample stick pose.
         for _ in range(self.config.max_init_sampling_attempts):
@@ -144,7 +143,7 @@ class ObjectCentricStickButton2DEnv(
             obj_name_to_obj = {o.name: o for o in state}
             stick = obj_name_to_obj["stick"]
             full_state = state.copy()
-            full_state.data.update(self._initial_constant_state.data)
+            full_state.data.update(self.initial_constant_state.data)
             if not state_2d_has_collision(full_state, {stick}, set(full_state), {}):
                 break
         else:
@@ -168,7 +167,7 @@ class ObjectCentricStickButton2DEnv(
                 obj_name_to_obj = {o.name: o for o in state}
                 new_button = obj_name_to_obj[f"button{len(button_positions)}"]
                 full_state = state.copy()
-                full_state.data.update(self._initial_constant_state.data)
+                full_state.data.update(self.initial_constant_state.data)
                 if not state_2d_has_collision(
                     full_state, {new_button}, set(full_state), {}
                 ):
@@ -229,7 +228,7 @@ class ObjectCentricStickButton2DEnv(
     ) -> ObjectCentricState:
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
-        assert self._initial_constant_state is not None
+        assert self.initial_constant_state is not None
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.
@@ -294,13 +293,13 @@ class ObjectCentricStickButton2DEnv(
         # color to pressed.
         super().step(action)
         assert self._current_state is not None
-        assert self._initial_constant_state is not None
+        assert self.initial_constant_state is not None
         newly_pressed_buttons: set[Object] = set()
         obj_name_to_obj = {o.name: o for o in self._current_state}
         robot = obj_name_to_obj["robot"]
         stick = obj_name_to_obj["stick"]
         full_state = self._current_state.copy()
-        full_state.data.update(self._initial_constant_state.data)
+        full_state.data.update(self.initial_constant_state.data)
         for button in self._current_state.get_objects(CircleType):
             if state_2d_has_collision(
                 full_state,

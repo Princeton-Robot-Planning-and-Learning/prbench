@@ -42,7 +42,7 @@ def test_motion_planning_in_motion3d_env():
     # Create the real environment.
     env = Motion3DEnv(render_mode="rgb_array")
     assert isinstance(env.observation_space, ObjectCentricBoxSpace)
-    spec = env._spec  # pylint: disable=protected-access
+    config = env._object_centric_env.config  # pylint: disable=protected-access
     if MAKE_VIDEOS:
         env = RecordVideo(env, "unit_test_videos")
 
@@ -52,7 +52,7 @@ def test_motion_planning_in_motion3d_env():
     obs = Motion3DObjectCentricState(oc_obs.data, oc_obs.type_features)
 
     # Create a simulator for planning.
-    sim = ObjectCentricMotion3DEnv(spec=spec)
+    sim = ObjectCentricMotion3DEnv(config=config)
 
     # Run motion planning.
     if MAKE_VIDEOS:  # make a smooth motion plan for videos
@@ -71,7 +71,7 @@ def test_motion_planning_in_motion3d_env():
     assert joint_plan is not None
     # Make sure we stay below the required max_action_mag by a fair amount.
     joint_plan = remap_joint_position_plan_to_constant_distance(
-        joint_plan, sim.robot, max_distance=spec.max_action_mag / 2
+        joint_plan, sim.robot, max_distance=config.max_action_mag / 2
     )
 
     env.action_space.seed(123)

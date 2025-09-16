@@ -166,8 +166,7 @@ class ObjectCentricClutteredStorage2DEnv(
         self._num_init_outside_blocks = num_blocks - self._num_init_shelf_blocks
 
     def _sample_initial_state(self) -> ObjectCentricState:
-        assert self._initial_constant_state is not None
-        static_objects = set(self._initial_constant_state)
+        static_objects = set(self.initial_constant_state)
         # Sample robot pose.
         robot_pose = sample_se2_pose(self.config.robot_init_pose_bounds, self.np_random)
         # Sample shelf pose.
@@ -185,7 +184,7 @@ class ObjectCentricClutteredStorage2DEnv(
         )
         robot = state.get_objects(CRVRobotType)[0]
         full_state = state.copy()
-        full_state.data.update(self._initial_constant_state.data)
+        full_state.data.update(self.initial_constant_state.data)
         assert not state_2d_has_collision(full_state, {robot}, static_objects, {})
         # Sample target block poses for those outside the shelf.
         target_block_outside_poses: list[SE2Pose] = []
@@ -211,7 +210,7 @@ class ObjectCentricClutteredStorage2DEnv(
                 num_blocks = sum(b.startswith("block") for b in obj_name_to_obj)
                 new_block = obj_name_to_obj[f"block{num_blocks-1}"]
                 full_state = state.copy()
-                full_state.data.update(self._initial_constant_state.data)
+                full_state.data.update(self.initial_constant_state.data)
                 if not state_2d_has_collision(
                     full_state, {new_block}, set(full_state), {}
                 ):
@@ -253,7 +252,7 @@ class ObjectCentricClutteredStorage2DEnv(
     ) -> ObjectCentricState:
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
-        assert self._initial_constant_state is not None
+        assert self.initial_constant_state is not None
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.
