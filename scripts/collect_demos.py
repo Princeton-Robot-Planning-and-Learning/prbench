@@ -145,7 +145,6 @@ class DemoCollector:
         self.render_fps = render_fps
 
         # Initialize joystick/controller support
-        self.joysticks = []
         self.controller = None
         joystick_count = pygame.joystick.get_count()
         if joystick_count > 0:
