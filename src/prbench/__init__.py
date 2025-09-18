@@ -49,7 +49,7 @@ def register_all_environments() -> None:
         )
 
     # Motion2D environment with different numbers of passages.
-    num_passages = [1, 2, 3, 4, 5]
+    num_passages = [0, 1, 2, 3, 4, 5]
     for num_passage in num_passages:
         _register(
             id=f"prbench/Motion2D-p{num_passage}-v0",
