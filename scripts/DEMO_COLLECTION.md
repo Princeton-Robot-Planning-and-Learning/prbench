@@ -11,13 +11,23 @@ Collect human demonstrations using keyboard/mouse or PS5 DualSense controller.
 #### Usage
 
 ```bash
-python scripts/collect_demos.py <environment_id>
+python scripts/collect_demos.py <environment_id> [--demo-dir DEMO_DIR]
 ```
+
+**Arguments:**
+- `environment_id`: Environment ID (must start with 'prbench/')
+- `--demo-dir`: Directory to save demonstrations (default: demos/)
+
+**Display Settings:**
+- Screen size: 1000x600 pixels
+- Render FPS: 20 frames per second
+- Font size: 24px
+- Side panels: 150px each for analog stick controls
 
 Examples:
 ```bash
 python scripts/collect_demos.py prbench/Motion2D-p1-v0
-python scripts/collect_demos.py prbench/Obstruction2D-o2-v0
+python scripts/collect_demos.py prbench/Obstruction2D-o2-v0 --demo-dir my_demos
 python scripts/collect_demos.py prbench/ClutteredRetrieval2D-o10-v0
 ```
 
@@ -26,17 +36,23 @@ python scripts/collect_demos.py prbench/ClutteredRetrieval2D-o10-v0
 The script automatically detects connected PS5 controllers and provides intuitive control mapping:
 
 **Analog Sticks:**
-- **Left Stick**: Rotate robot (yaw control)
-- **Right Stick**: Move robot base (x, y movement)
+- **Left Stick** (Axis 0,1): Rotate robot (yaw control)
+- **Right Stick** (Axis 2,3): Move robot base (x, y movement)
+- **Deadzone**: 0.1 (small movements are ignored for precision)
 
 **Face Buttons:**
-- **X (Cross)**: Toggle vacuum gripper on/off
-- **Circle**: Reset environment (start new demo)
-- **Square**: Save current demo
+- **X (Cross)** (Button 0): Toggle vacuum gripper on/off
+- **Circle** (Button 1): Reset environment (start new demo)
+- **Square** (Button 3): Save current demo
 
 **D-Pad:**
-- **D-pad Up**: Extend robot arm outward
-- **D-pad Down**: Retract robot arm inward
+- **D-pad Up** (Button 11): Extend robot arm outward
+- **D-pad Down** (Button 12): Retract robot arm inward
+
+**Technical Details:**
+- Y-axis inversion applied to both sticks for intuitive control
+- Deadzone filtering prevents unwanted small movements
+- Side panels (150px each) provide space for virtual analog stick displays
 
 #### Auto-Save Behavior
 
@@ -67,10 +83,25 @@ demos/
 │   └── ...
 ```
 
-Each demo file contains:
-- Environment ID and seed
-- Sequence of observations and actions
-- Rewards and termination information
+**File Naming:**
+- Files are named with Unix timestamps (e.g., `1752189500.p`)
+- Each demo uses a sequential seed starting from 0
+- Seed increments automatically after each environment reset
+
+**Demo File Contents:**
+- `env_id`: Environment identifier
+- `timestamp`: Unix timestamp when demo was saved
+- `seed`: Environment seed used for this demo
+- `observations`: Sequence of environment observations
+- `actions`: Sequence of actions taken
+- `rewards`: Float rewards received at each step
+- `terminated`: Whether episode ended successfully
+- `truncated`: Whether episode was cut short (timeout/failure)
+
+**Image Rendering:**
+- Environment renders RGB images (uint8, shape HxWx3 or HxWx4)
+- Images are scaled to fit center area while maintaining aspect ratio
+- Black side panels (150px each) frame the environment view
 
 ## Video Generation
 
