@@ -101,7 +101,12 @@ def generate_markdown(env_id: str, env: gymnasium.Env) -> str:
     md += "### Initial State Distribution\n"
     md += f"![initial state GIF](assets/initial_state_gifs/{env_filename}.gif)\n\n"
     md += "### Example Demonstration\n"
-    md += f"![demo GIF](assets/demo_gifs/{env_filename}.gif)\n\n"
+
+    # Use the new subdirectory structure to select the first demo GIF
+    demo_subdir = OUTPUT_DIR / "assets" / "demo_gifs" / env_filename
+    gif_files = sorted([f for f in demo_subdir.iterdir() if f.suffix.lower() == ".gif"])
+    first_gif = gif_files[0].name
+    md += f"![demo GIF](assets/demo_gifs/{env_filename}/{first_gif})\n\n"
     md += "### Observation Space\n"
     md += env.metadata["observation_space_description"] + "\n\n"
     md += "### Action Space\n"
