@@ -18,7 +18,7 @@ saving in the demonstrations also).
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 import dill as pkl
 import imageio.v2 as iio
@@ -85,10 +85,10 @@ def discover_demos_by_env(env_id: str, demos_dir: Path = Path("demos")) -> List[
         demos_dir: Directory containing demos
 
     Returns:
-        List of demo file paths for the environment sorted by modification time (newest first).
+        List of demo file paths for the environment sorted by modification time
+        (newest first).
     """
     # Remove prbench/ prefix if present for directory matching
-    env_name = env_id.replace("prbench/", "")
     sanitized_env_name = sanitize_env_id(env_id)
 
     env_dir = demos_dir / sanitized_env_name
@@ -132,9 +132,9 @@ def get_demo_info(demo_path: Path) -> Tuple[str, int, int]:
         seed = int(parts[-2])  # Seed directory name
         timestamp = int(demo_path.stem)  # Filename without extension
         return env_id_from_path, seed, timestamp
-    else:
-        # Fallback - try to parse from filename and parent dirs
-        return "unknown", 0, int(demo_path.stem)
+
+    # Fallback - try to parse from filename and parent dirs
+    return "unknown", 0, int(demo_path.stem)
 
 
 def generate_demo_video(
@@ -445,7 +445,7 @@ def _main() -> None:
 
         # For single demo mode, also organize by environment if output_dir is specified
         if args.output_dir:
-            env_id_from_path, seed, timestamp = get_demo_info(args.demo_path)
+            env_id_from_path, _, _ = get_demo_info(args.demo_path)
             env_subdir = args.output_dir / env_id_from_path
             env_subdir.mkdir(parents=True, exist_ok=True)
             custom_output_path = env_subdir / f"custom_{args.demo_path.stem}.gif"
