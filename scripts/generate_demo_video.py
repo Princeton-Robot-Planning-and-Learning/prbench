@@ -1,5 +1,15 @@
 """Generate videos from pickled demonstrations.
 
+This script can generate GIFs from demonstration files in several modes:
+
+1. Single demo: python generate_demo_video.py path/to/demo.p
+2. Latest demo: python generate_demo_video.py --latest
+3. All demos: python generate_demo_video.py --all [--max-demos N]
+4. Environment demos: python generate_demo_video.py --env prbench/Motion2D-p1
+
+The script automatically discovers demonstration files in the demos/ directory
+and generates appropriately named output files in docs/envs/assets/demo_gifs/.
+
 NOTE: this currently assumes that environments are deterministic. If that is
 not the case, we will need to be able to render observations (which are being
 saving in the demonstrations also).
@@ -8,6 +18,7 @@ saving in the demonstrations also).
 import argparse
 import sys
 from pathlib import Path
+from typing import List, Tuple, Optional
 
 import dill as pkl
 import imageio.v2 as iio
@@ -42,8 +53,88 @@ def load_demo(demo_path: Path) -> dict:
 
         return demo_data
     except Exception as e:
-        print(f"Error loading demo from {demo_path}: {e}")
-        sys.exit(1)
+        # Don't exit, just raise the exception to be handled by caller
+        raise ValueError(f"Error loading demo from {demo_path}: {e}") from e
+
+
+def discover_all_demos(demos_dir: Path = Path("demos")) -> List[Path]:
+    """Discover all demo files in the demos directory.
+
+    Returns:
+        List of demo file paths sorted by modification time (newest first).
+    """
+    if not demos_dir.exists():
+        print(f"Error: Demos directory {demos_dir} does not exist")
+        return []
+
+    demo_files = []
+    for demo_file in demos_dir.rglob("*.p"):
+        if demo_file.is_file():
+            demo_files.append(demo_file)
+
+    # Sort by modification time (newest first)
+    demo_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return demo_files
+
+
+def discover_demos_by_env(env_id: str, demos_dir: Path = Path("demos")) -> List[Path]:
+    """Discover all demo files for a specific environment.
+
+    Args:
+        env_id: Environment ID (with or without 'prbench/' prefix)
+        demos_dir: Directory containing demos
+
+    Returns:
+        List of demo file paths for the environment sorted by modification time (newest first).
+    """
+    # Remove prbench/ prefix if present for directory matching
+    env_name = env_id.replace("prbench/", "")
+    sanitized_env_name = sanitize_env_id(env_id)
+
+    env_dir = demos_dir / sanitized_env_name
+    if not env_dir.exists():
+        print(f"Error: No demos found for environment {env_id} in {env_dir}")
+        return []
+
+    demo_files = []
+    for demo_file in env_dir.rglob("*.p"):
+        if demo_file.is_file():
+            demo_files.append(demo_file)
+
+    # Sort by modification time (newest first)
+    demo_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return demo_files
+
+
+def find_latest_demo(demos_dir: Path = Path("demos")) -> Optional[Path]:
+    """Find the most recently modified demo file.
+
+    Args:
+        demos_dir: Directory containing demos
+
+    Returns:
+        Path to the latest demo file, or None if no demos found.
+    """
+    all_demos = discover_all_demos(demos_dir)
+    return all_demos[0] if all_demos else None
+
+
+def get_demo_info(demo_path: Path) -> Tuple[str, int, int]:
+    """Extract basic info from demo path without loading the full file.
+
+    Returns:
+        Tuple of (env_id_from_path, seed, timestamp)
+    """
+    # Parse path: demos/ENV_ID/SEED/TIMESTAMP.p
+    parts = demo_path.parts
+    if len(parts) >= 3:
+        env_id_from_path = parts[-3]  # Environment directory name
+        seed = int(parts[-2])  # Seed directory name
+        timestamp = int(demo_path.stem)  # Filename without extension
+        return env_id_from_path, seed, timestamp
+    else:
+        # Fallback - try to parse from filename and parent dirs
+        return "unknown", 0, int(demo_path.stem)
 
 
 def generate_demo_video(
@@ -77,8 +168,11 @@ def generate_demo_video(
     if output_path is None:
         env_filename = sanitize_env_id(env_id)
         output_dir = Path("./docs/envs/assets/demo_gifs")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"{env_filename}.gif"
+        env_subdir = output_dir / env_filename
+        env_subdir.mkdir(parents=True, exist_ok=True)
+        # Include timestamp in filename to avoid conflicts
+        timestamp = int(demo_path.stem) if demo_path.stem.isdigit() else "unknown"
+        output_path = env_subdir / f"{env_filename}_{timestamp}.gif"
 
     # Ensure output directory exists.
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -110,8 +204,7 @@ def generate_demo_video(
 
     # Check if we have enough frames.
     if len(frames) < 2:
-        print("Error: Not enough frames collected to create a video")
-        sys.exit(1)
+        raise ValueError("Not enough frames collected to create a video")
 
     # Save the video.
     print(f"Saving video to {output_path}")
@@ -121,22 +214,208 @@ def generate_demo_video(
         iio.mimsave(output_path, frames, fps=fps, loop=loop)  # type: ignore
         print("Video saved successfully!")
     except Exception as e:
-        print(f"Error saving video: {e}")
+        raise ValueError(f"Error saving video: {e}") from e
+
+
+def generate_latest_demo_video(
+    demos_dir: Path = Path("demos"),
+    output_dir: Optional[Path] = None,
+    fps: Optional[int] = None,
+    loop: int = 0,
+) -> None:
+    """Generate a video for the most recently collected demo."""
+    latest_demo = find_latest_demo(demos_dir)
+    if latest_demo is None:
+        print(f"Error: No demos found in {demos_dir}")
         sys.exit(1)
+
+    # Generate descriptive output path
+    if output_dir is None:
+        output_dir = Path("./docs/envs/assets/demo_gifs")
+
+    env_id_from_path, seed, timestamp = get_demo_info(latest_demo)
+    env_subdir = output_dir / env_id_from_path
+    env_subdir.mkdir(parents=True, exist_ok=True)
+    output_filename = f"latest_{env_id_from_path}_seed{seed}_{timestamp}.gif"
+    output_path = env_subdir / output_filename
+
+    print(f"Generating GIF for latest demo: {latest_demo}")
+
+    # Check if output already exists
+    if output_path.exists():
+        print(f"GIF already exists: {output_path}")
+        print("Skipping generation.")
+        return
+
+    try:
+        generate_demo_video(latest_demo, output_path, fps, loop)
+    except Exception as e:
+        print(f"Error processing latest demo {latest_demo}: {e}")
+        raise
+
+
+def generate_all_demo_videos(
+    demos_dir: Path = Path("demos"),
+    output_dir: Optional[Path] = None,
+    fps: Optional[int] = None,
+    loop: int = 0,
+    max_demos: Optional[int] = None,
+) -> None:
+    """Generate videos for all collected demos."""
+    all_demos = discover_all_demos(demos_dir)
+    if not all_demos:
+        print(f"Error: No demos found in {demos_dir}")
+        sys.exit(1)
+
+    if max_demos:
+        all_demos = all_demos[:max_demos]
+
+    if output_dir is None:
+        output_dir = Path("./docs/envs/assets/demo_gifs")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"Found {len(all_demos)} demos. Generating GIFs...")
+
+    successful = 0
+    failed = 0
+    skipped = 0
+    failed_demos = []
+
+    for i, demo_path in enumerate(all_demos, 1):
+        try:
+            env_id_from_path, seed, timestamp = get_demo_info(demo_path)
+            env_subdir = output_dir / env_id_from_path
+            env_subdir.mkdir(parents=True, exist_ok=True)
+            output_filename = f"{env_id_from_path}_seed{seed}_{timestamp}.gif"
+            output_path = env_subdir / output_filename
+
+            # Check if output already exists
+            if output_path.exists():
+                print(f"[{i}/{len(all_demos)}] Skipping {demo_path} (GIF exists)")
+                skipped += 1
+                continue
+
+            print(f"[{i}/{len(all_demos)}] Processing {demo_path}")
+            generate_demo_video(demo_path, output_path, fps, loop)
+            successful += 1
+
+        except Exception as e:
+            error_msg = f"{demo_path}: {e}"
+            failed_demos.append(error_msg)
+            print(f"[{i}/{len(all_demos)}] Error processing {demo_path}: {e}")
+            failed += 1
+            continue
+
+    print(f"\nCompleted: {successful} successful, {failed} failed, {skipped} skipped")
+
+    # Report all failed demos at the end
+    if failed_demos:
+        print(f"\n=== Failed Demos ({len(failed_demos)}) ===")
+        for error_msg in failed_demos:
+            print(f"  • {error_msg}")
+        print()
+
+
+def generate_env_demo_videos(
+    env_id: str,
+    demos_dir: Path = Path("demos"),
+    output_dir: Optional[Path] = None,
+    fps: Optional[int] = None,
+    loop: int = 0,
+    max_demos: Optional[int] = None,
+) -> None:
+    """Generate videos for all demos of a specific environment."""
+    env_demos = discover_demos_by_env(env_id, demos_dir)
+    if not env_demos:
+        print(f"Error: No demos found for environment {env_id}")
+        sys.exit(1)
+
+    if max_demos:
+        env_demos = env_demos[:max_demos]
+
+    if output_dir is None:
+        output_dir = Path("./docs/envs/assets/demo_gifs")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    sanitized_env = sanitize_env_id(env_id)
+    print(f"Found {len(env_demos)} demos for {env_id}. Generating GIFs...")
+
+    successful = 0
+    failed = 0
+    skipped = 0
+    failed_demos = []
+
+    for i, demo_path in enumerate(env_demos, 1):
+        try:
+            _, seed, timestamp = get_demo_info(demo_path)
+            env_subdir = output_dir / sanitized_env
+            env_subdir.mkdir(parents=True, exist_ok=True)
+            output_filename = f"{sanitized_env}_seed{seed}_{timestamp}.gif"
+            output_path = env_subdir / output_filename
+
+            # Check if output already exists
+            if output_path.exists():
+                print(f"[{i}/{len(env_demos)}] Skipping {demo_path} (GIF exists)")
+                skipped += 1
+                continue
+
+            print(f"[{i}/{len(env_demos)}] Processing {demo_path}")
+            generate_demo_video(demo_path, output_path, fps, loop)
+            successful += 1
+
+        except Exception as e:
+            error_msg = f"{demo_path}: {e}"
+            failed_demos.append(error_msg)
+            print(f"[{i}/{len(env_demos)}] Error processing {demo_path}: {e}")
+            failed += 1
+            continue
+
+    print(f"\nCompleted: {successful} successful, {failed} failed, {skipped} skipped")
+
+    # Report all failed demos at the end
+    if failed_demos:
+        print(f"\n=== Failed Demos ({len(failed_demos)}) ===")
+        for error_msg in failed_demos:
+            print(f"  • {error_msg}")
+        print()
 
 
 def _main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate videos from pickled demonstrations"
     )
+
+    # Create mutually exclusive group for input methods
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument(
+        "demo_path", nargs="?", type=Path, help="Path to the pickled demonstration file"
+    )
+    input_group.add_argument(
+        "--latest",
+        action="store_true",
+        help="Generate GIF for the most recently collected demo",
+    )
+    input_group.add_argument(
+        "--all", action="store_true", help="Generate GIFs for all collected demos"
+    )
+    input_group.add_argument(
+        "--env",
+        type=str,
+        help="Generate GIFs for all demos of the specified environment",
+    )
+
+    # Common options
     parser.add_argument(
-        "demo_path", type=Path, help="Path to the pickled demonstration file"
+        "--demos-dir",
+        type=Path,
+        default=Path("demos"),
+        help="Directory containing demo files (default: demos)",
     )
     parser.add_argument(
-        "--output",
+        "--output-dir",
         "-o",
         type=Path,
-        help="Output path (default: auto-generated in docs/envs/assets/demo_gifs/)",
+        help="Output directory (default: docs/envs/assets/demo_gifs/)",
     )
     parser.add_argument(
         "--fps",
@@ -149,20 +428,75 @@ def _main() -> None:
         default=0,
         help="Number of loops for GIF (0 = infinite, default: 0)",
     )
+    parser.add_argument(
+        "--max-demos",
+        type=int,
+        help="Maximum number of demos to process (for --all and --env modes)",
+    )
 
     args = parser.parse_args()
 
-    # Check if demo file exists
-    if not args.demo_path.exists():
-        print(f"Error: Demo file {args.demo_path} does not exist")
-        sys.exit(1)
+    # Handle different input modes
+    if args.demo_path:
+        # Original single demo mode
+        if not args.demo_path.exists():
+            print(f"Error: Demo file {args.demo_path} does not exist")
+            sys.exit(1)
 
-    generate_demo_video(
-        demo_path=args.demo_path,
-        output_path=args.output,
-        fps=args.fps,
-        loop=args.loop,
-    )
+        # For single demo mode, also organize by environment if output_dir is specified
+        if args.output_dir:
+            env_id_from_path, seed, timestamp = get_demo_info(args.demo_path)
+            env_subdir = args.output_dir / env_id_from_path
+            env_subdir.mkdir(parents=True, exist_ok=True)
+            custom_output_path = env_subdir / f"custom_{args.demo_path.stem}.gif"
+        else:
+            custom_output_path = None
+
+        # Check if output already exists for single demo mode
+        if custom_output_path and custom_output_path.exists():
+            print(f"GIF already exists: {custom_output_path}")
+            print("Skipping generation.")
+        else:
+            try:
+                generate_demo_video(
+                    demo_path=args.demo_path,
+                    output_path=custom_output_path,
+                    fps=args.fps,
+                    loop=args.loop,
+                )
+            except Exception as e:
+                print(f"Error processing demo {args.demo_path}: {e}")
+                sys.exit(1)
+
+    elif args.latest:
+        # Generate GIF for latest demo
+        generate_latest_demo_video(
+            demos_dir=args.demos_dir,
+            output_dir=args.output_dir,
+            fps=args.fps,
+            loop=args.loop,
+        )
+
+    elif args.all:
+        # Generate GIFs for all demos
+        generate_all_demo_videos(
+            demos_dir=args.demos_dir,
+            output_dir=args.output_dir,
+            fps=args.fps,
+            loop=args.loop,
+            max_demos=args.max_demos,
+        )
+
+    elif args.env:
+        # Generate GIFs for specific environment
+        generate_env_demo_videos(
+            env_id=args.env,
+            demos_dir=args.demos_dir,
+            output_dir=args.output_dir,
+            fps=args.fps,
+            loop=args.loop,
+            max_demos=args.max_demos,
+        )
 
 
 if __name__ == "__main__":
