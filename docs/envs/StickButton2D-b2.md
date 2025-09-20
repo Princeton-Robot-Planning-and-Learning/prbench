@@ -12,7 +12,7 @@ The robot has a movable circular base and a retractable arm with a rectangular v
 ![initial state GIF](assets/initial_state_gifs/StickButton2D-b2.gif)
 
 ### Example Demonstration
-![demo GIF](assets/demo_gifs/StickButton2D-b2.gif)
+*(No demonstration GIFs available)*
 
 ### Observation Space
 The entries of an array in this Box space correspond to the following object features:

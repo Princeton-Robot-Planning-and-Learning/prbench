@@ -17,7 +17,7 @@ Only targets that are reachable via inverse kinematics are sampled.
 ![initial state GIF](assets/initial_state_gifs/Motion3D.gif)
 
 ### Example Demonstration
-![demo GIF](assets/demo_gifs/Motion3D.gif)
+*(No demonstration GIFs available)*
 
 ### Observation Space
 The entries of an array in this Box space correspond to the following object features:

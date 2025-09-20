@@ -1,5 +1,5 @@
 # prbench/TidyBot3D-ground-o3-v0
-![random action GIF](assets/random_action_gifs/TidyBot3D-ground-o3.gif)
+*(Random action GIF could not be generated due to rendering issues)*
 
 ### Description
 A 3D mobile manipulation environment using the TidyBot platform.
@@ -14,10 +14,10 @@ The robot can control:
 - Gripper position (open/close)
 
 ### Initial State Distribution
-![initial state GIF](assets/initial_state_gifs/TidyBot3D-ground-o3.gif)
+*(Initial state GIF could not be generated due to rendering issues)*
 
 ### Example Demonstration
-![demo GIF](assets/demo_gifs/TidyBot3D-ground-o3.gif)
+*(No demonstration GIFs available)*
 
 ### Observation Space
 Observation includes:

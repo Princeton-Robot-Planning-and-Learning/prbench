@@ -7,7 +7,7 @@ A 2D environment with a robot, a hook (L-shape), a movable button, and a target 
 ![initial state GIF](assets/initial_state_gifs/PushPullHook2D.gif)
 
 ### Example Demonstration
-![demo GIF](assets/demo_gifs/PushPullHook2D.gif)
+![demo GIF](assets/demo_gifs/PushPullHook2D/PushPullHook2D_seed0_1757012197.gif)
 
 ### Observation Space
 The entries of an array in this Box space correspond to the following object features:
