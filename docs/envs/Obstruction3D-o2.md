@@ -18,7 +18,7 @@ The task requires planning to grasp and move obstructions out of the way, then p
 ![initial state GIF](assets/initial_state_gifs/Obstruction3D-o2.gif)
 
 ### Example Demonstration
-![demo GIF](assets/demo_gifs/Obstruction3D-o2.gif)
+*(No demonstration GIFs available)*
 
 ### Observation Space
 The entries of an array in this Box space correspond to the following object features:
