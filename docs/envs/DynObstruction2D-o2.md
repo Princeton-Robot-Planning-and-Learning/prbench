@@ -20,7 +20,7 @@ Each object includes physics properties like mass, moment of inertia (for dynami
 ![initial state GIF](assets/initial_state_gifs/DynObstruction2D-o2.gif)
 
 ### Example Demonstration
-![demo GIF](assets/demo_gifs/DynObstruction2D-o2.gif)
+![demo GIF](assets/demo_gifs/DynObstruction2D-o2/DynObstruction2D-o2_seed0_1757345215.gif)
 
 ### Observation Space
 The entries of an array in this Box space correspond to the following object features:

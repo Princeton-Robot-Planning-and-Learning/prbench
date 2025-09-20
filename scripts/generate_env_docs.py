@@ -56,22 +56,31 @@ def create_random_action_gif(
     num_actions: int = 25,
     seed: int = 0,
     default_fps: int = 10,
-) -> None:
-    """Create a GIF of taking random actions in the environment."""
-    imgs: list = []
-    env.reset(seed=seed)
-    env.action_space.seed(seed)
-    imgs.append(env.render())
-    for _ in range(num_actions):
-        action = env.action_space.sample()
-        _, _, terminated, truncated, _ = env.step(action)
+) -> bool:
+    """Create a GIF of taking random actions in the environment.
+
+    Returns:
+        bool: True if successful, False if rendering failed.
+    """
+    try:
+        imgs: list = []
+        env.reset(seed=seed)
+        env.action_space.seed(seed)
         imgs.append(env.render())
-        if terminated or truncated:
-            break
-    env_filename = sanitize_env_id(env_id)
-    outfile = OUTPUT_DIR / "assets" / "random_action_gifs" / f"{env_filename}.gif"
-    fps = env.metadata.get("render_fps", default_fps)
-    iio.mimsave(outfile, imgs, fps=fps, loop=0)
+        for _ in range(num_actions):
+            action = env.action_space.sample()
+            _, _, terminated, truncated, _ = env.step(action)
+            imgs.append(env.render())
+            if terminated or truncated:
+                break
+        env_filename = sanitize_env_id(env_id)
+        outfile = OUTPUT_DIR / "assets" / "random_action_gifs" / f"{env_filename}.gif"
+        fps = env.metadata.get("render_fps", default_fps)
+        iio.mimsave(outfile, imgs, fps=fps, loop=0)
+        return True
+    except Exception as e:
+        print(f"    Warning: Failed to create random action GIF for {env_id}: {e}")
+        return False
 
 
 def create_initial_state_gif(
@@ -80,28 +89,66 @@ def create_initial_state_gif(
     num_resets: int = 25,
     seed: int = 0,
     fps: int = 10,
-) -> None:
-    """Create a GIF of different initial states by calling reset()."""
-    imgs: list = []
-    for i in range(num_resets):
-        env.reset(seed=seed + i)
-        imgs.append(env.render())
-    env_filename = sanitize_env_id(env_id)
-    outfile = OUTPUT_DIR / "assets" / "initial_state_gifs" / f"{env_filename}.gif"
-    iio.mimsave(outfile, imgs, fps=fps, loop=0)
+) -> bool:
+    """Create a GIF of different initial states by calling reset().
+
+    Returns:
+        bool: True if successful, False if rendering failed.
+    """
+    try:
+        imgs: list = []
+        for i in range(num_resets):
+            env.reset(seed=seed + i)
+            imgs.append(env.render())
+        env_filename = sanitize_env_id(env_id)
+        outfile = OUTPUT_DIR / "assets" / "initial_state_gifs" / f"{env_filename}.gif"
+        iio.mimsave(outfile, imgs, fps=fps, loop=0)
+        return True
+    except Exception as e:
+        print(f"    Warning: Failed to create initial state GIF for {env_id}: {e}")
+        return False
 
 
-def generate_markdown(env_id: str, env: gymnasium.Env) -> str:
+def generate_markdown(
+    env_id: str,
+    env: gymnasium.Env,
+    has_random_gif: bool = True,
+    has_initial_gif: bool = True,
+) -> str:
     """Generate markdown for a given env."""
     md = f"# {env_id}\n"
     env_filename = sanitize_env_id(env_id)
-    md += f"![random action GIF](assets/random_action_gifs/{env_filename}.gif)\n\n"
+
+    if has_random_gif:
+        md += f"![random action GIF](assets/random_action_gifs/{env_filename}.gif)\n\n"
+    else:
+        md += "*(Random action GIF could not be generated due to rendering issues)*\n\n"
+
     description = env.metadata.get("description", "No description defined.")
     md += f"### Description\n{description}\n"
     md += "### Initial State Distribution\n"
-    md += f"![initial state GIF](assets/initial_state_gifs/{env_filename}.gif)\n\n"
+
+    if has_initial_gif:
+        md += f"![initial state GIF](assets/initial_state_gifs/{env_filename}.gif)\n\n"
+    else:
+        md += "*(Initial state GIF could not be generated due to rendering issues)*\n\n"
+
     md += "### Example Demonstration\n"
-    md += f"![demo GIF](assets/demo_gifs/{env_filename}.gif)\n\n"
+
+    # Use the new subdirectory structure to select the first demo GIF
+    demo_subdir = OUTPUT_DIR / "assets" / "demo_gifs" / env_filename
+    if demo_subdir.exists():
+        gif_files = sorted(
+            [f for f in demo_subdir.iterdir() if f.suffix.lower() == ".gif"]
+        )
+        if gif_files:
+            first_gif = gif_files[0].name
+            md += f"![demo GIF](assets/demo_gifs/{env_filename}/{first_gif})\n\n"
+        else:
+            md += "*(No demonstration GIFs available)*\n\n"
+    else:
+        md += "*(No demonstration GIFs available)*\n\n"
+
     md += "### Observation Space\n"
     md += env.metadata["observation_space_description"] + "\n\n"
     md += "### Action Space\n"
@@ -144,9 +191,9 @@ def _main() -> None:
 
         if args.force or is_env_changed(env, changed_files):
             print(f"  Regenerating {env_id}...")
-            create_random_action_gif(env_id, env)
-            create_initial_state_gif(env_id, env)
-            md = generate_markdown(env_id, env)
+            has_random_gif = create_random_action_gif(env_id, env)
+            has_initial_gif = create_initial_state_gif(env_id, env)
+            md = generate_markdown(env_id, env, has_random_gif, has_initial_gif)
             assert env_id.startswith("prbench/")
             env_filename = sanitize_env_id(env_id)
             filename = OUTPUT_DIR / f"{env_filename}.md"
