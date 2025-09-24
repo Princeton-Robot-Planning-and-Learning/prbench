@@ -19,6 +19,8 @@ except ImportError:
 from generate_env_docs import sanitize_env_id
 
 import prbench
+from prbench.envs.dynamic2d.utils import KinRobotActionSpace
+from prbench.envs.geom2d.utils import CRVRobotActionSpace
 
 
 class AnalogStick:
@@ -107,11 +109,24 @@ class DemoCollector:
         self.demo_dir.mkdir(parents=True, exist_ok=True)
         prbench.register_all_environments()
         self.env = prbench.make(env_id, render_mode="rgb_array")
+        # Use the resolved env_id from gymnasium (handles unversioned names)
+        self.env_id = self.env.spec.id if self.env.spec is not None else env_id
         self.unwrapped_env = self.env.unwrapped
         if not hasattr(self.unwrapped_env, "get_action_from_gui_input"):
             raise RuntimeError(
                 f"Environment {env_id} must implement get_action_from_gui_input."
             )
+
+        # Detect environment type based on action space
+        self.is_dynamic2d = isinstance(self.env.action_space, KinRobotActionSpace)
+        self.is_geom2d = isinstance(self.env.action_space, CRVRobotActionSpace)
+
+        env_type = (
+            "Dynamic2D"
+            if self.is_dynamic2d
+            else "Geom2D" if self.is_geom2d else "Unknown"
+        )
+        print(f"Environment type: {env_type}")
         self.observations: list = []
         self.actions: list = []
         self.rewards: list[float] = []
@@ -147,7 +162,37 @@ class DemoCollector:
         )
         self.side_panel_width = side_panel_width
         self.seed = start_seed
+        # Find the next available demo folder number
+        env_demo_dir = self.demo_dir / sanitize_env_id(self.env_id)
+        if env_demo_dir.exists():
+            existing_dirs = [d for d in env_demo_dir.iterdir() if d.is_dir()]
+            if existing_dirs:
+                # Find the highest numbered directory
+                existing_numbers = []
+                for d in existing_dirs:
+                    try:
+                        existing_numbers.append(int(d.name))
+                    except ValueError:
+                        continue  # Skip non-numeric directory names
+                if existing_numbers:
+                    self.seed = max(existing_numbers) + 1
         self.reset_env()
+
+    def translate_key_for_env(self, key_name: str) -> str:
+        """Translate key names based on environment type for proper control mapping."""
+        if self.is_dynamic2d:
+            # Dynamic2D environments (KinRobotActionSpace) expect different keys
+            key_map = {
+                "w": "a",  # extend arm
+                "s": "s",  # retract arm
+                "space": "d",  # close gripper
+                "f": "f",  # open gripper
+                "d": "d",  # close gripper (for D-pad right)
+            }
+            return key_map.get(key_name, key_name)
+
+        # Geom2D and other environments use original mapping
+        return key_name
 
     def reset_env(self) -> None:
         """Reset the environment and start collecting a new demo."""
@@ -243,36 +288,60 @@ class DemoCollector:
                 else:
                     key_name = pygame.key.name(event.key)
                     if key_name not in {"r", "g", "q"}:
-                        self.keys_pressed.add(key_name)
+                        translated_key = self.translate_key_for_env(key_name)
+                        self.keys_pressed.add(translated_key)
                         some_action_input = True
             if event.type == pygame.KEYUP:
                 key_name = pygame.key.name(event.key)
-                if key_name in self.keys_pressed:
-                    self.keys_pressed.discard(key_name)
+                translated_key = self.translate_key_for_env(key_name)
+                if translated_key in self.keys_pressed:
+                    self.keys_pressed.discard(translated_key)
                     some_action_input = True
             if event.type == pygame.JOYBUTTONDOWN and self.controller:
                 if event.button == 0:
-                    self.keys_pressed.add("space")
+                    translated_key = self.translate_key_for_env("space")
+                    self.keys_pressed.add(translated_key)
                     some_action_input = True
                 elif event.button == 1:
                     self.reset_env()
                 elif event.button == 3:
                     self.save_demo()
                 elif event.button == 11:
-                    self.keys_pressed.add("w")
+                    translated_key = self.translate_key_for_env("w")
+                    self.keys_pressed.add(translated_key)
                     some_action_input = True
                 elif event.button == 12:
-                    self.keys_pressed.add("s")
+                    translated_key = self.translate_key_for_env("s")
+                    self.keys_pressed.add(translated_key)
+                    some_action_input = True
+                elif event.button == 13:  # D-pad left
+                    translated_key = self.translate_key_for_env("f")
+                    self.keys_pressed.add(translated_key)
+                    some_action_input = True
+                elif event.button == 14:  # D-pad right
+                    translated_key = self.translate_key_for_env("d")
+                    self.keys_pressed.add(translated_key)
                     some_action_input = True
             if event.type == pygame.JOYBUTTONUP and self.controller:
                 if event.button == 0:
-                    self.keys_pressed.discard("space")
+                    translated_key = self.translate_key_for_env("space")
+                    self.keys_pressed.discard(translated_key)
                     some_action_input = True
                 elif event.button == 11:
-                    self.keys_pressed.discard("w")
+                    translated_key = self.translate_key_for_env("w")
+                    self.keys_pressed.discard(translated_key)
                     some_action_input = True
                 elif event.button == 12:
-                    self.keys_pressed.discard("s")
+                    translated_key = self.translate_key_for_env("s")
+                    self.keys_pressed.discard(translated_key)
+                    some_action_input = True
+                elif event.button == 13:  # D-pad left
+                    translated_key = self.translate_key_for_env("f")
+                    self.keys_pressed.discard(translated_key)
+                    some_action_input = True
+                elif event.button == 14:  # D-pad right
+                    translated_key = self.translate_key_for_env("d")
+                    self.keys_pressed.discard(translated_key)
                     some_action_input = True
         if some_action_input:
             self.step_env()
@@ -320,20 +389,38 @@ class DemoCollector:
         text_rect.topleft = (10, 10)
         self.screen.blit(text_surface, text_rect)
         if self.controller:
-            instructions = [
-                "Left Stick: Rotate robot",
-                "Right Stick: Move robot (x,y)",
-                "X Button: Toggle vacuum",
-                "D-pad Up/Down: Extend/retract arm",
-                "Circle: Reset | Square: Save",
-            ]
+            if self.is_dynamic2d:
+                instructions = [
+                    "Left Stick: Rotate robot",
+                    "Right Stick: Move robot (x,y)",
+                    "D-pad Up/Down: Extend/retract arm",
+                    "D-pad Left: Open gripper",
+                    "D-pad Right: Close gripper",
+                    "Circle: Reset | Square: Save",
+                ]
+            else:
+                instructions = [
+                    "Left Stick: Rotate robot",
+                    "Right Stick: Move robot (x,y)",
+                    "X Button: Toggle vacuum",
+                    "D-pad Up/Down: Extend/retract arm",
+                    "Circle: Reset | Square: Save",
+                ]
         else:
-            instructions = [
-                "Mouse: Click analog sticks",
-                "W/S: Extend/retract arm",
-                "Space: Toggle vacuum",
-                "R: Reset | G: Save | Q: Quit",
-            ]
+            if self.is_dynamic2d:
+                instructions = [
+                    "Mouse: Click analog sticks",
+                    "A/S: Extend/retract arm",
+                    "D/F: Close/open gripper",
+                    "R: Reset | G: Save | Q: Quit",
+                ]
+            else:
+                instructions = [
+                    "Mouse: Click analog sticks",
+                    "W/S: Extend/retract arm",
+                    "Space: Toggle vacuum",
+                    "R: Reset | G: Save | Q: Quit",
+                ]
         for i, instruction in enumerate(instructions):
             text_surface = self.font.render(instruction, True, (200, 200, 200))
             text_rect = text_surface.get_rect()
@@ -347,8 +434,16 @@ class DemoCollector:
 
     def step_env(self) -> None:
         """Step the environment one time."""
-        left_x, left_y = self.left_stick.x, self.left_stick.y
-        right_x, right_y = self.right_stick.x, self.right_stick.y
+        # Apply speed multiplier to make movement slower (half speed)
+        speed_multiplier = 1.0
+        left_x, left_y = (
+            self.left_stick.x * speed_multiplier,
+            self.left_stick.y * speed_multiplier,
+        )
+        right_x, right_y = (
+            self.right_stick.x * speed_multiplier,
+            self.right_stick.y * speed_multiplier,
+        )
         input_data = {
             "keys": self.keys_pressed,
             "left_stick": (left_x, left_y),

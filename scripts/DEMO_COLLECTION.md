@@ -39,15 +39,21 @@ The script automatically detects connected PS5 controllers and provides intuitiv
 - **Left Stick** (Axis 0,1): Rotate robot (yaw control)
 - **Right Stick** (Axis 2,3): Move robot base (x, y movement)
 - **Deadzone**: 0.1 (small movements are ignored for precision)
+- **Speed**: 50% of maximum (reduced for better control and shorter demos)
 
 **Face Buttons:**
-- **X (Cross)** (Button 0): Toggle vacuum gripper on/off
 - **Circle** (Button 1): Reset environment (start new demo)
 - **Square** (Button 3): Save current demo
 
 **D-Pad:**
 - **D-pad Up** (Button 11): Extend robot arm outward
 - **D-pad Down** (Button 12): Retract robot arm inward
+
+**Gripper Control (varies by environment):**
+- **Geometric 2D environments**: **X (Cross)** (Button 0): Toggle vacuum gripper
+- **Dynamic 2D environments**:
+  - **D-pad Left** (Button 13): Open gripper
+  - **D-pad Right** (Button 14): Close gripper
 
 **Technical Details:**
 - Y-axis inversion applied to both sticks for intuitive control
@@ -63,12 +69,20 @@ The script automatically detects connected PS5 controllers and provides intuitiv
 
 If no controller is detected, the system falls back to keyboard and mouse controls:
 
-- **Mouse**: Click and drag virtual analog sticks on screen
-- **W/S**: Extend/retract robot arm
-- **Space**: Toggle vacuum gripper
+- **Mouse**: Click and drag virtual analog sticks on screen (50% speed for better control)
 - **R**: Reset environment
 - **G**: Save demo
 - **Q**: Quit
+
+**Controls vary by environment type:**
+
+**Geometric 2D environments** (e.g., Obstruction2D):
+- **W/S**: Extend/retract robot arm
+- **Space**: Toggle vacuum gripper
+
+**Dynamic 2D environments** (e.g., DynObstruction2D):
+- **A/S**: Extend/retract robot arm
+- **D/F**: Close/open gripper
 
 #### Demo Output
 
