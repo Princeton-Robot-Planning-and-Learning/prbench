@@ -12,7 +12,7 @@ The robot has a movable circular base and a retractable arm with a rectangular v
 ![initial state GIF](assets/initial_state_gifs/ClutteredRetrieval2D-o25.gif)
 
 ### Example Demonstration
-![demo GIF](assets/demo_gifs/ClutteredRetrieval2D-o25/ClutteredRetrieval2D-o25_seed4_1752266253.gif)
+![demo GIF](assets/demo_gifs/ClutteredRetrieval2D-o25/ClutteredRetrieval2D-o25_1758719976.gif)
 
 ### Observation Space
 The entries of an array in this Box space correspond to the following object features:
