@@ -110,7 +110,7 @@ class DemoCollector:
         prbench.register_all_environments()
         self.env = prbench.make(env_id, render_mode="rgb_array")
         # Use the resolved env_id from gymnasium (handles unversioned names)
-        self.env_id = self.env.spec.id
+        self.env_id = self.env.spec.id if self.env.spec is not None else env_id
         self.unwrapped_env = self.env.unwrapped
         if not hasattr(self.unwrapped_env, "get_action_from_gui_input"):
             raise RuntimeError(
@@ -121,9 +121,12 @@ class DemoCollector:
         self.is_dynamic2d = isinstance(self.env.action_space, KinRobotActionSpace)
         self.is_geom2d = isinstance(self.env.action_space, CRVRobotActionSpace)
 
-        print(
-            f"Environment type: {'Dynamic2D' if self.is_dynamic2d else 'Geom2D' if self.is_geom2d else 'Unknown'}"
+        env_type = (
+            "Dynamic2D"
+            if self.is_dynamic2d
+            else "Geom2D" if self.is_geom2d else "Unknown"
         )
+        print(f"Environment type: {env_type}")
         self.observations: list = []
         self.actions: list = []
         self.rewards: list[float] = []
@@ -187,9 +190,9 @@ class DemoCollector:
                 "d": "d",  # close gripper (for D-pad right)
             }
             return key_map.get(key_name, key_name)
-        else:
-            # Geom2D and other environments use original mapping
-            return key_name
+
+        # Geom2D and other environments use original mapping
+        return key_name
 
     def reset_env(self) -> None:
         """Reset the environment and start collecting a new demo."""

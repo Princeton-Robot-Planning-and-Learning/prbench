@@ -2,6 +2,7 @@
 
 import argparse
 import inspect
+import re
 import subprocess
 from pathlib import Path
 
@@ -47,8 +48,6 @@ def sanitize_env_id(env_id: str) -> str:
     env_id = env_id[len("prbench/") :]
     env_id = env_id.replace("/", "_")
     # Assume version suffix is -v followed by digits
-    import re
-
     match = re.search(r"-v\d+$", env_id)
     assert match, f"env_id {env_id} must end with version suffix like -v0"
     return env_id[: match.start()]
