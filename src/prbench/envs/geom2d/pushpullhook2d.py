@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 from relational_structs import Object, ObjectCentricState
 from relational_structs.utils import create_state_from_dict
 
-from prbench.core import ConstantObjectPRBenchEnv
+from prbench.core import ConstantObjectPRBenchEnv, FinalConfigMeta
 from prbench.envs.geom2d.base_env import (
     Geom2DRobotEnvConfig,
     ObjectCentricGeom2DRobotEnv,
@@ -29,7 +29,7 @@ from prbench.envs.utils import BLACK, sample_se2_pose, state_2d_has_collision
 
 
 @dataclass(frozen=True)
-class PushPullHook2DEnvConfig(Geom2DRobotEnvConfig):
+class PushPullHook2DEnvConfig(Geom2DRobotEnvConfig, metaclass=FinalConfigMeta):
     """Config for PushPullHook2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.

@@ -6,7 +6,7 @@ import numpy as np
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
-from prbench.core import ConstantObjectPRBenchEnv
+from prbench.core import ConstantObjectPRBenchEnv, FinalConfigMeta
 from prbench.envs.geom2d.base_env import (
     Geom2DRobotEnvConfig,
     ObjectCentricGeom2DRobotEnv,
@@ -32,7 +32,7 @@ Geom2DRobotEnvTypeFeatures[TargetBlockType] = list(
 
 
 @dataclass(frozen=True)
-class ClutteredRetrieval2DEnvConfig(Geom2DRobotEnvConfig):
+class ClutteredRetrieval2DEnvConfig(Geom2DRobotEnvConfig, metaclass=FinalConfigMeta):
     """Config for ClutteredRetrieval2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.

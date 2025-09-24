@@ -39,6 +39,7 @@ Dynamic2DRobotEnvTypeFeatures[TargetSurfaceType] = list(
     Dynamic2DRobotEnvTypeFeatures[KinRectangleType]
 )
 
+
 @dataclass(frozen=True)
 class DynObstruction2DEnvConfig(Dynamic2DRobotEnvConfig, metaclass=FinalConfigMeta):
     """Scene config for DynObstruction2DEnv()."""
