@@ -109,6 +109,8 @@ class DemoCollector:
         self.demo_dir.mkdir(parents=True, exist_ok=True)
         prbench.register_all_environments()
         self.env = prbench.make(env_id, render_mode="rgb_array")
+        # Use the resolved env_id from gymnasium (handles unversioned names)
+        self.env_id = self.env.spec.id
         self.unwrapped_env = self.env.unwrapped
         if not hasattr(self.unwrapped_env, "get_action_from_gui_input"):
             raise RuntimeError(
@@ -416,7 +418,7 @@ class DemoCollector:
     def step_env(self) -> None:
         """Step the environment one time."""
         # Apply speed multiplier to make movement slower (half speed)
-        speed_multiplier = 0.5
+        speed_multiplier = 1.0
         left_x, left_y = (
             self.left_stick.x * speed_multiplier,
             self.left_stick.y * speed_multiplier,
