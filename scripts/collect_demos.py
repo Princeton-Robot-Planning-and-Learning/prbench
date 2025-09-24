@@ -159,6 +159,20 @@ class DemoCollector:
         )
         self.side_panel_width = side_panel_width
         self.seed = start_seed
+        # Find the next available demo folder number
+        env_demo_dir = self.demo_dir / sanitize_env_id(self.env_id)
+        if env_demo_dir.exists():
+            existing_dirs = [d for d in env_demo_dir.iterdir() if d.is_dir()]
+            if existing_dirs:
+                # Find the highest numbered directory
+                existing_numbers = []
+                for d in existing_dirs:
+                    try:
+                        existing_numbers.append(int(d.name))
+                    except ValueError:
+                        continue  # Skip non-numeric directory names
+                if existing_numbers:
+                    self.seed = max(existing_numbers) + 1
         self.reset_env()
 
     def translate_key_for_env(self, key_name: str) -> str:
