@@ -10,6 +10,7 @@ import numpy as np
 from gymnasium.spaces import Space
 from numpy.typing import NDArray
 from prpl_utils.spaces import FunctionalSpace
+from relational_structs import ObjectCentricState
 from relational_structs.utils import create_state_from_dict
 
 from prbench.envs.tidybot.mujoco_utils import MjAct, MjObs
@@ -208,7 +209,7 @@ class TidyBot3DEnv(TidyBotRobotEnv):
         *,
         seed: int | None = None,
         options: dict[str, Any] | None = None,
-    ) -> tuple[MjObs, dict[str, Any]]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         # Create scene XML
         self._objects = []
         xml_string = self._create_scene_xml()
@@ -238,14 +239,14 @@ class TidyBot3DEnv(TidyBotRobotEnv):
             cv.imshow(window_name, display_image)  # pylint: disable=no-member
             cv.waitKey(1)  # pylint: disable=no-member
 
-    def get_obs(self) -> NDArray[np.float32]:
+    def get_obs(self) -> dict[str, Any]:
         """Get the current observation."""
         obs = super().get_obs()
         vec_obs = self._vectorize_observation(obs)
         object_centric_state = self._get_object_centric_state()
         return {"vec": vec_obs, "object_centric_state": object_centric_state}
 
-    def _get_object_centric_state(self) -> dict[str, Any]:
+    def _get_object_centric_state(self) -> ObjectCentricState:
         """Get the current object-centric state of the environment."""
         state_dict = {}
         for obj in self._objects:
@@ -275,11 +276,11 @@ class TidyBot3DEnv(TidyBotRobotEnv):
 
         return obs, reward, terminated, truncated, {}
 
-    def reward(self, obs: MjObs) -> float:
+    def reward(self, obs: dict[str, Any]) -> float:
         """Calculate reward based on task completion."""
         return self._reward_calculator.calculate_reward(obs)
 
-    def _is_terminated(self, obs: MjObs) -> bool:
+    def _is_terminated(self, obs: dict[str, Any]) -> bool:
         """Check if episode should terminate."""
         return self._reward_calculator.is_terminated(obs)
 
