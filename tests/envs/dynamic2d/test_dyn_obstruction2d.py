@@ -3,9 +3,24 @@
 # import imageio.v2 as iio
 import numpy as np
 from gymnasium.spaces import Box
-from relational_structs import ObjectCentricState
 
 import prbench
+from prbench.envs.dynamic2d.dyn_obstruction2d import DynObstruction2DEnvConfig
+
+
+def test_config_cant_subclass():
+    """Tests that DynObstruction2DEnvConfig cannot be subclassed but can be
+    instantiated."""
+    # Test that the class can be instantiated
+    config = DynObstruction2DEnvConfig()
+    assert config is not None
+
+    # Test that subclassing raises TypeError
+    with np.testing.assert_raises(TypeError):
+
+        class SubConfig(DynObstruction2DEnvConfig):  # pylint: disable=unused-variable
+            """This should raise a TypeError because DynObstruction2DEnvConfig is
+            final."""
 
 
 def test_dyn_obstruction2d_observation_space():
@@ -27,7 +42,7 @@ def test_dyn_obstruction2d_action_space():
     # Check the control precision of base movements
     for s in range(5):
         obs, _ = env.reset(seed=s)
-        state: ObjectCentricState = env.observation_space.devectorize(obs)
+        state = env.observation_space.devectorize(obs)
         name_to_object = {obj.name: obj for obj in state.data}
         robot_object = name_to_object["robot"]
         robot_x = state.get(robot_object, "x")
@@ -36,7 +51,7 @@ def test_dyn_obstruction2d_action_space():
         robot_arm_length = state.get(robot_object, "arm_length")
         robot_finger_gap = state.get(robot_object, "finger_gap")
         obs_, _, _, _, _ = env.step(stable_move)
-        state_: ObjectCentricState = env.observation_space.devectorize(obs_)
+        state_ = env.observation_space.devectorize(obs_)
         robot_x_ = state_.get(robot_object, "x")
         robot_y_ = state_.get(robot_object, "y")
         robot_theta_ = state_.get(robot_object, "theta")
@@ -59,7 +74,7 @@ def test_dyn_obstruction2d_action_space():
     # Check the control precision of base movements
     for s in [1, 2]:
         obs, _ = env.reset(seed=s)
-        state: ObjectCentricState = env.observation_space.devectorize(obs)
+        state = env.observation_space.devectorize(obs)
         name_to_object = {obj.name: obj for obj in state.data}
         robot_object = name_to_object["robot"]
         robot_x = state.get(robot_object, "x")
@@ -68,7 +83,7 @@ def test_dyn_obstruction2d_action_space():
         robot_arm_length = state.get(robot_object, "arm_joint")
         robot_finger_gap = state.get(robot_object, "finger_gap")
         obs_, _, _, _, _ = env.step(stable_move)
-        state_: ObjectCentricState = env.observation_space.devectorize(obs_)
+        state_ = env.observation_space.devectorize(obs_)
         robot_x_ = state_.get(robot_object, "x")
         robot_y_ = state_.get(robot_object, "y")
         robot_theta_ = state_.get(robot_object, "theta")
@@ -92,7 +107,7 @@ def test_dyn_obstruction2d_grasping_droppping():
     prbench.register_all_environments()
     env = prbench.make("prbench/DynObstruction2D-o0-v0")
     obs, _ = env.reset(seed=0)
-    state: ObjectCentricState = env.observation_space.devectorize(obs)
+    state = env.observation_space.devectorize(obs)
     reset_state = state.copy()
     name_to_object = {obj.name: obj for obj in state.data}
     robot_object = name_to_object["robot"]
@@ -100,7 +115,7 @@ def test_dyn_obstruction2d_grasping_droppping():
     reset_state.set(robot_object, "x", 1.6)
     reset_state.set(robot_object, "y", 0.6)
     reset_state.set(robot_object, "theta", -np.pi / 2)
-    reset_state.set(robot_object, "arm_length", 0.24)
+    reset_state.set(robot_object, "arm_joint", 0.24)
     reset_state.set(robot_object, "finger_gap", 0.32)
     reset_state.set(target_block_object, "x", 1.6)
     reset_state.set(target_block_object, "y", 0.2)
@@ -112,23 +127,27 @@ def test_dyn_obstruction2d_grasping_droppping():
     # Check the grasping behavior
     _, _, _, _, _ = env.step(stable_move)
     # Should not hold the object yet
-    obj_centric_env = env.unwrapped._dynamic2d_env  # pylint: disable=protected-access
+    obj_centric_env = (
+        env.unwrapped._object_centric_env  # pylint: disable=protected-access
+    )
     assert len(obj_centric_env.robot.held_objects) == 0
     for _ in range(6):
         obs, _, _, _, _ = env.step(stable_move)
     # Should hold the object now
-    obj_centric_env = env.unwrapped._dynamic2d_env  # pylint: disable=protected-access
+    obj_centric_env = (
+        env.unwrapped._object_centric_env  # pylint: disable=protected-access
+    )
     assert len(obj_centric_env.robot.held_objects) == 1
     # Check move the object with the robot
     move_with_object = np.array([0.0, 0.05, 0.0, 0.0, 0.0], dtype=np.float32)
     for _ in range(3):
-        state: ObjectCentricState = env.observation_space.devectorize(obs)
+        state = env.observation_space.devectorize(obs)
         name_to_object = {obj.name: obj for obj in state.data}
         target_block_x = state.get(target_block_object, "x")
         target_block_y = state.get(target_block_object, "y")
         target_block_theta = state.get(target_block_object, "theta")
         obs_, _, _, _, _ = env.step(move_with_object)
-        state_: ObjectCentricState = env.observation_space.devectorize(obs_)
+        state_ = env.observation_space.devectorize(obs_)
         target_block_x_ = state_.get(target_block_object, "x")
         target_block_y_ = state_.get(target_block_object, "y")
         target_block_theta_ = state_.get(target_block_object, "theta")
@@ -145,13 +164,13 @@ def test_dyn_obstruction2d_grasping_droppping():
 
     move_with_object = np.array([0.0, 0.05, np.pi / 16, 0.0, 0.0], dtype=np.float32)
     for _ in range(5):
-        state: ObjectCentricState = env.observation_space.devectorize(obs)
+        state = env.observation_space.devectorize(obs)
         name_to_object = {obj.name: obj for obj in state.data}
         target_block_x = state.get(target_block_object, "x")
         target_block_y = state.get(target_block_object, "y")
         target_block_theta = state.get(target_block_object, "theta")
         obs_, _, _, _, _ = env.step(move_with_object)
-        state_: ObjectCentricState = env.observation_space.devectorize(obs_)
+        state_ = env.observation_space.devectorize(obs_)
         target_block_x_ = state_.get(target_block_object, "x")
         target_block_y_ = state_.get(target_block_object, "y")
         target_block_theta_ = state_.get(target_block_object, "theta")
@@ -168,14 +187,16 @@ def test_dyn_obstruction2d_grasping_droppping():
     stable_move = np.array([0.0, 0.0, 0.0, 0.0, 0.01], dtype=np.float32)
     # Check the dropping behavior
     obs, _, _, _, _ = env.step(stable_move)
-    state: ObjectCentricState = env.observation_space.devectorize(obs)
+    state = env.observation_space.devectorize(obs)
     curr_y = state.get(target_block_object, "y")
     # Should not hold the object
-    obj_centric_env = env.unwrapped._dynamic2d_env  # pylint: disable=protected-access
+    obj_centric_env = (
+        env.unwrapped._object_centric_env  # pylint: disable=protected-access
+    )
     assert len(obj_centric_env.robot.held_objects) == 0
     # The dropping behavior happends in the next step
     obs, _, _, _, _ = env.step(stable_move)
-    state: ObjectCentricState = env.observation_space.devectorize(obs)
+    state = env.observation_space.devectorize(obs)
     new_y = state.get(target_block_object, "y")
     assert new_y < curr_y  # The object should fall down due to gravity
 

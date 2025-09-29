@@ -2,56 +2,35 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
+from typing import Type as TypingType
 
-import gymnasium
 import numpy as np
 import pybullet as p
-from numpy.typing import NDArray
-from prpl_utils.spaces import FunctionalSpace
-from pybullet_helpers.camera import capture_image
 from pybullet_helpers.geometry import Pose, get_pose, set_pose
-from pybullet_helpers.gui import create_gui_connection
 from pybullet_helpers.inverse_kinematics import (
     InverseKinematicsError,
     inverse_kinematics,
 )
-from pybullet_helpers.joint import JointPositions
-from pybullet_helpers.robots import create_pybullet_robot
-from pybullet_helpers.robots.single_arm import FingeredSingleArmPyBulletRobot
+from relational_structs import Object, ObjectCentricState
+from relational_structs.utils import create_state_from_dict
+
+from prbench.core import ConstantObjectPRBenchEnv, FinalConfigMeta
+from prbench.envs.geom3d.base_env import (
+    Geom3DEnvConfig,
+    ObjectCentricGeom3DRobotEnv,
+)
+from prbench.envs.geom3d.object_types import (
+    Geom3DEnvTypeFeatures,
+    Geom3DPointType,
+    Geom3DRobotType,
+)
+from prbench.envs.geom3d.utils import Geom3DObjectCentricState
 
 
 @dataclass(frozen=True)
-class Motion3DEnvSpec:
-    """Spec for Motion3DEnv()."""
-
-    # Robot.
-    robot_name: str = "kinova-gen3"
-    robot_base_pose: Pose = Pose.identity()
-    # NOTE: the robot joints include 7 DOF for the arm and 6 DOF for the fingers. We
-    # don't need to change the fingers this in the environment.
-    initial_joints: JointPositions = field(
-        default_factory=lambda: [
-            -4.3,  # "joint_1", starting at the robot base and going up to the gripper
-            -1.6,  # "joint_2"
-            -4.8,  # "joint_3"
-            -1.8,  # "joint_4"
-            -1.4,  # "joint_5"
-            -1.1,  # "joint_6"
-            1.6,  # "joint_7"
-            # Finger joints (not used in this environment).
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        ]
-    )
-    end_effector_viz_radius: float = 0.01
-    end_effector_viz_color: tuple[float, float, float, float] = (1.0, 0.2, 0.2, 0.5)
-    max_action_mag: float = 0.05
+class Motion3DEnvConfig(Geom3DEnvConfig):
+    """Config for Motion3DEnv()."""
 
     # Target.
     target_radius: float = 0.1
@@ -59,128 +38,35 @@ class Motion3DEnvSpec:
     target_lower_bound: tuple[float, float, float] = (0.0, 0.1, 0.0)
     target_upper_bound: tuple[float, float, float] = (0.5, 0.8, 0.5)
 
-    # For rendering.
-    render_dpi: int = 300
-    render_fps: int = 20
 
-    def get_camera_kwargs(self) -> dict[str, Any]:
-        """Get kwargs to pass to PyBullet camera."""
-        return {
-            "camera_target": self.robot_base_pose.position,
-            "camera_yaw": 90,
-            "camera_distance": 1.5,
-            "camera_pitch": -20,
-            # Use for fast testing.
-            # "image_width": 32,
-            # "image_height": 32,
-        }
+class Motion3DObjectCentricState(Geom3DObjectCentricState, metaclass=FinalConfigMeta):
+    """A state in the Motion3DEnv().
 
-
-@dataclass(frozen=True)
-class Motion3DState:
-    """A state for Motion3DEnv()."""
-
-    joint_positions: JointPositions
-    target: tuple[float, float, float]  # 3D position to reach with end effector
-
-
-@dataclass(frozen=True)
-class Motion3DAction:
-    """An action for Motion3DEnv().
-
-    NOTE: the environment enforces a limit on the magnitude of the deltas.
+    Adds convenience methods on top of Geom3DObjectCentricState().
     """
 
-    # NOTE: this is only a delta on the 7 DOF of the arm, not the fingers, which do not
-    # need to change in this environment.
-    delta_arm_joints: JointPositions
+    @property
+    def target_position(self) -> tuple[float, float, float]:
+        """The position of the target, assuming the name "target"."""
+        target = self.get_object_from_name("target")
+        return (self.get(target, "x"), self.get(target, "y"), self.get(target, "z"))
 
 
-class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
+class ObjectCentricMotion3DEnv(
+    ObjectCentricGeom3DRobotEnv[Motion3DObjectCentricState, Motion3DEnvConfig]
+):
     """Environment where only 3D motion planning is needed to reach a goal region."""
 
-    # Only RGB rendering is implemented.
-    metadata = {"render_modes": ["rgb_array"]}
-
     def __init__(
-        self,
-        spec: Motion3DEnvSpec = Motion3DEnvSpec(),
-        render_mode: str | None = None,
-        use_gui: bool = False,
+        self, config: Motion3DEnvConfig = Motion3DEnvConfig(), **kwargs
     ) -> None:
-        super().__init__()
-        self._spec = spec
-
-        # Set up Gymnasium env fields.
-        obs_md = self._create_observation_space_markdown_description()
-        act_md = self._create_action_space_markdown_description()
-        env_md = self._create_env_markdown_description()
-        reward_md = self._create_reward_markdown_description()
-        references_md = self._create_references_markdown_description()
-        # Update the metadata. Note that we need to define the render_modes in the class
-        # rather than in the instance because gym.make() extracts render_modes from cls.
-        self.metadata = self.metadata.copy()
-        self.metadata.update(
-            {
-                "description": env_md,
-                "observation_space_description": obs_md,
-                "action_space_description": act_md,
-                "reward_description": reward_md,
-                "references": references_md,
-                "render_fps": self._spec.render_fps,
-            }
-        )
-        self.render_mode = render_mode
-        self.observation_space = FunctionalSpace(
-            contains_fn=lambda o: isinstance(o, Motion3DState)
-        )
-        self.action_space = FunctionalSpace(
-            contains_fn=lambda a: isinstance(a, Motion3DAction),
-            sample_fn=self._sample_action,
-        )
-
-        # Create the PyBullet client.
-        if use_gui:
-            camera_info = self._spec.get_camera_kwargs()
-            self.physics_client_id = create_gui_connection(**camera_info)
-        else:
-            self.physics_client_id = p.connect(p.DIRECT)
-
-        # Create robot.
-        robot = create_pybullet_robot(
-            self._spec.robot_name,
-            self.physics_client_id,
-            base_pose=self._spec.robot_base_pose,
-            control_mode="reset",
-            home_joint_positions=self._spec.initial_joints,
-        )
-        assert isinstance(robot, FingeredSingleArmPyBulletRobot)
-        self.robot = robot
-
-        # Show a visualization of the end effector.
-        visual_id = p.createVisualShape(
-            p.GEOM_SPHERE,
-            radius=self._spec.end_effector_viz_radius,
-            rgbaColor=self._spec.end_effector_viz_color,
-            physicsClientId=self.physics_client_id,
-        )
-
-        # Create the body.
-        end_effector_pose = self.robot.get_end_effector_pose()
-        self.end_effector_viz_id = p.createMultiBody(
-            baseMass=0,
-            baseCollisionShapeIndex=-1,
-            baseVisualShapeIndex=visual_id,
-            basePosition=end_effector_pose.position,
-            baseOrientation=end_effector_pose.orientation,
-            physicsClientId=self.physics_client_id,
-        )
+        super().__init__(config=config, **kwargs)
 
         # Create target.
         visual_id = p.createVisualShape(
             p.GEOM_SPHERE,
-            radius=self._spec.target_radius,
-            rgbaColor=self._spec.target_color,
+            radius=self.config.target_radius,
+            rgbaColor=self.config.target_color,
             physicsClientId=self.physics_client_id,
         )
 
@@ -194,28 +80,29 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
             physicsClientId=self.physics_client_id,
         )
 
-    def reset(
-        self,
-        *args,
-        **kwargs,
-    ) -> tuple[Motion3DState, dict]:
-        super().reset(*args, **kwargs)  # necessary to reset RNG if seed is given
+    @property
+    def state_cls(self) -> TypingType[Geom3DObjectCentricState]:
+        return Motion3DObjectCentricState
 
-        # Reset the robot.
-        self._set_robot_joints(self._spec.initial_joints)
+    def _create_constant_initial_state_dict(self) -> dict[Object, dict[str, float]]:
+        # Neither the target nor the robot are constant in this env.
+        return {}
 
+    def _reset_objects(self) -> None:
         # Reset the target. Sample and check reachability.
         target_pose: Pose | None = None
         for _ in range(100_000):
             target_position = self.np_random.uniform(
-                self._spec.target_lower_bound, self._spec.target_upper_bound
+                self.config.target_lower_bound, self.config.target_upper_bound
             )
             target_pose = Pose(tuple(target_position))
             try:
                 inverse_kinematics(self.robot, target_pose, validate=True)
             except InverseKinematicsError:
                 continue
-            self._set_robot_joints(self._spec.initial_joints)
+            self._set_robot_and_held_object(
+                self.config.initial_joints, self.config.initial_finger_state
+            )
             # If the goal is already reached, keep sampling.
             if not self._goal_reached():
                 break
@@ -223,68 +110,70 @@ class Motion3DEnv(gymnasium.Env[Motion3DState, Motion3DAction]):
             raise RuntimeError("Failed to find reachable target position")
         set_pose(self.target_id, target_pose, self.physics_client_id)
 
-        return self._get_obs(), {}
+    def _set_object_states(self, obs: Motion3DObjectCentricState) -> None:
+        assert self.target_id is not None
+        set_pose(self.target_id, Pose(obs.target_position), self.physics_client_id)
 
-    def step(
-        self, action: Motion3DAction
-    ) -> tuple[Motion3DState, float, bool, bool, dict]:
-        delta_joints = np.clip(
-            action.delta_arm_joints,
-            -self._spec.max_action_mag,
-            self._spec.max_action_mag,
+    def _object_name_to_pybullet_id(self, object_name: str) -> int:
+        if object_name == "target":
+            return self.target_id
+        raise ValueError(f"Unrecognized object name: {object_name}")
+
+    def _get_collision_object_ids(self) -> set[int]:
+        return set()
+
+    def _get_movable_object_names(self) -> set[str]:
+        return set()
+
+    def _get_surface_object_names(self) -> set[str]:
+        return set()
+
+    def _get_half_extents(self, object_name: str) -> tuple[float, float, float]:
+        raise NotImplementedError("No objects have half extents")
+
+    def _get_obs(self) -> Motion3DObjectCentricState:
+        state_dict = self._create_state_dict(
+            [("robot", Geom3DRobotType), ("target", Geom3DPointType)]
         )
-        current_joints = self.robot.get_joint_positions()
-        current_joints_fingers = current_joints[7:]
-        current_joints_no_fingers = current_joints[:7]
-        next_joints_no_fingers = np.clip(
-            current_joints_no_fingers + delta_joints,
-            self.robot.joint_lower_limits[:7],
-            self.robot.joint_upper_limits[:7],
-        ).tolist()
-        next_joints = next_joints_no_fingers + current_joints_fingers
-        self._set_robot_joints(next_joints)
-        reward = -1
-        terminated = self._goal_reached()
-        return self._get_obs(), reward, terminated, False, {}
-
-    def render(self) -> NDArray[np.uint8]:  # type: ignore
-        return capture_image(self.physics_client_id, **self._spec.get_camera_kwargs())
-
-    def _get_obs(self) -> Motion3DState:
-        joint_positions = self.robot.get_joint_positions()
-        target = get_pose(self.target_id, self.physics_client_id).position
-        return Motion3DState(joint_positions, target)
+        state = create_state_from_dict(
+            state_dict, Geom3DEnvTypeFeatures, state_cls=Motion3DObjectCentricState
+        )
+        assert isinstance(state, Motion3DObjectCentricState)
+        return state
 
     def _goal_reached(self) -> bool:
         target = get_pose(self.target_id, self.physics_client_id).position
         end_effector_pose = self.robot.get_end_effector_pose()
         dist = float(np.linalg.norm(np.subtract(target, end_effector_pose.position)))
-        return dist < self._spec.target_radius
+        return dist < self.config.target_radius
 
-    def _set_robot_joints(self, joints: JointPositions) -> None:
-        self.robot.set_joints(joints)
-        self.robot.open_fingers()
-        end_effector_pose = self.robot.get_end_effector_pose()
-        set_pose(self.end_effector_viz_id, end_effector_pose, self.physics_client_id)
 
-    def _sample_action(self, rng: np.random.Generator) -> Motion3DAction:
-        num_dof = 7
-        arr = rng.uniform(
-            -self._spec.max_action_mag, self._spec.max_action_mag, size=(num_dof,)
-        )
-        return Motion3DAction(arr.tolist())
+class Motion3DEnv(ConstantObjectPRBenchEnv):
+    """Motion 3D env with a constant number of objects."""
+
+    def _create_object_centric_env(
+        self, *args, **kwargs
+    ) -> ObjectCentricGeom3DRobotEnv:
+        return ObjectCentricMotion3DEnv(*args, **kwargs)
+
+    def _get_constant_object_names(
+        self, exemplar_state: ObjectCentricState
+    ) -> list[str]:
+        return ["robot", "target"]
 
     def _create_env_markdown_description(self) -> str:
         """Create environment description."""
         # pylint: disable=line-too-long
+        config = self._object_centric_env.config
+        assert isinstance(config, Motion3DEnvConfig)
         return f"""A 3D motion planning environment where the goal is to reach a target sphere with the robot's end effector.
 
-The robot is a Kinova Gen-3 with 7 degrees of freedom. The target is a sphere with radius {self._spec.target_radius:.3f}m positioned randomly within the workspace bounds.
+The robot is a Kinova Gen-3 with 7 degrees of freedom. The target is a sphere with radius {config.target_radius:.3f}m positioned randomly within the workspace bounds.
 
 The workspace bounds are:
-- X: [{self._spec.target_lower_bound[0]:.1f}, {self._spec.target_upper_bound[0]:.1f}]
-- Y: [{self._spec.target_lower_bound[1]:.1f}, {self._spec.target_upper_bound[1]:.1f}]
-- Z: [{self._spec.target_lower_bound[2]:.1f}, {self._spec.target_upper_bound[2]:.1f}]
+- X: [{config.target_lower_bound[0]:.1f}, {config.target_upper_bound[0]:.1f}]
+- Y: [{config.target_lower_bound[1]:.1f}, {config.target_upper_bound[1]:.1f}]
+- Z: [{config.target_lower_bound[2]:.1f}, {config.target_upper_bound[2]:.1f}]
 
 Only targets that are reachable via inverse kinematics are sampled.
 """
@@ -292,8 +181,10 @@ Only targets that are reachable via inverse kinematics are sampled.
     def _create_observation_space_markdown_description(self) -> str:
         """Create observation space description."""
         # pylint: disable=line-too-long
+        config = self._object_centric_env.config
+        assert isinstance(config, Motion3DEnvConfig)
         return f"""Observations consist of:
-- **joint_positions**: Current joint positions of the {len(self._spec.initial_joints)}-DOF robot arm (list of floats)
+- **joint_positions**: Current joint positions of the {len(config.initial_joints)}-DOF robot arm (list of floats)
 - **target**: 3D position (x, y, z) of the target sphere to reach (tuple of 3 floats)
 
 The observation is returned as a Motion3DState dataclass with these two fields.
@@ -302,10 +193,12 @@ The observation is returned as a Motion3DState dataclass with these two fields.
     def _create_action_space_markdown_description(self) -> str:
         """Create action space description."""
         # pylint: disable=line-too-long
+        config = self._object_centric_env.config
+        assert isinstance(config, Motion3DEnvConfig)
         return f"""Actions control the change in joint positions:
-- **delta_arm_joints**: Change in joint positions for all {len(self._spec.initial_joints)} joints (list of floats)
+- **delta_arm_joints**: Change in joint positions for all {len(config.initial_joints)} joints (list of floats)
 
-The action is a Motion3DAction dataclass with delta_arm_joints field. Each delta is clipped to the range [-{self._spec.max_action_mag:.3f}, {self._spec.max_action_mag:.3f}].
+The action is a Motion3DAction dataclass with delta_arm_joints field. Each delta is clipped to the range [-{config.max_action_mag:.3f}, {config.max_action_mag:.3f}].
 
 The resulting joint positions are clipped to the robot's joint limits before being applied.
 """
@@ -313,9 +206,11 @@ The resulting joint positions are clipped to the robot's joint limits before bei
     def _create_reward_markdown_description(self) -> str:
         """Create reward description."""
         # pylint: disable=line-too-long
+        config = self._object_centric_env.config
+        assert isinstance(config, Motion3DEnvConfig)
         return f"""The reward structure is simple:
 - **-1.0** penalty at every timestep until the goal is reached
-- **Termination** occurs when the end effector is within {self._spec.target_radius:.3f}m of the target center
+- **Termination** occurs when the end effector is within {config.target_radius:.3f}m of the target center
 
 This encourages the robot to reach the target as quickly as possible while avoiding infinite episodes.
 """

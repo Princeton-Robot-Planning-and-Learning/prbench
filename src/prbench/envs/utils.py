@@ -1,7 +1,10 @@
 """Utility functions shared across different types of environments."""
 
+import abc
+
 import matplotlib.pyplot as plt
 import numpy as np
+from gymnasium.spaces import Box
 from numpy.typing import NDArray
 from prpl_utils.utils import fig2data
 from relational_structs import (
@@ -33,6 +36,14 @@ from prbench.envs.geom2d.structs import (
 
 PURPLE: tuple[float, float, float] = (128 / 255, 0 / 255, 128 / 255)
 BLACK: tuple[float, float, float] = (0.1, 0.1, 0.1)
+
+
+class RobotActionSpace(Box):
+    """A space for robot actions."""
+
+    @abc.abstractmethod
+    def create_markdown_description(self) -> str:
+        """Create a markdown description of this space."""
 
 
 def get_se2_pose(state: ObjectCentricState, obj: Object) -> SE2Pose:
@@ -79,7 +90,18 @@ def state_2d_has_collision(
     # Check pairwise collisions.
     for obj1 in group1:
         for obj2 in group2:
-            if obj1 == obj2:
+            obj1_static = (
+                state.get(obj1, "static")
+                if "static" in state.type_features[obj1.type]
+                else False
+            )
+            obj2_static = (
+                state.get(obj2, "static")
+                if "static" in state.type_features[obj2.type]
+                else False
+            )
+            if obj1 == obj2 or (obj1_static and obj2_static):
+                # Skip self-collision and static-static collision.
                 continue
             multibody1 = obj_to_multibody[obj1]
             multibody2 = obj_to_multibody[obj2]
@@ -195,6 +217,25 @@ def kin_robot_to_multibody2d(obj: Object, state: ObjectCentricState) -> MultiBod
         theta=theta,
     )
     bodies.append(gripper_base)
+
+    # Arm
+    gripper_base_arm_rel_se2 = SE2Pose(
+        x=(-state.get(obj, "arm_length") / 2 - gripper_base_width / 2),
+        y=0.0,
+        theta=0.0,
+    )
+    arm_se2 = gripper_base_pose * gripper_base_arm_rel_se2
+    rect = Rectangle.from_center(
+        center_x=arm_se2.x,
+        center_y=arm_se2.y,
+        height=gripper_base_width,
+        width=state.get(obj, "arm_length"),
+        rotation_about_center=theta,
+    )
+    z_order = ZOrder.ALL
+    rendering_kwargs = {"facecolor": PURPLE, "edgecolor": BLACK}
+    arm = Body2D(rect, z_order, rendering_kwargs, name="arm")
+    bodies.append(arm)
 
     # Fingers
     relative_dx = state.get(obj, "finger_width") / 2

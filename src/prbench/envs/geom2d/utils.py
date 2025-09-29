@@ -3,7 +3,6 @@
 from typing import Any, Iterable
 
 import numpy as np
-from gymnasium.spaces import Box
 from numpy.typing import NDArray
 from prpl_utils.motion_planning import BiRRT
 from prpl_utils.utils import get_signed_angle_distance, wrap_angle
@@ -15,6 +14,7 @@ from relational_structs import (
 from tomsgeoms2d.structs import Rectangle
 from tomsgeoms2d.utils import find_closest_points, geom2ds_intersect
 
+from prbench.core import RobotActionSpace
 from prbench.envs.geom2d.object_types import (
     DoubleRectType,
     RectangleType,
@@ -35,7 +35,7 @@ from prbench.envs.utils import (
 )
 
 
-class CRVRobotActionSpace(Box):
+class CRVRobotActionSpace(RobotActionSpace):
     """An action space for a CRV robot.
 
     Actions are bounded relative movements of the base and the arm, as well as an

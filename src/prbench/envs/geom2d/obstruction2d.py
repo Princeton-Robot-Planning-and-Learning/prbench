@@ -7,10 +7,10 @@ import numpy as np
 from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 
+from prbench.core import ConstantObjectPRBenchEnv, FinalConfigMeta
 from prbench.envs.geom2d.base_env import (
-    ConstantObjectGeom2DEnv,
-    Geom2DRobotEnv,
-    Geom2DRobotEnvSpec,
+    Geom2DRobotEnvConfig,
+    ObjectCentricGeom2DRobotEnv,
 )
 from prbench.envs.geom2d.object_types import (
     CRVRobotType,
@@ -37,8 +37,8 @@ Geom2DRobotEnvTypeFeatures[TargetSurfaceType] = list(
 
 
 @dataclass(frozen=True)
-class Obstruction2DEnvSpec(Geom2DRobotEnvSpec):
-    """Scene specification for Obstruction2DEnv()."""
+class Obstruction2DEnvConfig(Geom2DRobotEnvConfig, metaclass=FinalConfigMeta):
+    """Config for Obstruction2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
     world_min_x: float = 0.0
@@ -143,74 +143,70 @@ class Obstruction2DEnvSpec(Geom2DRobotEnvSpec):
     render_dpi: int = 250
 
 
-class ObjectCentricObstruction2DEnv(Geom2DRobotEnv):
+class ObjectCentricObstruction2DEnv(
+    ObjectCentricGeom2DRobotEnv[Obstruction2DEnvConfig]
+):
     """Environment where a block must be placed on an obstructed target."""
 
     def __init__(
         self,
         num_obstructions: int = 2,
-        spec: Obstruction2DEnvSpec = Obstruction2DEnvSpec(),
+        config: Obstruction2DEnvConfig = Obstruction2DEnvConfig(),
         **kwargs,
     ) -> None:
-        super().__init__(spec, **kwargs)
+        super().__init__(config, **kwargs)
         self._num_obstructions = num_obstructions
-        self._spec: Obstruction2DEnvSpec = spec  # for type checking
-        initial_state_dict = self._create_constant_initial_state_dict()
-        self._initial_constant_state = create_state_from_dict(
-            initial_state_dict, Geom2DRobotEnvTypeFeatures
-        )
 
     def _sample_initial_state(self) -> ObjectCentricState:
-        assert self._initial_constant_state is not None
-        static_objects = set(self._initial_constant_state)
+        static_objects = set(self.initial_constant_state)
         assert not state_2d_has_collision(
-            self._initial_constant_state,
+            self.initial_constant_state,
             static_objects,
             static_objects,
             {},
         )
-        n = self._spec.max_initial_state_sampling_attempts
+        n = self.config.max_initial_state_sampling_attempts
         for _ in range(n):
             # Sample all randomized values.
             robot_pose = sample_se2_pose(
-                self._spec.robot_init_pose_bounds, self.np_random
+                self.config.robot_init_pose_bounds, self.np_random
             )
             target_block_pose = sample_se2_pose(
-                self._spec.target_block_init_pose_bounds, self.np_random
+                self.config.target_block_init_pose_bounds, self.np_random
             )
             target_block_shape = (
-                self.np_random.uniform(*self._spec.target_block_width_bounds),
-                self.np_random.uniform(*self._spec.target_block_height_bounds),
+                self.np_random.uniform(*self.config.target_block_width_bounds),
+                self.np_random.uniform(*self.config.target_block_height_bounds),
             )
             target_surface_pose = sample_se2_pose(
-                self._spec.target_surface_init_pose_bounds, self.np_random
+                self.config.target_surface_init_pose_bounds, self.np_random
             )
             target_surface_width_addition = self.np_random.uniform(
-                *self._spec.target_surface_width_addition_bounds
+                *self.config.target_surface_width_addition_bounds
             )
             target_surface_shape = (
                 target_block_shape[0] + target_surface_width_addition,
-                self._spec.target_surface_height,
+                self.config.target_surface_height,
             )
             obstructions: list[tuple[SE2Pose, tuple[float, float]]] = []
             for _ in range(self._num_obstructions):
                 obstruction_shape = (
-                    self.np_random.uniform(*self._spec.obstruction_width_bounds),
-                    self.np_random.uniform(*self._spec.obstruction_height_bounds),
+                    self.np_random.uniform(*self.config.obstruction_width_bounds),
+                    self.np_random.uniform(*self.config.obstruction_height_bounds),
                 )
                 obstruction_init_on_target = (
                     self.np_random.uniform()
-                    < self._spec.obstruction_init_on_target_prob
+                    < self.config.obstruction_init_on_target_prob
                 )
                 if obstruction_init_on_target:
-                    old_lb, old_ub = self._spec.obstruction_init_pose_bounds
+                    old_lb, old_ub = self.config.obstruction_init_pose_bounds
                     new_x_lb = target_surface_pose.x - obstruction_shape[0]
                     new_x_ub = target_surface_pose.x + target_surface_shape[0]
                     new_lb = SE2Pose(new_x_lb, old_lb.y, old_lb.theta)
                     new_ub = SE2Pose(new_x_ub, old_ub.y, old_ub.theta)
                     pose_bounds = (new_lb, new_ub)
                 else:
-                    pose_bounds = self._spec.obstruction_init_pose_bounds
+                    pose_bounds = self.config.obstruction_init_pose_bounds
                 obstruction_pose = sample_se2_pose(pose_bounds, self.np_random)
                 obstructions.append((obstruction_pose, obstruction_shape))
             state = self._create_initial_state(
@@ -225,7 +221,7 @@ class ObjectCentricObstruction2DEnv(Geom2DRobotEnv):
             if self._target_satisfied(state, {}):
                 continue
             full_state = state.copy()
-            full_state.data.update(self._initial_constant_state.data)
+            full_state.data.update(self.initial_constant_state.data)
             all_objects = set(full_state)
             if state_2d_has_collision(full_state, all_objects, all_objects, {}):
                 continue
@@ -238,15 +234,15 @@ class ObjectCentricObstruction2DEnv(Geom2DRobotEnv):
         # Create the table.
         table = Object("table", RectangleType)
         init_state_dict[table] = {
-            "x": self._spec.table_pose.x,
-            "y": self._spec.table_pose.y,
-            "theta": self._spec.table_pose.theta,
-            "width": self._spec.table_width,
-            "height": self._spec.table_height,
+            "x": self.config.table_pose.x,
+            "y": self.config.table_pose.y,
+            "theta": self.config.table_pose.theta,
+            "width": self.config.table_width,
+            "height": self.config.table_height,
             "static": True,
-            "color_r": self._spec.table_rgb[0],
-            "color_g": self._spec.table_rgb[1],
-            "color_b": self._spec.table_rgb[2],
+            "color_r": self.config.table_rgb[0],
+            "color_g": self.config.table_rgb[1],
+            "color_b": self.config.table_rgb[2],
             "z_order": ZOrder.ALL.value,
         }
 
@@ -255,10 +251,10 @@ class ObjectCentricObstruction2DEnv(Geom2DRobotEnv):
         min_dx, min_dy = self.action_space.low[:2]
         max_dx, max_dy = self.action_space.high[:2]
         wall_state_dict = create_walls_from_world_boundaries(
-            self._spec.world_min_x,
-            self._spec.world_max_x,
-            self._spec.world_min_y,
-            self._spec.world_max_y,
+            self.config.world_min_x,
+            self.config.world_max_x,
+            self.config.world_min_y,
+            self.config.world_max_y,
             min_dx,
             max_dx,
             min_dy,
@@ -287,12 +283,12 @@ class ObjectCentricObstruction2DEnv(Geom2DRobotEnv):
             "x": robot_pose.x,
             "y": robot_pose.y,
             "theta": robot_pose.theta,
-            "base_radius": self._spec.robot_base_radius,
-            "arm_joint": self._spec.robot_base_radius,  # arm is fully retracted
-            "arm_length": self._spec.robot_arm_length,
+            "base_radius": self.config.robot_base_radius,
+            "arm_joint": self.config.robot_base_radius,  # arm is fully retracted
+            "arm_length": self.config.robot_arm_length,
             "vacuum": 0.0,  # vacuum is off
-            "gripper_height": self._spec.robot_gripper_height,
-            "gripper_width": self._spec.robot_gripper_width,
+            "gripper_height": self.config.robot_gripper_height,
+            "gripper_width": self.config.robot_gripper_width,
         }
 
         # Create the target surface.
@@ -304,9 +300,9 @@ class ObjectCentricObstruction2DEnv(Geom2DRobotEnv):
             "width": target_surface_shape[0],
             "height": target_surface_shape[1],
             "static": True,
-            "color_r": self._spec.target_surface_rgb[0],
-            "color_g": self._spec.target_surface_rgb[1],
-            "color_b": self._spec.target_surface_rgb[2],
+            "color_r": self.config.target_surface_rgb[0],
+            "color_g": self.config.target_surface_rgb[1],
+            "color_b": self.config.target_surface_rgb[2],
             "z_order": ZOrder.NONE.value,
         }
 
@@ -319,9 +315,9 @@ class ObjectCentricObstruction2DEnv(Geom2DRobotEnv):
             "width": target_block_shape[0],
             "height": target_block_shape[1],
             "static": False,
-            "color_r": self._spec.target_block_rgb[0],
-            "color_g": self._spec.target_block_rgb[1],
-            "color_b": self._spec.target_block_rgb[2],
+            "color_r": self.config.target_block_rgb[0],
+            "color_g": self.config.target_block_rgb[1],
+            "color_b": self.config.target_block_rgb[2],
             "z_order": ZOrder.ALL.value,
         }
 
@@ -335,9 +331,9 @@ class ObjectCentricObstruction2DEnv(Geom2DRobotEnv):
                 "width": obstruction_shape[0],
                 "height": obstruction_shape[1],
                 "static": False,
-                "color_r": self._spec.obstruction_rgb[0],
-                "color_g": self._spec.obstruction_rgb[1],
-                "color_b": self._spec.obstruction_rgb[2],
+                "color_r": self.config.obstruction_rgb[0],
+                "color_g": self.config.obstruction_rgb[1],
+                "color_b": self.config.obstruction_rgb[2],
                 "z_order": ZOrder.ALL.value,
             }
 
@@ -368,10 +364,12 @@ class ObjectCentricObstruction2DEnv(Geom2DRobotEnv):
         return -1.0, terminated
 
 
-class Obstruction2DEnv(ConstantObjectGeom2DEnv):
+class Obstruction2DEnv(ConstantObjectPRBenchEnv):
     """Obstruction 2D env with a constant number of objects."""
 
-    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom2DRobotEnv:
+    def _create_object_centric_env(
+        self, *args, **kwargs
+    ) -> ObjectCentricGeom2DRobotEnv:
         return ObjectCentricObstruction2DEnv(*args, **kwargs)
 
     def _get_constant_object_names(

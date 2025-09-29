@@ -16,6 +16,8 @@ Unless you have had a direct conversation with a maintainer, this code is not re
 
 ## :zap: Usage Example
 
+### Basic Usage (Gym API)
+
 ```python
 import prbench
 prbench.register_all_environments()
@@ -26,67 +28,48 @@ next_obs, reward, terminated, truncated, info = env.step(action)
 img = env.render()  
 ```
 
----
+### Object-Centric States
 
-# TidyBot Integration with PRBench
+All environments in PRBench use object-centric states. For example:
 
-This section describes the integration of TidyBot 3D mobile manipulation environments into PRBench.
+```python
+from prbench.envs.geom2d.obstruction2d import ObjectCentricObstruction2DEnv
+env = ObjectCentricObstruction2DEnv(num_obstructions=3)
+obs, _ = env.reset(seed=123)
+print(obs.pretty_str())
+```
+Here, `obs` is an [ObjectCentricState](https://github.com/tomsilver/relational-structs/blob/main/src/relational_structs/object_centric_state.py#L25), and the printout is:
+```
+############################################################### STATE ###############################################################
+type: crv_robot           x         y    theta    base_radius    arm_joint    arm_length    vacuum    gripper_height    gripper_width
+-----------------  --------  --------  -------  -------------  -----------  ------------  --------  ----------------  ---------------
+robot              0.885039  0.803795  -1.5708            0.1          0.1           0.2         0              0.07             0.01
 
-## Usage
+type: rectangle           x         y    theta    static    color_r    color_g    color_b    z_order      width     height
+-----------------  --------  --------  -------  --------  ---------  ---------  ---------  ---------  ---------  ---------
+obstruction0       0.422462  0.100001        0         0       0.75        0.1        0.1        100  0.132224   0.0766399
+obstruction1       0.804663  0.100001        0         0       0.75        0.1        0.1        100  0.0805652  0.0955062
+obstruction2       0.559246  0.100001        0         0       0.75        0.1        0.1        100  0.12608    0.180172
 
-### Basic Usage
+type: target_block          x         y    theta    static    color_r    color_g    color_b    z_order     width    height
+--------------------  -------  --------  -------  --------  ---------  ---------  ---------  ---------  --------  --------
+target_block          1.20082  0.100001        0         0   0.501961          0   0.501961        100  0.138302  0.155183
 
-Table environment
+type: target_surface           x    y    theta    static    color_r    color_g    color_b    z_order     width    height
+----------------------  --------  ---  -------  --------  ---------  ---------  ---------  ---------  --------  --------
+target_surface          0.499675    0        0         1   0.501961          0   0.501961        101  0.180286       0.1
+#####################################################################################################################################
+```
+
+For compatibility with baselines, the observations provided by the main environments are vectors. It is easy to convert between vectors and object-centric states. For example:
 ```python
 import prbench
 prbench.register_all_environments()
-env = prbench.make(
-    "prbench/TidyBot3D-table-o5-v0",
-    render_images=True,
-    show_viewer=True,
-    show_images=True
-    )
-obs, info = env.reset(seed=123)
-action = env.action_space.sample()
-obs, reward, terminated, truncated, info = env.step(action)
-img = env.render()
-env.close()
+env = prbench.make("prbench/Obstruction2D-o3-v0")
+vec_obs, _ = env.reset(seed=123)
+object_centric_obs = env.observation_space.devectorize(vec_obs)
+recovered_vec_obs = env.observation_space.vectorize(object_centric_obs)
 ```
-
-Cupboard environment
-```python
-import prbench
-prbench.register_all_environments()
-env = prbench.make(
-    "prbench/TidyBot3D-cupboard-o8-v0",
-    render_images=True,
-    show_viewer=True,
-    show_images=True
-    )
-obs, info = env.reset(seed=123)
-action = env.action_space.sample()
-obs, reward, terminated, truncated, info = env.step(action)
-img = env.render()
-env.close()
-```
-
-### Action Space
-
-The action space is 11-dimensional:
-- `base_pose[3]`: Mobile base position (x, y) and orientation (theta)
-- `arm_pos[3]`: End effector position (x, y, z)
-- `arm_quat[4]`: End effector orientation as quaternion (x, y, z, w)
-- `gripper_pos[1]`: Gripper position (0=closed, 1=open)
-
-### Observation Space
-
-The observation space includes:
-- Robot state: base pose, arm position/orientation, gripper state
-- Object states: positions and orientations of all objects
-- Camera images: RGB images from base and wrist cameras
-- Scene-specific features: handle positions for cabinets/drawers
-
----
 
 ## :muscle: Challenges for Existing Approaches
 
@@ -120,7 +103,15 @@ PRBench does not provide any models for TAMP. Users are welcome to engineer thei
 
 ### :wrench: Installation
 1. Recommended: create and source a virtualenv (perhaps with [uv](https://github.com/astral-sh/uv))
-2. `pip install -e ".[develop]"`
+2. Choose one of the following based on you need:
+    - `pip install -e .` - Installs only core dependencies (matplotlib, numpy, relational_structs, prpl_utils)
+    - `pip install -e .[all]` - Installs everything (excluding develop)
+    - `pip install -e .[geom2d]` - Installs only core + geom2d dependencies (no pybullet)
+    - `pip install -e .[dynamic2d]` - Installs only core + dynamic2d dependencies
+    - `pip install -e .[tidybot]` - Installs only core + tidybot dependencies
+    - `pip install -e .[geom3d]` - Installs only core + geom3d dependencies
+    - `pip install -e .[develop]` - Installs only core + development tools
+    - Compositionally install the dependencies like `[geom2d,develop]`
 3. `pre-commit install`
 
 ### :microscope: Check Installation
@@ -144,12 +135,12 @@ Here is an example of demo collection.
 ### :oncoming_automobile: Roadmap
 For specific environments, we will use issue tracking. Here are higher level TODOs:
 
-- [ ] Decide which simulator(s) to use for 3D environments
+- [x] Decide which simulator(s) to use for 3D environments
 - [ ] Determine what metrics we want to record, and how
 - [ ] Run reinforcement learning baselines
 - [ ] Run VLM/VLA baselines
 - [ ] Create interface to PDDLStream
-- [ ] Create interface to "task then motion planning"
+- [x] Create interface to "task then motion planning"
 - [ ] Run "code as policies" type baselines
 - [ ] Collect at least 100 demonstrations per environment
 - [ ] Run imitation learning baselines

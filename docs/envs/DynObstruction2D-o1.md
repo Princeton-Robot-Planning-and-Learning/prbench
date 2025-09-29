@@ -20,7 +20,7 @@ Each object includes physics properties like mass, moment of inertia (for dynami
 ![initial state GIF](assets/initial_state_gifs/DynObstruction2D-o1.gif)
 
 ### Example Demonstration
-![demo GIF](assets/demo_gifs/DynObstruction2D-o1.gif)
+![demo GIF](assets/demo_gifs/DynObstruction2D-o1/DynObstruction2D-o1_seed0_1757345185.gif)
 
 ### Observation Space
 The entries of an array in this Box space correspond to the following object features:
@@ -68,10 +68,10 @@ The entries of an array in this Box space correspond to the following object fea
 | 39 | obstruction0 | height |
 | 40 | obstruction0 | mass |
 | 41 | robot | x |
-| 42 | robot | vx |
-| 43 | robot | y |
-| 44 | robot | vy |
-| 45 | robot | theta |
+| 42 | robot | y |
+| 43 | robot | theta |
+| 44 | robot | vx |
+| 45 | robot | vy |
 | 46 | robot | omega |
 | 47 | robot | static |
 | 48 | robot | base_radius |

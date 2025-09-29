@@ -7,10 +7,10 @@ from relational_structs import Object, ObjectCentricState, Type
 from relational_structs.utils import create_state_from_dict
 from tomsgeoms2d.structs import Rectangle
 
+from prbench.core import ConstantObjectPRBenchEnv, FinalConfigMeta
 from prbench.envs.geom2d.base_env import (
-    ConstantObjectGeom2DEnv,
-    Geom2DRobotEnv,
-    Geom2DRobotEnvSpec,
+    Geom2DRobotEnvConfig,
+    ObjectCentricGeom2DRobotEnv,
 )
 from prbench.envs.geom2d.object_types import (
     CRVRobotType,
@@ -37,8 +37,8 @@ Geom2DRobotEnvTypeFeatures[ShelfType] = list(Geom2DRobotEnvTypeFeatures[DoubleRe
 
 
 @dataclass(frozen=True)
-class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
-    """Scene specification for ClutteredStorage2DEnv()."""
+class ClutteredStorage2DEnvConfig(Geom2DRobotEnvConfig, metaclass=FinalConfigMeta):
+    """Config for ClutteredStorage2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
     world_min_x: float = 0.0
@@ -145,7 +145,9 @@ class ClutteredStorage2DEnvSpec(Geom2DRobotEnvSpec):
         return [(x, y) for x in xs]
 
 
-class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
+class ObjectCentricClutteredStorage2DEnv(
+    ObjectCentricGeom2DRobotEnv[ClutteredStorage2DEnvConfig]
+):
     """Cluttered environment where blocks must be stored on a shelf.
 
     This is an object-centric environment. The vectorized version with Box spaces is
@@ -155,36 +157,26 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
     def __init__(
         self,
         num_blocks: int = 3,
-        spec: ClutteredStorage2DEnvSpec = ClutteredStorage2DEnvSpec(),
+        config: ClutteredStorage2DEnvConfig = ClutteredStorage2DEnvConfig(),
         **kwargs,
     ) -> None:
-        super().__init__(spec, **kwargs)
+        super().__init__(config, **kwargs)
         assert num_blocks % 2 == 1, "Number of blocks must be odd"
         self._num_init_shelf_blocks = num_blocks // 2
         self._num_init_outside_blocks = num_blocks - self._num_init_shelf_blocks
-        self._spec: ClutteredStorage2DEnvSpec = spec  # for type checking
-        self.metadata = {
-            "render_modes": ["rgb_array"],
-            "render_fps": self._spec.render_fps,
-        }
-        initial_state_dict = self._create_constant_initial_state_dict()
-        self._initial_constant_state = create_state_from_dict(
-            initial_state_dict, Geom2DRobotEnvTypeFeatures
-        )
 
     def _sample_initial_state(self) -> ObjectCentricState:
-        assert self._initial_constant_state is not None
-        static_objects = set(self._initial_constant_state)
+        static_objects = set(self.initial_constant_state)
         # Sample robot pose.
-        robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
+        robot_pose = sample_se2_pose(self.config.robot_init_pose_bounds, self.np_random)
         # Sample shelf pose.
-        shelf_init_pose_bounds = self._spec.get_shelf_init_pose_bounds(
+        shelf_init_pose_bounds = self.config.get_shelf_init_pose_bounds(
             self._num_init_shelf_blocks
         )
         shelf_pose = sample_se2_pose(shelf_init_pose_bounds, self.np_random)
         # Sample the target block rotations for those in the shelf.
         shelf_target_block_rotations = self.np_random.uniform(
-            *self._spec.target_block_in_shelf_rotation_bounds,
+            *self.config.target_block_in_shelf_rotation_bounds,
             size=self._num_init_shelf_blocks,
         ).tolist()
         state = self._create_initial_state(
@@ -192,19 +184,19 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         )
         robot = state.get_objects(CRVRobotType)[0]
         full_state = state.copy()
-        full_state.data.update(self._initial_constant_state.data)
+        full_state.data.update(self.initial_constant_state.data)
         assert not state_2d_has_collision(full_state, {robot}, static_objects, {})
         # Sample target block poses for those outside the shelf.
         target_block_outside_poses: list[SE2Pose] = []
         for _ in range(self._num_init_outside_blocks):
-            for _ in range(self._spec.max_init_sampling_attempts):
+            for _ in range(self.config.max_init_sampling_attempts):
                 pose = sample_se2_pose(
-                    self._spec.target_block_out_of_shelf_pose_bounds, self.np_random
+                    self.config.target_block_out_of_shelf_pose_bounds, self.np_random
                 )
                 # Make sure in bounds.
                 if not (
-                    self._spec.world_min_x < pose.x < self._spec.world_max_x
-                    and self._spec.world_min_y < pose.y < self._spec.world_max_y
+                    self.config.world_min_x < pose.x < self.config.world_max_x
+                    and self.config.world_min_y < pose.y < self.config.world_max_y
                 ):
                     continue
                 # Check for collisions.
@@ -218,7 +210,7 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
                 num_blocks = sum(b.startswith("block") for b in obj_name_to_obj)
                 new_block = obj_name_to_obj[f"block{num_blocks-1}"]
                 full_state = state.copy()
-                full_state.data.update(self._initial_constant_state.data)
+                full_state.data.update(self.initial_constant_state.data)
                 if not state_2d_has_collision(
                     full_state, {new_block}, set(full_state), {}
                 ):
@@ -238,10 +230,10 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         min_dx, min_dy = self.action_space.low[:2]
         max_dx, max_dy = self.action_space.high[:2]
         wall_state_dict = create_walls_from_world_boundaries(
-            self._spec.world_min_x,
-            self._spec.world_max_x,
-            self._spec.world_min_y,
-            self._spec.world_max_y,
+            self.config.world_min_x,
+            self.config.world_max_x,
+            self.config.world_min_y,
+            self.config.world_max_y,
             min_dx,
             max_dx,
             min_dy,
@@ -260,7 +252,7 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
     ) -> ObjectCentricState:
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
-        assert self._initial_constant_state is not None
+        assert self.initial_constant_state is not None
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.
@@ -269,33 +261,33 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
             "x": robot_pose.x,
             "y": robot_pose.y,
             "theta": robot_pose.theta,
-            "base_radius": self._spec.robot_base_radius,
-            "arm_joint": self._spec.robot_base_radius,  # arm is fully retracted
-            "arm_length": self._spec.robot_arm_length,
+            "base_radius": self.config.robot_base_radius,
+            "arm_joint": self.config.robot_base_radius,  # arm is fully retracted
+            "arm_length": self.config.robot_arm_length,
             "vacuum": 0.0,  # vacuum is off
-            "gripper_height": self._spec.robot_gripper_height,
-            "gripper_width": self._spec.robot_gripper_width,
+            "gripper_height": self.config.robot_gripper_height,
+            "gripper_width": self.config.robot_gripper_width,
         }
 
         # Create the shelf.
         shelf = Object("shelf", ShelfType)
-        shelf_width = self._spec.get_shelf_width(self._num_init_shelf_blocks)
+        shelf_width = self.config.get_shelf_width(self._num_init_shelf_blocks)
         init_state_dict[shelf] = {
             "x1": shelf_pose.x,
             "y1": shelf_pose.y,
             "theta1": shelf_pose.theta,
             "width1": shelf_width,
-            "height1": self._spec.shelf_height,
+            "height1": self.config.shelf_height,
             "static": True,
-            "color_r1": self._spec.shelf_rgb[0],
-            "color_g1": self._spec.shelf_rgb[1],
-            "color_b1": self._spec.shelf_rgb[2],
+            "color_r1": self.config.shelf_rgb[0],
+            "color_g1": self.config.shelf_rgb[1],
+            "color_b1": self.config.shelf_rgb[2],
             "z_order1": ZOrder.NONE.value,
-            "x": self._spec.world_min_x,
+            "x": self.config.world_min_x,
             "y": shelf_pose.y,
             "theta": shelf_pose.theta,
-            "width": self._spec.world_max_x - self._spec.world_min_x,
-            "height": self._spec.shelf_height,
+            "width": self.config.world_max_x - self.config.world_min_x,
+            "height": self.config.shelf_height,
             "color_r": BLACK[0],
             "color_g": BLACK[1],
             "color_b": BLACK[2],
@@ -306,7 +298,7 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         # them horizontally and apply rotations.
         block_num = 0
         target_block_in_shelf_center_positions = (
-            self._spec.get_target_block_in_shelf_center_positions(
+            self.config.get_target_block_in_shelf_center_positions(
                 self._num_init_shelf_blocks, shelf_pose
             )
         )
@@ -320,8 +312,8 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
             rect = Rectangle.from_center(
                 center_x,
                 center_y,
-                self._spec.target_block_shape[0],
-                self._spec.target_block_shape[1],
+                self.config.target_block_shape[0],
+                self.config.target_block_shape[1],
                 rot,
             )
             init_state_dict[block] = {
@@ -331,9 +323,9 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
                 "width": rect.width,
                 "height": rect.height,
                 "static": False,
-                "color_r": self._spec.target_block_rgb[0],
-                "color_g": self._spec.target_block_rgb[1],
-                "color_b": self._spec.target_block_rgb[2],
+                "color_r": self.config.target_block_rgb[0],
+                "color_g": self.config.target_block_rgb[1],
+                "color_b": self.config.target_block_rgb[2],
                 "z_order": ZOrder.SURFACE.value,
             }
 
@@ -346,12 +338,12 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
                     "x": pose.x,
                     "y": pose.y,
                     "theta": pose.theta,
-                    "width": self._spec.target_block_shape[0],
-                    "height": self._spec.target_block_shape[1],
+                    "width": self.config.target_block_shape[0],
+                    "height": self.config.target_block_shape[1],
                     "static": False,
-                    "color_r": self._spec.target_block_rgb[0],
-                    "color_g": self._spec.target_block_rgb[1],
-                    "color_b": self._spec.target_block_rgb[2],
+                    "color_r": self.config.target_block_rgb[0],
+                    "color_g": self.config.target_block_rgb[1],
+                    "color_b": self.config.target_block_rgb[2],
                     "z_order": ZOrder.SURFACE.value,
                 }
 
@@ -374,10 +366,12 @@ class ObjectCentricClutteredStorage2DEnv(Geom2DRobotEnv):
         return -1.0, terminated
 
 
-class ClutteredStorage2DEnv(ConstantObjectGeom2DEnv):
+class ClutteredStorage2DEnv(ConstantObjectPRBenchEnv):
     """Cluttered storage 2D env with a constant number of objects."""
 
-    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom2DRobotEnv:
+    def _create_object_centric_env(
+        self, *args, **kwargs
+    ) -> ObjectCentricGeom2DRobotEnv:
         return ObjectCentricClutteredStorage2DEnv(*args, **kwargs)
 
     def _get_constant_object_names(

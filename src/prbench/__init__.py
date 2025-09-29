@@ -49,7 +49,7 @@ def register_all_environments() -> None:
         )
 
     # Motion2D environment with different numbers of passages.
-    num_passages = [1, 2, 3, 4, 5]
+    num_passages = [0, 1, 2, 3, 4, 5]
     for num_passage in num_passages:
         _register(
             id=f"prbench/Motion2D-p{num_passage}-v0",
@@ -90,6 +90,15 @@ def register_all_environments() -> None:
         id="prbench/Motion3D-v0",
         entry_point="prbench.envs.geom3d.motion3d:Motion3DEnv",
     )
+
+    # Obstructions3D environment with different numbers of obstructions.
+    num_obstructions = [0, 1, 2, 3, 4]
+    for num_obstruction in num_obstructions:
+        _register(
+            id=f"prbench/Obstruction3D-o{num_obstruction}-v0",
+            entry_point="prbench.envs.geom3d.obstruction3d:Obstruction3DEnv",
+            kwargs={"num_obstructions": num_obstruction},
+        )
 
     # ******* Dynamic3D Environments *******
 

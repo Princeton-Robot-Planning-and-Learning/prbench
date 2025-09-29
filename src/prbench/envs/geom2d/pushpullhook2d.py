@@ -7,10 +7,10 @@ from numpy.typing import NDArray
 from relational_structs import Object, ObjectCentricState
 from relational_structs.utils import create_state_from_dict
 
+from prbench.core import ConstantObjectPRBenchEnv, FinalConfigMeta
 from prbench.envs.geom2d.base_env import (
-    ConstantObjectGeom2DEnv,
-    Geom2DRobotEnv,
-    Geom2DRobotEnvSpec,
+    Geom2DRobotEnvConfig,
+    ObjectCentricGeom2DRobotEnv,
 )
 from prbench.envs.geom2d.object_types import (
     CircleType,
@@ -29,8 +29,8 @@ from prbench.envs.utils import BLACK, sample_se2_pose, state_2d_has_collision
 
 
 @dataclass(frozen=True)
-class PushPullHook2DEnvSpec(Geom2DRobotEnvSpec):
-    """Spec for PushPullHook2DEnv()."""
+class PushPullHook2DEnvConfig(Geom2DRobotEnvConfig, metaclass=FinalConfigMeta):
+    """Config for PushPullHook2DEnv()."""
 
     # World boundaries. Standard coordinate frame with (0, 0) in bottom left.
     world_min_x: float = 0.0
@@ -133,7 +133,9 @@ class PushPullHook2DEnvSpec(Geom2DRobotEnvSpec):
 
 
 # Object-centric environment class
-class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
+class ObjectCentricPushPullHook2DEnv(
+    ObjectCentricGeom2DRobotEnv[PushPullHook2DEnvConfig]
+):
     """Environment with a hook, a movable button and a target button.
 
     The robot or hook cannot directly press the target button.
@@ -143,33 +145,25 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
     contact with it.
     """
 
-    def __init__(self, spec: PushPullHook2DEnvSpec = PushPullHook2DEnvSpec(), **kwargs):
-        super().__init__(spec, **kwargs)
-        self._spec: PushPullHook2DEnvSpec = spec
-        self.metadata = {
-            "render_modes": ["rgb_array"],
-            "render_fps": self._spec.render_fps,
-        }
-        initial_state_dict = self._create_constant_initial_state_dict()
-        self._initial_constant_state = create_state_from_dict(
-            initial_state_dict, Geom2DRobotEnvTypeFeatures
-        )
+    def __init__(
+        self, config: PushPullHook2DEnvConfig = PushPullHook2DEnvConfig(), **kwargs
+    ) -> None:
+        super().__init__(config, **kwargs)
 
     def _sample_initial_state(self) -> ObjectCentricState:
         # Sample initial robot pose.
-        assert self._initial_constant_state is not None
-        robot_pose = sample_se2_pose(self._spec.robot_init_pose_bounds, self.np_random)
+        robot_pose = sample_se2_pose(self.config.robot_init_pose_bounds, self.np_random)
 
         # Sample hook pose.
-        for _ in range(self._spec.max_init_sampling_attempts):
+        for _ in range(self.config.max_init_sampling_attempts):
             hook_pose = sample_se2_pose(
-                self._spec.hook_init_pose_bounds, self.np_random
+                self.config.hook_init_pose_bounds, self.np_random
             )
             movable_button_pose = tuple(
-                self.np_random.uniform(*self._spec.movable_button_init_position_bounds)
+                self.np_random.uniform(*self.config.movable_button_init_position_bounds)
             )
             target_button_pose = tuple(
-                self.np_random.uniform(*self._spec.target_button_init_position_bounds)
+                self.np_random.uniform(*self.config.target_button_init_position_bounds)
             )
             state = self._create_initial_state(
                 robot_pose,
@@ -192,7 +186,7 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
             )
 
             full_state = state.copy()
-            full_state.data.update(self._initial_constant_state.data)
+            full_state.data.update(self.initial_constant_state.data)
             if (
                 not state_2d_has_collision(
                     full_state,
@@ -200,9 +194,9 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
                     set(full_state),
                     {},
                 )
-                and 3 * self._spec.movable_button_radius
+                and 3 * self.config.movable_button_radius
                 < dist_movable_button
-                < 6 * self._spec.movable_button_radius
+                < 6 * self.config.movable_button_radius
             ):
                 break
         else:
@@ -226,10 +220,10 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         min_dx, min_dy = self.action_space.low[:2]
         max_dx, max_dy = self.action_space.high[:2]
         wall_state_dict = create_walls_from_world_boundaries(
-            self._spec.world_min_x,
-            self._spec.world_max_x,
-            self._spec.world_min_y,
-            self._spec.world_max_y,
+            self.config.world_min_x,
+            self.config.world_max_x,
+            self.config.world_min_y,
+            self.config.world_max_y,
             min_dx,
             max_dx,
             min_dy,
@@ -240,15 +234,15 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         # Create the table.
         table = Object("table", RectangleType)
         init_state_dict[table] = {
-            "x": self._spec.table_pose.x,
-            "y": self._spec.table_pose.y,
-            "theta": self._spec.table_pose.theta,
-            "width": self._spec.table_shape[0],
-            "height": self._spec.table_shape[1],
+            "x": self.config.table_pose.x,
+            "y": self.config.table_pose.y,
+            "theta": self.config.table_pose.theta,
+            "width": self.config.table_shape[0],
+            "height": self.config.table_shape[1],
             "static": True,
-            "color_r": self._spec.table_rgb[0],
-            "color_g": self._spec.table_rgb[1],
-            "color_b": self._spec.table_rgb[2],
+            "color_r": self.config.table_rgb[0],
+            "color_g": self.config.table_rgb[1],
+            "color_b": self.config.table_rgb[2],
             "z_order": ZOrder.FLOOR.value,
         }
 
@@ -264,7 +258,7 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
     ) -> ObjectCentricState:
         # Shallow copy should be okay because the constant objects should not
         # ever change in this method.
-        assert self._initial_constant_state is not None
+        assert self.initial_constant_state is not None
         init_state_dict: dict[Object, dict[str, float]] = {}
 
         # Create the robot.
@@ -273,12 +267,12 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
             "x": robot_pose.x,
             "y": robot_pose.y,
             "theta": robot_pose.theta,
-            "base_radius": self._spec.robot_base_radius,
-            "arm_joint": self._spec.robot_base_radius,  # arm is fully retracted
-            "arm_length": self._spec.robot_arm_length,
+            "base_radius": self.config.robot_base_radius,
+            "arm_joint": self.config.robot_base_radius,  # arm is fully retracted
+            "arm_length": self.config.robot_arm_length,
             "vacuum": 0.0,  # vacuum is off
-            "gripper_height": self._spec.robot_gripper_height,
-            "gripper_width": self._spec.robot_gripper_width,
+            "gripper_height": self.config.robot_gripper_height,
+            "gripper_width": self.config.robot_gripper_width,
         }
 
         # Create the hook.
@@ -287,13 +281,13 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
             "x": hook_pose.x,
             "y": hook_pose.y,
             "theta": hook_pose.theta,
-            "width": self._spec.hook_shape[0],
-            "length_side1": self._spec.hook_shape[1],
-            "length_side2": self._spec.hook_shape[2],
+            "width": self.config.hook_shape[0],
+            "length_side1": self.config.hook_shape[1],
+            "length_side2": self.config.hook_shape[2],
             "static": False,
-            "color_r": self._spec.hook_rgb[0],
-            "color_g": self._spec.hook_rgb[1],
-            "color_b": self._spec.hook_rgb[2],
+            "color_r": self.config.hook_rgb[0],
+            "color_g": self.config.hook_rgb[1],
+            "color_b": self.config.hook_rgb[2],
             "z_order": ZOrder.SURFACE.value,
         }
 
@@ -304,11 +298,11 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
                 "x": movable_button_pose[0],
                 "y": movable_button_pose[1],
                 "theta": 0,
-                "radius": self._spec.movable_button_radius,
+                "radius": self.config.movable_button_radius,
                 "static": False,
-                "color_r": self._spec.movable_button_unpressed_rgb[0],
-                "color_g": self._spec.movable_button_unpressed_rgb[1],
-                "color_b": self._spec.movable_button_unpressed_rgb[2],
+                "color_r": self.config.movable_button_unpressed_rgb[0],
+                "color_g": self.config.movable_button_unpressed_rgb[1],
+                "color_b": self.config.movable_button_unpressed_rgb[2],
                 "z_order": ZOrder.SURFACE.value,
             }
 
@@ -318,11 +312,11 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
                 "x": target_button_pose[0],
                 "y": target_button_pose[1],
                 "theta": 0,
-                "radius": self._spec.target_button_radius,
+                "radius": self.config.target_button_radius,
                 "static": True,
-                "color_r": self._spec.target_button_unpressed_rgb[0],
-                "color_g": self._spec.target_button_unpressed_rgb[1],
-                "color_b": self._spec.target_button_unpressed_rgb[2],
+                "color_r": self.config.target_button_unpressed_rgb[0],
+                "color_g": self.config.target_button_unpressed_rgb[1],
+                "color_b": self.config.target_button_unpressed_rgb[2],
                 "z_order": target_button_z_order.value,
             }
 
@@ -334,23 +328,23 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         assert self._current_state is not None
         if button.name == "movable_button":
             self._current_state.set(
-                button, "color_r", self._spec.movable_button_pressed_rgb[0]
+                button, "color_r", self.config.movable_button_pressed_rgb[0]
             )
             self._current_state.set(
-                button, "color_g", self._spec.movable_button_pressed_rgb[1]
+                button, "color_g", self.config.movable_button_pressed_rgb[1]
             )
             self._current_state.set(
-                button, "color_b", self._spec.movable_button_pressed_rgb[2]
+                button, "color_b", self.config.movable_button_pressed_rgb[2]
             )
         elif button.name == "target_button":
             self._current_state.set(
-                button, "color_r", self._spec.target_button_pressed_rgb[0]
+                button, "color_r", self.config.target_button_pressed_rgb[0]
             )
             self._current_state.set(
-                button, "color_g", self._spec.target_button_pressed_rgb[1]
+                button, "color_g", self.config.target_button_pressed_rgb[1]
             )
             self._current_state.set(
-                button, "color_b", self._spec.target_button_pressed_rgb[2]
+                button, "color_b", self.config.target_button_pressed_rgb[2]
             )
             del self._static_object_body_cache[button]
         return self._current_state
@@ -360,23 +354,23 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         assert self._current_state is not None
         if button.name == "movable_button":
             self._current_state.set(
-                button, "color_r", self._spec.movable_button_unpressed_rgb[0]
+                button, "color_r", self.config.movable_button_unpressed_rgb[0]
             )
             self._current_state.set(
-                button, "color_g", self._spec.movable_button_unpressed_rgb[1]
+                button, "color_g", self.config.movable_button_unpressed_rgb[1]
             )
             self._current_state.set(
-                button, "color_b", self._spec.movable_button_unpressed_rgb[2]
+                button, "color_b", self.config.movable_button_unpressed_rgb[2]
             )
         elif button.name == "target_button":
             self._current_state.set(
-                button, "color_r", self._spec.target_button_unpressed_rgb[0]
+                button, "color_r", self.config.target_button_unpressed_rgb[0]
             )
             self._current_state.set(
-                button, "color_g", self._spec.target_button_unpressed_rgb[1]
+                button, "color_g", self.config.target_button_unpressed_rgb[1]
             )
             self._current_state.set(
-                button, "color_b", self._spec.target_button_unpressed_rgb[2]
+                button, "color_b", self.config.target_button_unpressed_rgb[2]
             )
             del self._static_object_body_cache[button]
         return self._current_state
@@ -388,7 +382,7 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
         If robot travels in opposite direction, button disconnects and does not move.
         """
         assert self._current_state is not None
-        assert self._initial_constant_state is not None
+        assert self.initial_constant_state is not None
 
         hook = self._current_state.get("hook")
         button = self._current_state.get("movable_button")
@@ -400,7 +394,7 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
     ) -> tuple[ObjectCentricState, float, bool, bool, dict]:
         super().step(action)
         assert self._current_state is not None
-        assert self._initial_constant_state is not None
+        assert self.initial_constant_state is not None
         obj_name_to_obj = {o.name: o for o in self._current_state}
         movable_button = obj_name_to_obj["movable_button"]
         target_button = obj_name_to_obj["target_button"]
@@ -415,7 +409,7 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
             ]
         )
         dist = np.linalg.norm(button_to_target)
-        success = dist < self._spec.target_button_radius * 2
+        success = dist < self.config.target_button_radius * 2
         if success:
             self.press_button(target_button)
 
@@ -458,17 +452,19 @@ class ObjectCentricPushPullHook2DEnv(Geom2DRobotEnv):
             self._current_state.get(target_button, "color_b"),
         )
         terminated = np.allclose(
-            movable_color, self._spec.movable_button_pressed_rgb
-        ) and np.allclose(target_color, self._spec.target_button_pressed_rgb)
+            movable_color, self.config.movable_button_pressed_rgb
+        ) and np.allclose(target_color, self.config.target_button_pressed_rgb)
         reward = 1.0 if terminated else -1.0
         return reward, terminated
 
 
 # Main env class
-class PushPullHook2DEnv(ConstantObjectGeom2DEnv):
+class PushPullHook2DEnv(ConstantObjectPRBenchEnv):
     """Push-pull hook 2D env with a constant number of objects."""
 
-    def _create_object_centric_geom2d_env(self, *args, **kwargs) -> Geom2DRobotEnv:
+    def _create_object_centric_env(
+        self, *args, **kwargs
+    ) -> ObjectCentricGeom2DRobotEnv:
         return ObjectCentricPushPullHook2DEnv(*args, **kwargs)
 
     def _get_constant_object_names(
