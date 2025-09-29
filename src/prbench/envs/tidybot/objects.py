@@ -5,8 +5,7 @@ from typing import Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
-from relational_structs import Object, ObjectCentricState, Type
-from relational_structs.utils import create_state_from_dict
+from relational_structs import Object
 
 from prbench.envs.tidybot.mujoco_utils import MujocoEnv
 from prbench.envs.tidybot.object_types import MujocoObjectType
