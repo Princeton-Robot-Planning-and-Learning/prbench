@@ -2,8 +2,10 @@
 step, and reset."""
 
 import numpy as np
+from relational_structs import ObjectCentricState
 
 from prbench.envs.tidybot.mujoco_utils import MjAct
+from prbench.envs.tidybot.object_types import MujocoObjectType, MujocoObjectTypeFeatures
 from prbench.envs.tidybot.tidybot3d import TidyBot3DEnv
 
 
@@ -105,4 +107,40 @@ def test_tidybot3d_set_get_object_pos_quat_consistency():
         assert all(
             abs(o - u) < 1e-5 for o, u in zip(new_quat, updated_quat)
         ), "Orientation not set correctly"
+    env.close()
+
+
+def test_tidybot3d_object_centric_data():
+    """Test that mujoco objects' get_object_centric_data() returns a valid
+    ObjectCentricState."""
+    env = TidyBot3DEnv(num_objects=3, render_images=False)
+    env.reset()
+    for obj in env._objects:  # pylint: disable=protected-access
+        data = obj.get_object_centric_data()
+        assert isinstance(data, dict), "Object-centric data should be a dict"
+        object_state_type = obj.object_state_type.type
+        expected_keys = set(MujocoObjectTypeFeatures[object_state_type])
+        assert expected_keys.issubset(
+            data.keys()
+        ), f"Data keys missing, expected at least {expected_keys}"
+    env.close()
+
+
+def test_tidybot3d_env_object_centric_state():
+    """Test that the environment's observation includes valid object-centric states."""
+    num_objects = 3
+    env = TidyBot3DEnv(num_objects=num_objects, render_images=False)
+    obs, _ = env.reset()
+    object_centric_state = obs.get("object_centric_state", {})
+    assert isinstance(
+        object_centric_state, ObjectCentricState
+    ), "Object-centric state should be a dict"
+    assert (
+        len(object_centric_state.data) == num_objects
+    ), "Incorrect number of objects in state"
+    object_state_type = MujocoObjectType  # All objects should be of this type
+    for _, state in object_centric_state.data.items():
+        assert len(state) == len(
+            MujocoObjectTypeFeatures[object_state_type]
+        ), "State vector length mismatch"
     env.close()
