@@ -10,8 +10,10 @@ import numpy as np
 from gymnasium.spaces import Space
 from numpy.typing import NDArray
 from prpl_utils.spaces import FunctionalSpace
+from relational_structs.utils import create_state_from_dict
 
 from prbench.envs.tidybot.mujoco_utils import MjAct, MjObs
+from prbench.envs.tidybot.object_types import MujocoObjectTypeFeatures
 from prbench.envs.tidybot.objects import Cube, MujocoObject
 from prbench.envs.tidybot.tidybot_rewards import create_reward_calculator
 from prbench.envs.tidybot.tidybot_robot_env import TidyBotRobotEnv
@@ -220,14 +222,9 @@ class TidyBot3DEnv(TidyBotRobotEnv):
         self._initialize_object_poses()
 
         # Get observation and vectorize
-        obs = super().get_obs()
+        obs = self.get_obs()
 
-        vec_obs = self._vectorize_observation(obs)
-
-        # NOTE: this will be refactored soon after we introduce object-centric structs.
-        final_obs = {"vec": vec_obs}
-
-        return final_obs, {}
+        return obs, {}
 
     def _visualize_image_in_window(
         self, image: NDArray[np.uint8], window_name: str
@@ -241,13 +238,27 @@ class TidyBot3DEnv(TidyBotRobotEnv):
             cv.imshow(window_name, display_image)  # pylint: disable=no-member
             cv.waitKey(1)  # pylint: disable=no-member
 
+    def get_obs(self) -> NDArray[np.float32]:
+        """Get the current observation."""
+        obs = super().get_obs()
+        vec_obs = self._vectorize_observation(obs)
+        object_centric_state = self._get_object_centric_state()
+        return {"vec": vec_obs, "object_centric_state": object_centric_state}
+
+    def _get_object_centric_state(self) -> dict[str, Any]:
+        """Get the current object-centric state of the environment."""
+        state_dict = {}
+        for obj in self._objects:
+            obj_data = obj.get_object_centric_data()
+            state_dict[obj.object_state_type] = obj_data
+        return create_state_from_dict(state_dict, MujocoObjectTypeFeatures)
+
     def step(self, action: MjAct) -> tuple[MjObs, float, bool, bool, dict[str, Any]]:
         # Run the action.
         super().step(action)
 
         # Get observation
         obs = self.get_obs()
-        vec_obs = self._vectorize_observation(obs)
 
         # Visualization loop for rendered image
         if self.show_images:
@@ -262,10 +273,7 @@ class TidyBot3DEnv(TidyBotRobotEnv):
         terminated = self._is_terminated(obs)
         truncated = False
 
-        # NOTE: this will be refactored soon after we introduce object-centric structs.
-        final_obs = {"vec": vec_obs}
-
-        return final_obs, reward, terminated, truncated, {}
+        return obs, reward, terminated, truncated, {}
 
     def reward(self, obs: MjObs) -> float:
         """Calculate reward based on task completion."""

@@ -5,33 +5,11 @@ from typing import Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
+from relational_structs import Object, ObjectCentricState, Type
+from relational_structs.utils import create_state_from_dict
 
 from prbench.envs.tidybot.mujoco_utils import MujocoEnv
-
-
-class MujocoObjectState:
-    """Class to represent the state of a MujocoObject."""
-
-    def __init__(
-        self,
-        position: NDArray[np.float32],
-        orientation: NDArray[np.float32],
-    ) -> None:
-        """Initialize a MujocoObjectState.
-
-        Args:
-            position: Position as [x, y, z] array
-            orientation: Orientation as quaternion [x, y, z, w] array
-        """
-        self.position = position
-        self.orientation = orientation
-
-    def __repr__(self) -> str:
-        """Detailed string representation of the object state."""
-        return (
-            f"MujocoObjectState(position={self.position.tolist()}, "
-            f"orientation={self.orientation.tolist()})"
-        )
+from prbench.envs.tidybot.object_types import MujocoObjectType
 
 
 class MujocoObject:
@@ -51,6 +29,9 @@ class MujocoObject:
         self.name = name
         self.joint_name = f"{name}_joint"
         self.env = env
+
+        # Create the corresponding Object for state representation key
+        self.object_state_type = Object(self.name, MujocoObjectType)
 
     def get_position(self) -> NDArray[np.float32]:
         """Get the object's current position.
@@ -155,11 +136,11 @@ class MujocoObject:
             self.joint_name, np.array(position), np.array(quaternion)
         )
 
-    def get_state(self) -> MujocoObjectState:
-        """Get the object's current state as a MujocoObjectState.
+    def get_object_centric_data(self) -> dict[str, float]:
+        """Get the object's current data.
 
         Returns:
-            MujocoObjectState with current position and orientation
+            dict with current position and orientation
 
         Raises:
             ValueError: If environment is not set
@@ -168,7 +149,18 @@ class MujocoObject:
             raise ValueError("Environment must be set to get state")
 
         pos, quat = self.env.get_joint_pos_quat(self.joint_name)
-        return MujocoObjectState(np.array(pos), np.array(quat))
+
+        # create and return the data
+        obj_data = {
+            "x": pos[0],
+            "y": pos[1],
+            "z": pos[2],
+            "qw": quat[0],
+            "qx": quat[1],
+            "qy": quat[2],
+            "qz": quat[3],
+        }
+        return obj_data
 
 
 class Cube(MujocoObject):
