@@ -172,7 +172,7 @@ def _main() -> None:
     parser.add_argument(
         "--force-tidybot",
         action="store_true",
-        help="Force regeneration of all environments",
+        help="Force regeneration of all environments for tidybot",
     )
     args = parser.parse_args()
 
